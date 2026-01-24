@@ -65,3 +65,14 @@
   - Fixed dictation audio session leak (deactivate on stop).
   - Fixed auto-scroll during streaming deltas by tracking last item signature.
   - Added image upload limits (resize to 1920px max, compress to JPEG 0.7, reject >2MB) with user-facing error alert.
+
+## 🧩 2026-01-24 — GPT 5.2 Pro Review Fixes Pass
+- **Status:** Complete ✅
+- **Notes:**
+  - Updated NSLocalNetworkUsageDescription copy to include "manage Codex sessions".
+  - Enforced terminal buffer cap at 50k chars per session.
+  - Updated dictation stop to deactivate audio session with error logging.
+  - Adjusted auto-scroll to track last item hash (streaming deltas).
+  - Added fallback image compression (0.4) when >2MB after primary compression.
+  - Standardized path comparison via URL.standardized.path in `pathsEquivalent`.
+  - Verified `swift build` for CodexMonitorRPC package.

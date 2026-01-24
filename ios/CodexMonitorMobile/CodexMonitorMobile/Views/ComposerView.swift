@@ -20,6 +20,7 @@ struct ComposerView: View {
     private let maxImageBytes = 2 * 1024 * 1024
     private let maxImageDimension: CGFloat = 1920
     private let imageCompressionQuality: CGFloat = 0.7
+    private let fallbackCompressionQuality: CGFloat = 0.4
 
     var body: some View {
         GlassPanel(cornerRadius: 20) {
@@ -163,7 +164,11 @@ struct ComposerView: View {
             return nil
         }
 
-        guard data.count <= maxImageBytes else {
+        if data.count > maxImageBytes {
+            if let smallerData = processedImage.jpegData(compressionQuality: fallbackCompressionQuality),
+               smallerData.count <= maxImageBytes {
+                return smallerData
+            }
             showImageError("Image too large. Max size is 2MB after compression.")
             return nil
         }

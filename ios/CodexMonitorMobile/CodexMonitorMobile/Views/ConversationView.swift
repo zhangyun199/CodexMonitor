@@ -24,7 +24,14 @@ struct ConversationView: View {
                 }
                 .padding()
             }
-            .onChange(of: itemsSignature) { _, _ in
+            .onChange(of: items.count) { _, _ in
+                if let last = items.last {
+                    withAnimation {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: lastItemHash) { _, _ in
                 if let last = items.last {
                     withAnimation {
                         proxy.scrollTo(last.id, anchor: .bottom)
@@ -34,13 +41,9 @@ struct ConversationView: View {
         }
     }
 
-    private var itemsSignature: String {
-        guard let last = items.last else { return "" }
-        let textCount = last.text?.count ?? 0
-        let summaryCount = last.summary?.count ?? 0
-        let contentCount = last.content?.count ?? 0
-        let outputCount = last.output?.count ?? 0
-        return "\(last.id)-\(textCount)-\(summaryCount)-\(contentCount)-\(outputCount)"
+    private var lastItemHash: Int {
+        guard let last = items.last else { return 0 }
+        return "\(last.id)-\(last.text?.count ?? 0)-\(last.output?.count ?? 0)".hashValue
     }
 
     private var items: [ConversationItem] {

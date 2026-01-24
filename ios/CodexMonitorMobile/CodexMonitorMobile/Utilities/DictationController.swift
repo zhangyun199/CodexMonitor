@@ -87,6 +87,10 @@ final class DictationController: ObservableObject {
         recognitionRequest = nil
         recognitionTask = nil
         isRecording = false
-        try? session.setActive(false, options: .notifyOthersOnDeactivation)
+        do {
+            try session.setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("Failed to deactivate audio session: \(error)")
+        }
     }
 }

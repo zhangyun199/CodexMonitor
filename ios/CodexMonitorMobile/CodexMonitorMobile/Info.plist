@@ -21,7 +21,7 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>CodexMonitor connects to your Mac Mini daemon over your local network.</string>
+	<string>CodexMonitor connects to your Mac Mini daemon over your local network to manage Codex sessions.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>CodexMonitor uses the microphone for dictation.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

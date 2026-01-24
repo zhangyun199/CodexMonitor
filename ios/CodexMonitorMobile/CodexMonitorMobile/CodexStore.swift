@@ -58,7 +58,7 @@ final class CodexStore: ObservableObject {
     @Published var debugEntries: [DebugEntry] = []
 
     private let maxItemsPerThread = 500
-    private let maxTerminalChars = 10_000
+    private let maxTerminalCharsPerSession = 50_000
 
     private let rpc = RPCClient()
     private var reconnectTask: Task<Void, Never>?
@@ -208,12 +208,11 @@ final class CodexStore: ObservableObject {
         guard let workspace = workspaces.first(where: { $0.id == workspaceId }) else { return }
         do {
             let response = try await api.listThreads(workspaceId: workspaceId, cursor: nil, limit: 50)
-            let workspacePath = normalizeRootPath(workspace.path)
             let matches = response.data.filter { record in
                 guard let cwd = record.cwd, !cwd.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                     return true
                 }
-                return pathsEquivalent(cwd, workspacePath: workspacePath)
+                return pathsEquivalent(cwd, workspace.path)
             }
             let filtered = matches.isEmpty ? response.data : matches
             if matches.isEmpty && !response.data.isEmpty {
@@ -222,7 +221,7 @@ final class CodexStore: ObservableObject {
                     label: "threads_filter_fallback",
                     payload: .object([
                         "workspacePath": .string(workspace.path),
-                        "workspaceNormalized": .string(workspacePath),
+                        "workspaceNormalized": .string(normalizeRootPath(workspace.path)),
                         "threadCount": .number(Double(response.data.count))
                     ])
                 )
@@ -573,8 +572,8 @@ final class CodexStore: ObservableObject {
         let key = "\(event.workspaceId)-\(event.terminalId)"
         let existing = terminalOutputBySession[key] ?? ""
         let combined = existing + event.data
-        if combined.count > maxTerminalChars {
-            terminalOutputBySession[key] = String(combined.suffix(maxTerminalChars))
+        if combined.count > maxTerminalCharsPerSession {
+            terminalOutputBySession[key] = String(combined.suffix(maxTerminalCharsPerSession))
         } else {
             terminalOutputBySession[key] = combined
         }
@@ -928,21 +927,9 @@ final class CodexStore: ObservableObject {
         return standardized.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
 
-    private func pathsEquivalent(_ cwd: String, workspacePath: String) -> Bool {
-        let normalizedCwd = normalizeRootPath(cwd)
-        if normalizedCwd == workspacePath {
-            return true
-        }
-        let workspaceComponents = workspacePath.split(separator: "/")
-        if let workspaceName = workspaceComponents.last {
-            let cwdComponents = normalizedCwd.split(separator: "/")
-            if let cwdName = cwdComponents.last, cwdName == workspaceName {
-                return true
-            }
-        }
-        if normalizedCwd.hasPrefix(workspacePath + "/") || workspacePath.hasPrefix(normalizedCwd + "/") {
-            return true
-        }
-        return false
+    private func pathsEquivalent(_ path1: String, _ path2: String) -> Bool {
+        let url1 = URL(fileURLWithPath: path1).standardized.path
+        let url2 = URL(fileURLWithPath: path2).standardized.path
+        return url1 == url2
     }
 }

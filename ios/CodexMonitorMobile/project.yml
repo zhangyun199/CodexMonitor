@@ -1,0 +1,29 @@
+name: CodexMonitorMobile
+options:
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+targets:
+  CodexMonitorMobile:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: CodexMonitorMobile
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.codexmonitor.mobile
+        INFOPLIST_FILE: CodexMonitorMobile/Info.plist
+    dependencies:
+      - package: CodexMonitorRPC
+        product: CodexMonitorRPC
+      - package: CodexMonitorRPC
+        product: CodexMonitorModels
+      - package: CodexMonitorRPC
+        product: CodexMonitorRendering
+packages:
+  CodexMonitorRPC:
+    path: ../Packages/CodexMonitorRPC

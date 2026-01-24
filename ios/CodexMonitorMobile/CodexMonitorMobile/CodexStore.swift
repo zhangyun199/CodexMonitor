@@ -1,0 +1,847 @@
+import Foundation
+import SwiftUI
+import CodexMonitorRPC
+import CodexMonitorModels
+
+@MainActor
+final class CodexStore: ObservableObject {
+    enum ConnectionState: Equatable {
+        case disconnected
+        case connecting
+        case connected
+        case error(String)
+    }
+
+    struct ThreadActivityStatus: Hashable {
+        var isProcessing: Bool = false
+        var hasUnread: Bool = false
+        var isReviewing: Bool = false
+        var processingStartedAt: Date?
+        var lastDurationMs: Double?
+    }
+
+    struct DebugEntry: Identifiable, Hashable {
+        var id: String
+        var timestamp: Date
+        var source: String
+        var label: String
+        var payload: JSONValue?
+    }
+
+    @Published var connectionState: ConnectionState = .disconnected
+    @Published var lastError: String?
+    @Published var host: String
+    @Published var port: String
+    @Published var token: String
+
+    @Published var workspaces: [WorkspaceInfo] = []
+    @Published var activeWorkspaceId: String?
+    @Published var activeThreadIdByWorkspace: [String: String?] = [:]
+    @Published var threadsByWorkspace: [String: [ThreadSummary]] = [:]
+    @Published var itemsByThread: [String: [ConversationItem]] = [:]
+    @Published var approvals: [ApprovalRequest] = []
+    @Published var threadStatusById: [String: ThreadActivityStatus] = [:]
+    @Published var activeTurnIdByThread: [String: String] = [:]
+    @Published var tokenUsageByThread: [String: ThreadTokenUsage] = [:]
+    @Published var rateLimitsByWorkspace: [String: RateLimitSnapshot?] = [:]
+    @Published var turnPlanByThread: [String: TurnPlan?] = [:]
+    @Published var lastAgentMessageByThread: [String: (text: String, timestamp: Date)] = [:]
+    @Published var gitStatusByWorkspace: [String: GitStatusResponse] = [:]
+    @Published var gitDiffsByWorkspace: [String: [GitFileDiff]] = [:]
+    @Published var gitLogByWorkspace: [String: GitLogResponse] = [:]
+    @Published var gitHubIssuesByWorkspace: [String: [GitHubIssue]] = [:]
+    @Published var gitHubPullsByWorkspace: [String: [GitHubPullRequest]] = [:]
+    @Published var filesByWorkspace: [String: [String]] = [:]
+    @Published var promptsByWorkspace: [String: [CustomPromptOption]] = [:]
+    @Published var terminalOutputBySession: [String: String] = [:]
+    @Published var usageSnapshot: LocalUsageSnapshot?
+    @Published var debugEntries: [DebugEntry] = []
+
+    private let rpc = RPCClient()
+    private var reconnectTask: Task<Void, Never>?
+    private var retryDelay: TimeInterval = 1.0
+    private var isBackgrounded = false
+
+    private var api: CodexMonitorAPI { CodexMonitorAPI(rpc: rpc) }
+
+    private let hostKey = "codex.monitor.host"
+    private let portKey = "codex.monitor.port"
+    private let tokenKey = "codex.monitor.token"
+
+    init() {
+        let defaults = UserDefaults.standard
+        host = defaults.string(forKey: hostKey) ?? ""
+        let storedPort = defaults.string(forKey: portKey) ?? "4732"
+        port = storedPort
+        token = KeychainHelper.readToken(key: tokenKey) ?? ""
+
+        rpc.onNotification = { [weak self] notification in
+            Task { @MainActor in
+                self?.handleNotification(notification)
+            }
+        }
+    }
+
+    func handleScenePhase(_ phase: ScenePhase) {
+        switch phase {
+        case .background:
+            isBackgrounded = true
+            disconnect()
+        case .active:
+            isBackgrounded = false
+            connect()
+        default:
+            break
+        }
+    }
+
+    func saveSettings() {
+        let defaults = UserDefaults.standard
+        defaults.setValue(host, forKey: hostKey)
+        defaults.setValue(port, forKey: portKey)
+        KeychainHelper.saveToken(token, key: tokenKey)
+    }
+
+    func connect() {
+        guard !isBackgrounded else { return }
+        guard connectionState != .connecting else { return }
+        let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        let portValue = UInt16(port) ?? 4732
+        let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedHost.isEmpty, !trimmedToken.isEmpty else {
+            connectionState = .error("Host and token required.")
+            return
+        }
+
+        connectionState = .connecting
+        saveSettings()
+        reconnectTask?.cancel()
+
+        let config = RPCClient.Config(host: trimmedHost, port: portValue, token: trimmedToken)
+        Task {
+            do {
+                try await rpc.connect(config)
+                connectionState = .connected
+                lastError = nil
+                retryDelay = 1.0
+                await refreshAfterConnect()
+            } catch {
+                let message = error.localizedDescription
+                connectionState = .error(message)
+                lastError = message
+                scheduleReconnect()
+            }
+        }
+    }
+
+    func ping() async -> Bool {
+        do {
+            let response = try await api.ping()
+            return response.ok
+        } catch {
+            lastError = error.localizedDescription
+            return false
+        }
+    }
+
+    func disconnect() {
+        rpc.disconnect()
+        connectionState = .disconnected
+    }
+
+    private func scheduleReconnect() {
+        reconnectTask?.cancel()
+        reconnectTask = Task { [weak self] in
+            guard let self else { return }
+            let delay = retryDelay
+            retryDelay = min(retryDelay * 2, 30)
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            await MainActor.run { self.connect() }
+        }
+    }
+
+    func refreshAfterConnect() async {
+        await refreshWorkspaces()
+        guard let workspaceId = activeWorkspaceId ?? workspaces.first?.id else { return }
+        await connectWorkspace(id: workspaceId)
+        await refreshThreads(for: workspaceId)
+        await refreshUsage()
+    }
+
+    func refreshWorkspaces() async {
+        do {
+            let list = try await api.listWorkspaces()
+            workspaces = list
+            if activeWorkspaceId == nil {
+                activeWorkspaceId = list.first?.id
+            }
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func addWorkspace(path: String, codexBin: String?) async {
+        do {
+            _ = try await api.addWorkspace(path: path, codexBin: codexBin)
+            await refreshWorkspaces()
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func connectWorkspace(id: String) async {
+        do {
+            try await api.connectWorkspace(id: id)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func refreshThreads(for workspaceId: String) async {
+        guard let workspace = workspaces.first(where: { $0.id == workspaceId }) else { return }
+        do {
+            let response = try await api.listThreads(workspaceId: workspaceId, cursor: nil, limit: 50)
+            let filtered = response.data.filter { record in
+                guard let cwd = record.cwd else { return false }
+                return normalizeRootPath(cwd) == normalizeRootPath(workspace.path)
+            }
+            let summaries = filtered.map { record -> ThreadSummary in
+                let name = record.name ?? record.title ?? record.id
+                let updated = record.updatedAt ?? record.updated_at ?? record.createdAt ?? record.created_at ?? Date().timeIntervalSince1970 * 1000
+                return ThreadSummary(id: record.id, name: name, updatedAt: updated)
+            }
+            threadsByWorkspace[workspaceId] = summaries.sorted { $0.updatedAt > $1.updatedAt }
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func startThread(in workspaceId: String) async -> String? {
+        do {
+            let response = try await api.startThread(workspaceId: workspaceId)
+            let thread = response.thread ?? response.result?.thread
+            guard let threadId = thread?.id else { return nil }
+            await refreshThreads(for: workspaceId)
+            activeWorkspaceId = workspaceId
+            activeThreadIdByWorkspace[workspaceId] = threadId
+            return threadId
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    func resumeThread(workspaceId: String, threadId: String) async {
+        do {
+            _ = try await api.resumeThread(workspaceId: workspaceId, threadId: threadId)
+            activeWorkspaceId = workspaceId
+            activeThreadIdByWorkspace[workspaceId] = threadId
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func sendMessage(
+        workspaceId: String,
+        threadId: String,
+        text: String,
+        model: String? = nil,
+        effort: String? = nil,
+        accessMode: AccessMode? = nil,
+        images: [String]? = nil
+    ) async {
+        do {
+            _ = try await api.sendUserMessage(
+                workspaceId: workspaceId,
+                threadId: threadId,
+                text: text,
+                model: model,
+                effort: effort,
+                accessMode: accessMode,
+                images: images
+            )
+        } catch {
+            lastError = error.localizedDescription
+            appendSystemMessage(threadId: threadId, text: "Send failed: \(error.localizedDescription)")
+        }
+    }
+
+    func interruptTurn(workspaceId: String, threadId: String) async {
+        guard let turnId = activeTurnIdByThread[threadId] else { return }
+        do {
+            try await api.interruptTurn(workspaceId: workspaceId, threadId: threadId, turnId: turnId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func respondToApproval(_ approval: ApprovalRequest, decision: ApprovalDecision) async {
+        do {
+            try await api.respondToServerRequest(workspaceId: approval.workspaceId, requestId: approval.requestId, decision: decision)
+            approvals.removeAll { $0.id == approval.id }
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func refreshGitStatus(workspaceId: String) async {
+        do {
+            let status = try await api.getGitStatus(workspaceId: workspaceId)
+            gitStatusByWorkspace[workspaceId] = status
+            let diffs = try await api.getGitDiffs(workspaceId: workspaceId)
+            gitDiffsByWorkspace[workspaceId] = diffs
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func stageGitFile(workspaceId: String, path: String) async {
+        do {
+            try await api.stageGitFile(workspaceId: workspaceId, path: path)
+            await refreshGitStatus(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func unstageGitFile(workspaceId: String, path: String) async {
+        do {
+            try await api.unstageGitFile(workspaceId: workspaceId, path: path)
+            await refreshGitStatus(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func revertGitFile(workspaceId: String, path: String) async {
+        do {
+            try await api.revertGitFile(workspaceId: workspaceId, path: path)
+            await refreshGitStatus(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func stageAll(workspaceId: String) async {
+        do {
+            try await api.stageGitAll(workspaceId: workspaceId)
+            await refreshGitStatus(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func revertAll(workspaceId: String) async {
+        do {
+            try await api.revertGitAll(workspaceId: workspaceId)
+            await refreshGitStatus(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func commit(workspaceId: String, message: String) async {
+        do {
+            try await api.commitGit(workspaceId: workspaceId, message: message)
+            await refreshGitStatus(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func generateCommitMessage(workspaceId: String) async -> String? {
+        do {
+            return try await api.generateCommitMessage(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    func pull(workspaceId: String) async {
+        do {
+            try await api.pullGit(workspaceId: workspaceId)
+            await refreshGitStatus(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func push(workspaceId: String) async {
+        do {
+            try await api.pushGit(workspaceId: workspaceId)
+            await refreshGitStatus(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func sync(workspaceId: String) async {
+        do {
+            try await api.syncGit(workspaceId: workspaceId)
+            await refreshGitStatus(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func refreshGitLog(workspaceId: String) async {
+        do {
+            let log = try await api.getGitLog(workspaceId: workspaceId, limit: 50)
+            gitLogByWorkspace[workspaceId] = log
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func refreshGitHubIssues(workspaceId: String) async {
+        do {
+            let response = try await api.getGitHubIssues(workspaceId: workspaceId)
+            gitHubIssuesByWorkspace[workspaceId] = response.issues
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func refreshGitHubPulls(workspaceId: String) async {
+        do {
+            let response = try await api.getGitHubPullRequests(workspaceId: workspaceId)
+            gitHubPullsByWorkspace[workspaceId] = response.pullRequests
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func fetchPullRequestDiff(workspaceId: String, prNumber: Int) async -> [GitHubPullRequestDiff] {
+        do {
+            return try await api.getGitHubPullRequestDiff(workspaceId: workspaceId, prNumber: prNumber)
+        } catch {
+            lastError = error.localizedDescription
+            return []
+        }
+    }
+
+    func fetchPullRequestComments(workspaceId: String, prNumber: Int) async -> [GitHubPullRequestComment] {
+        do {
+            return try await api.getGitHubPullRequestComments(workspaceId: workspaceId, prNumber: prNumber)
+        } catch {
+            lastError = error.localizedDescription
+            return []
+        }
+    }
+
+    func refreshFiles(workspaceId: String) async {
+        do {
+            let files = try await api.listWorkspaceFiles(workspaceId: workspaceId)
+            filesByWorkspace[workspaceId] = files
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func readFile(workspaceId: String, path: String) async -> WorkspaceFileResponse? {
+        do {
+            return try await api.readWorkspaceFile(workspaceId: workspaceId, path: path)
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    func refreshPrompts(workspaceId: String) async {
+        do {
+            let prompts = try await api.promptsList(workspaceId: workspaceId)
+            promptsByWorkspace[workspaceId] = prompts
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func createPrompt(workspaceId: String, scope: PromptScope, name: String, description: String?, argumentHint: String?, content: String) async {
+        do {
+            _ = try await api.promptsCreate(
+                workspaceId: workspaceId,
+                scope: scope,
+                name: name,
+                description: description,
+                argumentHint: argumentHint,
+                content: content
+            )
+            await refreshPrompts(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func deletePrompt(workspaceId: String, path: String) async {
+        do {
+            try await api.promptsDelete(workspaceId: workspaceId, path: path)
+            await refreshPrompts(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func refreshUsage() async {
+        do {
+            usageSnapshot = try await api.localUsageSnapshot(days: 30)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func openTerminal(workspaceId: String, terminalId: String, cols: Int, rows: Int) async {
+        do {
+            _ = try await api.terminalOpen(workspaceId: workspaceId, terminalId: terminalId, cols: cols, rows: rows)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func writeTerminal(workspaceId: String, terminalId: String, data: String) async {
+        do {
+            try await api.terminalWrite(workspaceId: workspaceId, terminalId: terminalId, data: data)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func closeTerminal(workspaceId: String, terminalId: String) async {
+        do {
+            try await api.terminalClose(workspaceId: workspaceId, terminalId: terminalId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func resizeTerminal(workspaceId: String, terminalId: String, cols: Int, rows: Int) async {
+        do {
+            try await api.terminalResize(workspaceId: workspaceId, terminalId: terminalId, cols: cols, rows: rows)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    // MARK: - Notifications
+    private func handleNotification(_ notification: RPCNotification) {
+        switch notification.method {
+        case "app-server-event":
+            if let params = notification.params,
+               let event = try? params.decode(AppServerEvent.self) {
+                handleAppServerEvent(event)
+            }
+        case "terminal-output":
+            if let params = notification.params,
+               let event = try? params.decode(TerminalOutputEvent.self) {
+                handleTerminalOutput(event)
+            }
+        default:
+            break
+        }
+    }
+
+    private func handleTerminalOutput(_ event: TerminalOutputEvent) {
+        let key = "\(event.workspaceId)-\(event.terminalId)"
+        let existing = terminalOutputBySession[key] ?? ""
+        terminalOutputBySession[key] = existing + event.data
+    }
+
+    private func handleAppServerEvent(_ event: AppServerEvent) {
+        guard case .object(let message) = event.message else { return }
+        let method = message["method"]?.asString() ?? ""
+        logDebug(source: "event", label: method.isEmpty ? "app-server-event" : method, payload: event.message)
+
+        if method == "codex/connected" {
+            Task { await refreshWorkspaces() }
+            return
+        }
+
+        if method.contains("requestApproval"),
+           let id = message["id"]?.asNumber().map(Int.init) {
+            let params = message["params"]?.objectValue ?? [:]
+            approvals.append(
+                ApprovalRequest(
+                    workspaceId: event.workspaceId,
+                    requestId: id,
+                    method: method,
+                    params: params
+                )
+            )
+            return
+        }
+
+        if method == "item/agentMessage/delta" {
+            let params = message["params"]?.objectValue ?? [:]
+            let threadId = params["threadId"]?.asString()
+                ?? params["thread_id"]?.asString()
+                ?? ""
+            let itemId = params["itemId"]?.asString()
+                ?? params["item_id"]?.asString()
+                ?? ""
+            let delta = params["delta"]?.asString() ?? ""
+            guard !threadId.isEmpty, !itemId.isEmpty, !delta.isEmpty else { return }
+            ensureThread(workspaceId: event.workspaceId, threadId: threadId)
+            markProcessing(threadId: threadId, isProcessing: true)
+            appendAgentDelta(workspaceId: event.workspaceId, threadId: threadId, itemId: itemId, delta: delta)
+            return
+        }
+
+        if method == "item/completed" {
+            let params = message["params"]?.objectValue ?? [:]
+            let threadId = params["threadId"]?.asString()
+                ?? params["thread_id"]?.asString()
+                ?? ""
+            let itemValue = params["item"]
+            if let itemValue {
+                if let item = ConversationHelpers.buildConversationItem(from: itemValue) {
+                    upsertItem(threadId: threadId, item: item)
+                }
+                if case .object(let itemDict) = itemValue,
+                   itemDict["type"]?.asString() == "agentMessage" {
+                    let itemId = itemDict["id"]?.asString() ?? ""
+                    let text = itemDict["text"]?.asString() ?? ""
+                    if !itemId.isEmpty {
+                        completeAgentMessage(workspaceId: event.workspaceId, threadId: threadId, itemId: itemId, text: text)
+                    }
+                }
+            }
+            return
+        }
+
+        if method == "item/started" {
+            let params = message["params"]?.objectValue ?? [:]
+            let threadId = params["threadId"]?.asString()
+                ?? params["thread_id"]?.asString()
+                ?? ""
+            if let itemValue = params["item"],
+               let item = ConversationHelpers.buildConversationItem(from: itemValue) {
+                upsertItem(threadId: threadId, item: item)
+            }
+            return
+        }
+
+        if method == "item/reasoning/summaryTextDelta" {
+            let params = message["params"]?.objectValue ?? [:]
+            let threadId = params["threadId"]?.asString() ?? params["thread_id"]?.asString() ?? ""
+            let itemId = params["itemId"]?.asString() ?? params["item_id"]?.asString() ?? ""
+            let delta = params["delta"]?.asString() ?? ""
+            appendReasoning(threadId: threadId, itemId: itemId, delta: delta, isSummary: true)
+            return
+        }
+
+        if method == "item/reasoning/textDelta" {
+            let params = message["params"]?.objectValue ?? [:]
+            let threadId = params["threadId"]?.asString() ?? params["thread_id"]?.asString() ?? ""
+            let itemId = params["itemId"]?.asString() ?? params["item_id"]?.asString() ?? ""
+            let delta = params["delta"]?.asString() ?? ""
+            appendReasoning(threadId: threadId, itemId: itemId, delta: delta, isSummary: false)
+            return
+        }
+
+        if method == "item/commandExecution/outputDelta" || method == "item/fileChange/outputDelta" {
+            let params = message["params"]?.objectValue ?? [:]
+            let threadId = params["threadId"]?.asString() ?? params["thread_id"]?.asString() ?? ""
+            let itemId = params["itemId"]?.asString() ?? params["item_id"]?.asString() ?? ""
+            let delta = params["delta"]?.asString() ?? ""
+            appendToolOutput(threadId: threadId, itemId: itemId, delta: delta)
+            return
+        }
+
+        if method == "turn/started" {
+            let params = message["params"]?.objectValue ?? [:]
+            let threadId = params["threadId"]?.asString()
+                ?? params["thread_id"]?.asString()
+                ?? params["turn"]?.objectValue?["threadId"]?.asString()
+                ?? params["turn"]?.objectValue?["thread_id"]?.asString()
+                ?? ""
+            let turnId = params["turnId"]?.asString()
+                ?? params["turn_id"]?.asString()
+                ?? params["turn"]?.objectValue?["id"]?.asString()
+                ?? ""
+            if !threadId.isEmpty {
+                markProcessing(threadId: threadId, isProcessing: true)
+                if !turnId.isEmpty {
+                    activeTurnIdByThread[threadId] = turnId
+                }
+            }
+            return
+        }
+
+        if method == "turn/completed" {
+            let params = message["params"]?.objectValue ?? [:]
+            let threadId = params["threadId"]?.asString()
+                ?? params["thread_id"]?.asString()
+                ?? params["turn"]?.objectValue?["threadId"]?.asString()
+                ?? params["turn"]?.objectValue?["thread_id"]?.asString()
+                ?? ""
+            if !threadId.isEmpty {
+                markProcessing(threadId: threadId, isProcessing: false)
+                activeTurnIdByThread.removeValue(forKey: threadId)
+            }
+            return
+        }
+
+        if method == "turn/plan/updated" {
+            let params = message["params"]?.objectValue ?? [:]
+            let threadId = params["threadId"]?.asString() ?? params["thread_id"]?.asString() ?? ""
+            if let planValue = params["plan"],
+               let plan = try? planValue.decode([TurnPlanStep].self) {
+                let explanation = params["explanation"]?.asString()
+                let turnId = params["turnId"]?.asString() ?? params["turn_id"]?.asString() ?? ""
+                turnPlanByThread[threadId] = TurnPlan(turnId: turnId, explanation: explanation, steps: plan)
+            }
+            return
+        }
+
+        if method == "thread/tokenUsage/updated" {
+            let params = message["params"]?.objectValue ?? [:]
+            let threadId = params["threadId"]?.asString() ?? params["thread_id"]?.asString() ?? ""
+            let usageValue = params["tokenUsage"] ?? params["token_usage"]
+            if let usageValue,
+               let usage = try? usageValue.decode(ThreadTokenUsage.self) {
+                tokenUsageByThread[threadId] = usage
+            }
+            return
+        }
+
+        if method == "account/rateLimits/updated" {
+            let params = message["params"]?.objectValue ?? [:]
+            if let rateLimitsValue = params["rateLimits"] ?? params["rate_limits"],
+               let snapshot = try? rateLimitsValue.decode(RateLimitSnapshot.self) {
+                rateLimitsByWorkspace[event.workspaceId] = snapshot
+            }
+            return
+        }
+
+        if method == "error" {
+            let params = message["params"]?.objectValue ?? [:]
+            let threadId = params["threadId"]?.asString() ?? params["thread_id"]?.asString() ?? ""
+            let errorMessage = params["error"]?.objectValue?["message"]?.asString() ?? "Turn failed."
+            markProcessing(threadId: threadId, isProcessing: false)
+            appendSystemMessage(threadId: threadId, text: errorMessage)
+            return
+        }
+    }
+
+    // MARK: - Item helpers
+    private func ensureThread(workspaceId: String, threadId: String) {
+        if threadsByWorkspace[workspaceId]?.contains(where: { $0.id == threadId }) == false {
+            var list = threadsByWorkspace[workspaceId] ?? []
+            list.insert(ThreadSummary(id: threadId, name: threadId, updatedAt: Date().timeIntervalSince1970 * 1000), at: 0)
+            threadsByWorkspace[workspaceId] = list
+        }
+    }
+
+    private func appendAgentDelta(workspaceId: String, threadId: String, itemId: String, delta: String) {
+        var list = itemsByThread[threadId] ?? []
+        if let index = list.firstIndex(where: { $0.id == itemId }) {
+            var item = list[index]
+            item.text = ConversationHelpers.mergeStreamingText(existing: item.text ?? "", delta: delta)
+            list[index] = item
+        } else {
+            list.append(ConversationItem(id: itemId, kind: .message, role: .assistant, text: delta))
+        }
+        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(list)
+    }
+
+    private func completeAgentMessage(workspaceId: String, threadId: String, itemId: String, text: String) {
+        var list = itemsByThread[threadId] ?? []
+        if let index = list.firstIndex(where: { $0.id == itemId }) {
+            var item = list[index]
+            item.text = text.isEmpty ? item.text : text
+            list[index] = item
+        } else {
+            list.append(ConversationItem(id: itemId, kind: .message, role: .assistant, text: text))
+        }
+        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(list)
+
+        let timestamp = Date()
+        lastAgentMessageByThread[threadId] = (text: text, timestamp: timestamp)
+        markProcessing(threadId: threadId, isProcessing: false)
+        updateThreadTimestamp(workspaceId: workspaceId, threadId: threadId, timestamp: timestamp)
+        if activeThreadIdByWorkspace[workspaceId] ?? nil != threadId {
+            markUnread(threadId: threadId, hasUnread: true)
+        }
+    }
+
+    private func upsertItem(threadId: String, item: ConversationItem) {
+        let list = itemsByThread[threadId] ?? []
+        let next = ConversationHelpers.upsertItem(list, item: item)
+        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(next)
+    }
+
+    private func appendReasoning(threadId: String, itemId: String, delta: String, isSummary: Bool) {
+        guard !threadId.isEmpty, !itemId.isEmpty, !delta.isEmpty else { return }
+        var list = itemsByThread[threadId] ?? []
+        if let index = list.firstIndex(where: { $0.id == itemId }) {
+            var item = list[index]
+            if isSummary {
+                item.summary = ConversationHelpers.mergeStreamingText(existing: item.summary ?? "", delta: delta)
+            } else {
+                item.content = ConversationHelpers.mergeStreamingText(existing: item.content ?? "", delta: delta)
+            }
+            list[index] = item
+        } else {
+            let item = ConversationItem(id: itemId, kind: .reasoning, summary: isSummary ? delta : "", content: isSummary ? "" : delta)
+            list.append(item)
+        }
+        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(list)
+    }
+
+    private func appendToolOutput(threadId: String, itemId: String, delta: String) {
+        guard !threadId.isEmpty, !itemId.isEmpty else { return }
+        var list = itemsByThread[threadId] ?? []
+        guard let index = list.firstIndex(where: { $0.id == itemId }) else { return }
+        var item = list[index]
+        item.output = ConversationHelpers.mergeStreamingText(existing: item.output ?? "", delta: delta)
+        list[index] = item
+        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(list)
+    }
+
+    private func appendSystemMessage(threadId: String, text: String) {
+        guard !threadId.isEmpty else { return }
+        var list = itemsByThread[threadId] ?? []
+        list.append(ConversationItem(id: UUID().uuidString, kind: .message, role: .assistant, text: text))
+        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(list)
+    }
+
+    private func markProcessing(threadId: String, isProcessing: Bool) {
+        var status = threadStatusById[threadId] ?? ThreadActivityStatus()
+        status.isProcessing = isProcessing
+        if isProcessing {
+            status.processingStartedAt = Date()
+        } else if let started = status.processingStartedAt {
+            status.lastDurationMs = Date().timeIntervalSince(started) * 1000
+        }
+        threadStatusById[threadId] = status
+    }
+
+    private func markUnread(threadId: String, hasUnread: Bool) {
+        var status = threadStatusById[threadId] ?? ThreadActivityStatus()
+        status.hasUnread = hasUnread
+        threadStatusById[threadId] = status
+    }
+
+    private func updateThreadTimestamp(workspaceId: String, threadId: String, timestamp: Date) {
+        guard var list = threadsByWorkspace[workspaceId] else { return }
+        let timeMs = timestamp.timeIntervalSince1970 * 1000
+        list = list.map { summary in
+            if summary.id == threadId && summary.updatedAt < timeMs {
+                return ThreadSummary(id: summary.id, name: summary.name, updatedAt: timeMs)
+            }
+            return summary
+        }
+        threadsByWorkspace[workspaceId] = list.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    private func logDebug(source: String, label: String, payload: JSONValue?) {
+        debugEntries.append(DebugEntry(id: UUID().uuidString, timestamp: Date(), source: source, label: label, payload: payload))
+        if debugEntries.count > 200 {
+            debugEntries.removeFirst(debugEntries.count - 200)
+        }
+    }
+
+    private func normalizeRootPath(_ path: String) -> String {
+        path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+}

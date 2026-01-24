@@ -46,3 +46,12 @@
   - Updated `ThreadsListView.swift` with smart timestamp detection (ms vs seconds), UUID name fallback display, and selection visual feedback
   - Updated `SettingsView.swift` with new Appearance section for gradient picker
   - Fixed Xcode project.pbxproj to include new utility files in build
+
+## 🧩 2026-01-24 — iOS Thread History Sync Fix
+- **Status:** Complete ✅
+- **Notes:**
+  - Fixed iOS thread list names to use `preview` when `name/title` are missing.
+  - Added decoding for `ThreadTurn` + `ThreadRecord.preview` + `ThreadRecord.turns`.
+  - `resume_thread` now loads historical turns into `itemsByThread`.
+  - Conversation history now renders `agentMessage` items as assistant messages.
+  - Added debug-panel entry `thread_history_loaded` with turn/item counts.

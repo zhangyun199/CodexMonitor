@@ -205,12 +205,27 @@ final class CodexStore: ObservableObject {
         guard let workspace = workspaces.first(where: { $0.id == workspaceId }) else { return }
         do {
             let response = try await api.listThreads(workspaceId: workspaceId, cursor: nil, limit: 50)
-            let filtered = response.data.filter { record in
-                guard let cwd = record.cwd else { return false }
-                return normalizeRootPath(cwd) == normalizeRootPath(workspace.path)
+            let workspacePath = normalizeRootPath(workspace.path)
+            let matches = response.data.filter { record in
+                guard let cwd = record.cwd, !cwd.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    return true
+                }
+                return pathsEquivalent(cwd, workspacePath: workspacePath)
+            }
+            let filtered = matches.isEmpty ? response.data : matches
+            if matches.isEmpty && !response.data.isEmpty {
+                logDebug(
+                    source: "threads",
+                    label: "threads_filter_fallback",
+                    payload: .object([
+                        "workspacePath": .string(workspace.path),
+                        "workspaceNormalized": .string(workspacePath),
+                        "threadCount": .number(Double(response.data.count))
+                    ])
+                )
             }
             let summaries = filtered.map { record -> ThreadSummary in
-                let name = record.name ?? record.title ?? record.id
+                let name = record.name ?? record.title ?? record.preview ?? record.id
                 let updated = record.updatedAt ?? record.updated_at ?? record.createdAt ?? record.created_at ?? Date().timeIntervalSince1970 * 1000
                 return ThreadSummary(id: record.id, name: name, updatedAt: updated)
             }
@@ -237,9 +252,16 @@ final class CodexStore: ObservableObject {
 
     func resumeThread(workspaceId: String, threadId: String) async {
         do {
-            _ = try await api.resumeThread(workspaceId: workspaceId, threadId: threadId)
+            let response = try await api.resumeThread(workspaceId: workspaceId, threadId: threadId)
+            let thread = response.thread ?? response.result?.thread
             activeWorkspaceId = workspaceId
             activeThreadIdByWorkspace[workspaceId] = threadId
+            if let preview = thread?.preview, !preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                updateThreadName(workspaceId: workspaceId, threadId: threadId, name: preview)
+            }
+            if let turns = thread?.turns {
+                loadThreadHistory(workspaceId: workspaceId, threadId: threadId, turns: turns)
+            }
         } catch {
             lastError = error.localizedDescription
         }
@@ -809,6 +831,31 @@ final class CodexStore: ObservableObject {
         itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(list)
     }
 
+    private func loadThreadHistory(workspaceId: String, threadId: String, turns: [ThreadTurn]) {
+        var items: [ConversationItem] = []
+        for turn in turns {
+            let turnItems = turn.items ?? []
+            for raw in turnItems {
+                if let item = ConversationHelpers.buildConversationItem(from: raw) {
+                    items.append(item)
+                }
+            }
+        }
+        logDebug(
+            source: "threads",
+            label: "thread_history_loaded",
+            payload: .object([
+                "threadId": .string(threadId),
+                "turnCount": .number(Double(turns.count)),
+                "itemCount": .number(Double(items.count))
+            ])
+        )
+        if !items.isEmpty {
+            itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(items)
+            updateThreadTimestamp(workspaceId: workspaceId, threadId: threadId, timestamp: Date())
+        }
+    }
+
     private func markProcessing(threadId: String, isProcessing: Bool) {
         var status = threadStatusById[threadId] ?? ThreadActivityStatus()
         status.isProcessing = isProcessing
@@ -838,6 +885,21 @@ final class CodexStore: ObservableObject {
         threadsByWorkspace[workspaceId] = list.sorted { $0.updatedAt > $1.updatedAt }
     }
 
+    private func updateThreadName(workspaceId: String, threadId: String, name: String) {
+        guard var list = threadsByWorkspace[workspaceId], !name.isEmpty else { return }
+        var updated = false
+        list = list.map { summary in
+            if summary.id == threadId && summary.name != name {
+                updated = true
+                return ThreadSummary(id: summary.id, name: name, updatedAt: summary.updatedAt)
+            }
+            return summary
+        }
+        if updated {
+            threadsByWorkspace[workspaceId] = list.sorted { $0.updatedAt > $1.updatedAt }
+        }
+    }
+
     private func logDebug(source: String, label: String, payload: JSONValue?) {
         debugEntries.append(DebugEntry(id: UUID().uuidString, timestamp: Date(), source: source, label: label, payload: payload))
         if debugEntries.count > 200 {
@@ -846,6 +908,25 @@ final class CodexStore: ObservableObject {
     }
 
     private func normalizeRootPath(_ path: String) -> String {
-        path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let standardized = URL(fileURLWithPath: path).standardizedFileURL.path
+        return standardized.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    private func pathsEquivalent(_ cwd: String, workspacePath: String) -> Bool {
+        let normalizedCwd = normalizeRootPath(cwd)
+        if normalizedCwd == workspacePath {
+            return true
+        }
+        let workspaceComponents = workspacePath.split(separator: "/")
+        if let workspaceName = workspaceComponents.last {
+            let cwdComponents = normalizedCwd.split(separator: "/")
+            if let cwdName = cwdComponents.last, cwdName == workspaceName {
+                return true
+            }
+        }
+        if normalizedCwd.hasPrefix(workspacePath + "/") || workspacePath.hasPrefix(normalizedCwd + "/") {
+            return true
+        }
+        return false
     }
 }

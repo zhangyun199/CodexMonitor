@@ -237,15 +237,29 @@ public struct ThreadSummary: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
+public struct ThreadTurn: Codable, Hashable, Sendable {
+    public var id: String?
+    public var items: [JSONValue]?
+    public var error: JSONValue?
+
+    public init(id: String? = nil, items: [JSONValue]? = nil, error: JSONValue? = nil) {
+        self.id = id
+        self.items = items
+        self.error = error
+    }
+}
+
 public struct ThreadRecord: Codable, Hashable, Sendable, Identifiable {
     public var id: String
     public var name: String?
     public var title: String?
+    public var preview: String?
     public var cwd: String?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var created_at: Double?
     public var updated_at: Double?
+    public var turns: [ThreadTurn]?
 }
 
 public struct ThreadListResponse: Codable, Sendable {

@@ -107,7 +107,8 @@ public enum ConversationHelpers {
         guard !type.isEmpty, !id.isEmpty else { return nil }
 
         if type == "agentMessage" {
-            return nil
+            let text = asString(item["text"])
+            return ConversationItem(id: id, kind: .message, role: .assistant, text: text.isEmpty ? "[message]" : text)
         }
         if type == "userMessage" {
             let content = item["content"]?.arrayValue ?? []

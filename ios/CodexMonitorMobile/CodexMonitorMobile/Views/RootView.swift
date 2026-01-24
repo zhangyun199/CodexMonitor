@@ -93,6 +93,7 @@ private struct PhoneRootView: View {
                     Label("Log", systemImage: "waveform.path.ecg")
                 }
             }
+            .background(.clear)
         }
     }
 }
@@ -162,6 +163,8 @@ private struct TabletRootView: View {
                     }
                 }
             }
+            .navigationSplitViewStyle(.balanced)
+            .background(.clear)
         }
     }
 }

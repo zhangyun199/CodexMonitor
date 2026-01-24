@@ -41,6 +41,8 @@ struct ProjectsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(.clear)
         .navigationTitle("Projects")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {

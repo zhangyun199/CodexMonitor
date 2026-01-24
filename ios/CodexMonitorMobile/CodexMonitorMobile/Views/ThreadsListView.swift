@@ -94,6 +94,8 @@ struct ThreadsListView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(.clear)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: {

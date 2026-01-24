@@ -39,7 +39,10 @@
 - **Notes:**
   - Added `ThemeGradient.swift` with 4 selectable gradient backgrounds (Midnight Blue, Ocean Deep, Cosmic Purple, Slate Dark)
   - Added `ColorExtension.swift` with hex color initializer
-  - Updated `RootView.swift` to wrap Phone/Tablet layouts in ZStack with gradient background (fixes black background issue — glass needs content to lens)
+  - Added `GradientBackground.swift` — reusable gradient view with `@AppStorage` theme binding
+  - Key insight: NavigationSplitView has opaque UIKit layers that can't be cleared from outside
+  - **Solution:** Apply gradient INSIDE each column view using `.background { GradientBackground() }` + `.scrollContentBackground(.hidden)`
+  - Updated all views (RootView, ThreadsListView, WorkspaceListView, ConversationTabView, GitView, FilesView, PromptsView, TerminalView, DebugLogView, ProjectsView) with gradient backgrounds
   - Updated `ThreadsListView.swift` with smart timestamp detection (ms vs seconds), UUID name fallback display, and selection visual feedback
   - Updated `SettingsView.swift` with new Appearance section for gradient picker
   - Fixed Xcode project.pbxproj to include new utility files in build

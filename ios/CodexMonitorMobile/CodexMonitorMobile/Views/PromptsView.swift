@@ -35,7 +35,9 @@ struct PromptsView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
-                .background(.clear)
+                .background {
+                    GradientBackground()
+                }
                 .task { await store.refreshPrompts(workspaceId: workspaceId) }
                 .refreshable { await store.refreshPrompts(workspaceId: workspaceId) }
                 .toolbar {

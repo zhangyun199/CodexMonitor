@@ -42,7 +42,9 @@ struct ProjectsView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(.clear)
+        .background {
+            GradientBackground()
+        }
         .navigationTitle("Projects")
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {

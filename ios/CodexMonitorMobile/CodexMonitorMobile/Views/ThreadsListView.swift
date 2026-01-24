@@ -95,7 +95,9 @@ struct ThreadsListView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(.clear)
+        .background {
+            GradientBackground()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: {

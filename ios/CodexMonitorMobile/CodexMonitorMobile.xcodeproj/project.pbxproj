@@ -14,6 +14,7 @@
 		AA1122334455667788990011 /* ColorExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1122334455667788990011 /* ColorExtension.swift */; };
 		CC1122334455667788990011 /* ThemeGradient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1122334455667788990011 /* ThemeGradient.swift */; };
 		EE1122334455667788990011 /* BackgroundClearer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF1122334455667788990011 /* BackgroundClearer.swift */; };
+		A01122334455667788990011 /* GradientBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = B01122334455667788990011 /* GradientBackground.swift */; };
 		1A3E8FBDE1ADAEE4363F8302 /* ComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF38ECB2DE05396E6A7682A /* ComposerView.swift */; };
 		1A66DD6B664167EFE7A62F58 /* DebugLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31AB4D3EF9E188DAB8DA7C75 /* DebugLogView.swift */; };
 		47D2F022DA79E1A866DBD505 /* GitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 332924F0468527C55DB195B9 /* GitView.swift */; };
@@ -40,6 +41,7 @@
 		BB1122334455667788990011 /* ColorExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorExtension.swift; sourceTree = "<group>"; };
 		DD1122334455667788990011 /* ThemeGradient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeGradient.swift; sourceTree = "<group>"; };
 		FF1122334455667788990011 /* BackgroundClearer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundClearer.swift; sourceTree = "<group>"; };
+		B01122334455667788990011 /* GradientBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientBackground.swift; sourceTree = "<group>"; };
 		31AB4D3EF9E188DAB8DA7C75 /* DebugLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLogView.swift; sourceTree = "<group>"; };
 		332924F0468527C55DB195B9 /* GitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitView.swift; sourceTree = "<group>"; };
 		37C29E5C3611320FC10D9ED7 /* ConnectionStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusView.swift; sourceTree = "<group>"; };
@@ -141,6 +143,7 @@
 				FF1122334455667788990011 /* BackgroundClearer.swift */,
 				BB1122334455667788990011 /* ColorExtension.swift */,
 				4A254DC55323C0A29A41B82B /* DictationController.swift */,
+				B01122334455667788990011 /* GradientBackground.swift */,
 				6EE25BFBAC0C2CD8CA0B41F7 /* KeychainHelper.swift */,
 				DD1122334455667788990011 /* ThemeGradient.swift */,
 			);
@@ -213,6 +216,7 @@
 				AA1122334455667788990011 /* ColorExtension.swift in Sources */,
 				CC1122334455667788990011 /* ThemeGradient.swift in Sources */,
 				EE1122334455667788990011 /* BackgroundClearer.swift in Sources */,
+				A01122334455667788990011 /* GradientBackground.swift in Sources */,
 				1A3E8FBDE1ADAEE4363F8302 /* ComposerView.swift in Sources */,
 				D7C0B0D25450D46AB72BF964 /* ConnectionStatusView.swift in Sources */,
 				102D26955010C65D4C73468E /* ConversationTabView.swift in Sources */,

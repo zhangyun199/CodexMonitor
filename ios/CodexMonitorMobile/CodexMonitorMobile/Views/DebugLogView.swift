@@ -20,6 +20,10 @@ struct DebugLogView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            GradientBackground()
+        }
         .navigationTitle("Debug Log")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

@@ -127,7 +127,9 @@ struct GitView: View {
                     }
                 }
                 .scrollContentBackground(.hidden)
-                .background(.clear)
+                .background {
+                    GradientBackground()
+                }
                 .refreshable {
                     switch tab {
                     case .status:

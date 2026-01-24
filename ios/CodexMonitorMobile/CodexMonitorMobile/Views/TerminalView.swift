@@ -40,6 +40,9 @@ struct TerminalView: View {
             }
         }
         .padding()
+        .background {
+            GradientBackground()
+        }
         .navigationTitle("Terminal")
         .task {
             if let workspaceId = store.activeWorkspaceId {

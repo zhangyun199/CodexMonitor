@@ -16,6 +16,9 @@ struct ConversationTabView: View {
             }
         }
         .navigationTitle("Codex")
+        .background {
+            GradientBackground()
+        }
     }
 
     private var currentThreadId: String? {

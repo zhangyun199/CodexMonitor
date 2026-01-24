@@ -22,7 +22,9 @@ struct FilesView: View {
                         }
                 }
                 .scrollContentBackground(.hidden)
-                .background(.clear)
+                .background {
+                    GradientBackground()
+                }
                 .searchable(text: $searchText)
                 .task {
                     await store.refreshFiles(workspaceId: workspaceId)

@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftUIIntrospect
 import CodexMonitorModels
 
 struct RootView: View {
@@ -29,74 +28,63 @@ struct RootView: View {
 private struct PhoneRootView: View {
     @EnvironmentObject private var store: CodexStore
     @Binding var showSettings: Bool
-    @AppStorage("themeGradient") private var themeGradient = ThemeGradient.midnightBlue
 
     var body: some View {
-        ZStack {
-            // Background gradient
-            themeGradient.gradient
-                .ignoresSafeArea()
-
-            TabView {
-                NavigationStack {
-                    ProjectsView()
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button(action: { showSettings = true }) {
-                                    Image(systemName: "gearshape")
-                                }
+        TabView {
+            NavigationStack {
+                ProjectsView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showSettings = true }) {
+                                Image(systemName: "gearshape")
                             }
                         }
-                }
-                .tabItem {
-                    Label("Projects", systemImage: "folder")
-                }
-
-                NavigationStack {
-                    ConversationTabView()
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button(action: { showSettings = true }) {
-                                    Image(systemName: "gearshape")
-                                }
-                            }
-                        }
-                }
-                .tabItem {
-                    Label("Codex", systemImage: "bubble.left.and.text.bubble.right")
-                }
-
-                NavigationStack {
-                    GitView()
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button(action: { showSettings = true }) {
-                                    Image(systemName: "gearshape")
-                                }
-                            }
-                        }
-                }
-                .tabItem {
-                    Label("Git", systemImage: "arrow.triangle.branch")
-                }
-
-                NavigationStack {
-                    DebugLogView()
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button(action: { showSettings = true }) {
-                                    Image(systemName: "gearshape")
-                                }
-                            }
-                        }
-                }
-                .tabItem {
-                    Label("Log", systemImage: "waveform.path.ecg")
-                }
+                    }
             }
-            .background(.clear)
-            .introspect(.tabView, on: .iOS(.v16, .v17, .v18)) { tabBarVC in
-                BackgroundClearer.clearTabBarBackgrounds(tabBarVC)
+            .tabItem {
+                Label("Projects", systemImage: "folder")
+            }
+
+            NavigationStack {
+                ConversationTabView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showSettings = true }) {
+                                Image(systemName: "gearshape")
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Codex", systemImage: "bubble.left.and.text.bubble.right")
+            }
+
+            NavigationStack {
+                GitView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showSettings = true }) {
+                                Image(systemName: "gearshape")
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Git", systemImage: "arrow.triangle.branch")
+            }
+
+            NavigationStack {
+                DebugLogView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showSettings = true }) {
+                                Image(systemName: "gearshape")
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Log", systemImage: "waveform.path.ecg")
             }
         }
     }
@@ -108,7 +96,6 @@ private struct TabletRootView: View {
     @State private var selectedWorkspace: WorkspaceInfo?
     @State private var selectedThreadId: String?
     @State private var detailSelection: TabletDetail = .conversation
-    @AppStorage("themeGradient") private var themeGradient = ThemeGradient.midnightBlue
 
     enum TabletDetail: String, CaseIterable {
         case conversation = "Conversation"
@@ -119,60 +106,65 @@ private struct TabletRootView: View {
     }
 
     var body: some View {
-        let _ = print("🎨 Current theme: \(themeGradient) (raw: \(themeGradient.rawValue))")
+        NavigationSplitView {
+            WorkspaceListView(selectedWorkspace: $selectedWorkspace)
+                .navigationTitle("Workspaces")
+        } content: {
+            ThreadsListView(
+                selectedWorkspace: $selectedWorkspace,
+                selectedThreadId: $selectedThreadId
+            )
+            .navigationTitle("Threads")
+        } detail: {
+            DetailColumnView(
+                detailSelection: $detailSelection,
+                selectedThreadId: selectedThreadId,
+                showSettings: $showSettings
+            )
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
+}
 
-        ZStack {
-            // Background gradient
-            themeGradient.gradient
-                .ignoresSafeArea()
+private struct DetailColumnView: View {
+    @Binding var detailSelection: TabletRootView.TabletDetail
+    let selectedThreadId: String?
+    @Binding var showSettings: Bool
 
-            NavigationSplitView {
-                WorkspaceListView(selectedWorkspace: $selectedWorkspace)
-                    .navigationTitle("Workspaces")
-            } content: {
-                ThreadsListView(
-                    selectedWorkspace: $selectedWorkspace,
-                    selectedThreadId: $selectedThreadId
-                )
-                .navigationTitle("Threads")
-            } detail: {
-                VStack(spacing: 0) {
-                    Picker("Detail", selection: $detailSelection) {
-                        ForEach(TabletDetail.allCases, id: \.self) { item in
-                            Text(item.rawValue).tag(item)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding()
-
-                    Group {
-                        switch detailSelection {
-                        case .conversation:
-                            ConversationTabView(selectedThreadId: selectedThreadId)
-                        case .git:
-                            GitView()
-                        case .files:
-                            FilesView()
-                        case .prompts:
-                            PromptsView()
-                        case .terminal:
-                            TerminalView()
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(action: { showSettings = true }) {
-                            Image(systemName: "gearshape")
-                        }
-                    }
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("Detail", selection: $detailSelection) {
+                ForEach(TabletRootView.TabletDetail.allCases, id: \.self) { item in
+                    Text(item.rawValue).tag(item)
                 }
             }
-            .navigationSplitViewStyle(.balanced)
-            .background(.clear)
-            .introspect(.navigationSplitView, on: .iOS(.v16, .v17, .v18)) { splitVC in
-                BackgroundClearer.clearSplitViewBackgrounds(splitVC)
+            .pickerStyle(.segmented)
+            .padding()
+
+            Group {
+                switch detailSelection {
+                case .conversation:
+                    ConversationTabView(selectedThreadId: selectedThreadId)
+                case .git:
+                    GitView()
+                case .files:
+                    FilesView()
+                case .prompts:
+                    PromptsView()
+                case .terminal:
+                    TerminalView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background {
+            GradientBackground()
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(action: { showSettings = true }) {
+                    Image(systemName: "gearshape")
+                }
             }
         }
     }

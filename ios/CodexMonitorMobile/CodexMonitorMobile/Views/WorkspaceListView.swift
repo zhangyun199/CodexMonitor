@@ -35,7 +35,9 @@ struct WorkspaceListView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(.clear)
+        .background {
+            GradientBackground()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: { showAddWorkspace = true }) {

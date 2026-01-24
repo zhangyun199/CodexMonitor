@@ -1,10 +1,10 @@
 import SwiftUI
 
 enum ThemeGradient: String, CaseIterable, Codable {
-    case midnightBlue
-    case oceanDeep
-    case cosmicPurple
-    case slateDark
+    case midnightBlue = "midnightBlue"
+    case oceanDeep = "oceanDeep"
+    case cosmicPurple = "cosmicPurple"
+    case slateDark = "slateDark"
 
     var displayName: String {
         switch self {

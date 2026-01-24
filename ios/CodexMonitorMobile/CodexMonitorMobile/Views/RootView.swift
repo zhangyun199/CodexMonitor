@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftUIIntrospect
 import CodexMonitorModels
 
 struct RootView: View {
@@ -94,6 +95,9 @@ private struct PhoneRootView: View {
                 }
             }
             .background(.clear)
+            .introspect(.tabView, on: .iOS(.v16, .v17, .v18, .v26)) { tabBarVC in
+                BackgroundClearer.clearTabBarBackgrounds(tabBarVC)
+            }
         }
     }
 }
@@ -115,6 +119,8 @@ private struct TabletRootView: View {
     }
 
     var body: some View {
+        let _ = print("🎨 Current theme: \(themeGradient) (raw: \(themeGradient.rawValue))")
+
         ZStack {
             // Background gradient
             themeGradient.gradient
@@ -165,6 +171,9 @@ private struct TabletRootView: View {
             }
             .navigationSplitViewStyle(.balanced)
             .background(.clear)
+            .introspect(.navigationSplitView, on: .iOS(.v16, .v17, .v18, .v26)) { splitVC in
+                BackgroundClearer.clearSplitViewBackgrounds(splitVC)
+            }
         }
     }
 }

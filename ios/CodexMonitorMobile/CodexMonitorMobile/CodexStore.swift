@@ -75,9 +75,11 @@ final class CodexStore: ObservableObject {
         port = storedPort
         token = KeychainHelper.readToken(key: tokenKey) ?? ""
 
-        rpc.onNotification = { [weak self] notification in
-            Task { @MainActor in
-                self?.handleNotification(notification)
+        Task {
+            await rpc.setNotificationHandler { [weak self] notification in
+                Task { @MainActor in
+                    self?.handleNotification(notification)
+                }
             }
         }
     }
@@ -145,7 +147,9 @@ final class CodexStore: ObservableObject {
     }
 
     func disconnect() {
-        rpc.disconnect()
+        Task {
+            await rpc.disconnect()
+        }
         connectionState = .disconnected
     }
 

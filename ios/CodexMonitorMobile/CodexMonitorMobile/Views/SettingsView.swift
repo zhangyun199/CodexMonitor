@@ -3,12 +3,33 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var store: CodexStore
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("themeGradient") private var themeGradient = ThemeGradient.midnightBlue
     @State private var testResult: String?
     @State private var isTesting = false
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Appearance") {
+                    Picker("Background", selection: $themeGradient) {
+                        ForEach(ThemeGradient.allCases, id: \.self) { gradient in
+                            HStack {
+                                // Preview swatch
+                                LinearGradient(
+                                    colors: gradient.previewColors,
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .frame(width: 30, height: 20)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                                Text(gradient.displayName)
+                            }
+                            .tag(gradient)
+                        }
+                    }
+                }
+
                 Section("Connection") {
                     TextField("Host", text: $store.host)
                         .textInputAutocapitalization(.never)

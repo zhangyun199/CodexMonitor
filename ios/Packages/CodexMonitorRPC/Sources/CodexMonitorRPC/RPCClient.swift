@@ -32,6 +32,10 @@ public actor RPCClient {
 
     public init() {}
 
+    public func setNotificationHandler(_ handler: (@Sendable (RPCNotification) -> Void)?) {
+        onNotification = handler
+    }
+
     public func connect(_ config: Config) async throws {
         disconnect()
 

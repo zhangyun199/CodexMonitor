@@ -189,12 +189,52 @@ public struct ConversationItem: Identifiable, Hashable, Sendable {
     public var output: String? = nil
     public var durationMs: Double? = nil
     public var changes: [ToolChange]? = nil
+
+    public init(
+        id: String,
+        kind: ConversationItemKind,
+        role: MessageRole? = nil,
+        text: String? = nil,
+        summary: String? = nil,
+        content: String? = nil,
+        title: String? = nil,
+        diff: String? = nil,
+        state: ReviewState? = nil,
+        toolType: String? = nil,
+        detail: String? = nil,
+        status: String? = nil,
+        output: String? = nil,
+        durationMs: Double? = nil,
+        changes: [ToolChange]? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.role = role
+        self.text = text
+        self.summary = summary
+        self.content = content
+        self.title = title
+        self.diff = diff
+        self.state = state
+        self.toolType = toolType
+        self.detail = detail
+        self.status = status
+        self.output = output
+        self.durationMs = durationMs
+        self.changes = changes
+    }
 }
 
 public struct ThreadSummary: Codable, Hashable, Sendable, Identifiable {
     public var id: String
     public var name: String
     public var updatedAt: Double
+
+    public init(id: String, name: String, updatedAt: Double) {
+        self.id = id
+        self.name = name
+        self.updatedAt = updatedAt
+    }
 }
 
 public struct ThreadRecord: Codable, Hashable, Sendable, Identifiable {
@@ -259,6 +299,12 @@ public struct TurnPlan: Codable, Hashable, Sendable {
     public var turnId: String
     public var explanation: String?
     public var steps: [TurnPlanStep]
+
+    public init(turnId: String, explanation: String?, steps: [TurnPlanStep]) {
+        self.turnId = turnId
+        self.explanation = explanation
+        self.steps = steps
+    }
 }
 
 public struct ApprovalRequest: Codable, Hashable, Sendable, Identifiable {
@@ -268,6 +314,13 @@ public struct ApprovalRequest: Codable, Hashable, Sendable, Identifiable {
     public var params: [String: JSONValue]
 
     public var id: String { "\(workspaceId)-\(requestId)" }
+
+    public init(workspaceId: String, requestId: Int, method: String, params: [String: JSONValue]) {
+        self.workspaceId = workspaceId
+        self.requestId = requestId
+        self.method = method
+        self.params = params
+    }
 
     enum CodingKeys: String, CodingKey {
         case workspaceId = "workspace_id"

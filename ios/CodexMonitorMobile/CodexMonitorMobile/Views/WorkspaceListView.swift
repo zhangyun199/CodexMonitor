@@ -27,6 +27,10 @@ struct WorkspaceListView: View {
                 .onTapGesture {
                     selectedWorkspace = workspace
                     store.activeWorkspaceId = workspace.id
+                    Task {
+                        await store.connectWorkspace(id: workspace.id)
+                        await store.refreshThreads(for: workspace.id)
+                    }
                 }
             }
         }

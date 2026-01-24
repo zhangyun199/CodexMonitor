@@ -33,3 +33,13 @@
 ## 🟡 Phase 7 — Deliverables / Acceptance Tests
 - **Status:** In progress 🟡
 - **Notes:** Added `docs/mobile_acceptance_checklist.md` for on-device testing. Deliverables added (Xcode project, Swift package, daemon parity). Automated tests: `cargo test` + `swift test` passing. Manual iOS acceptance checklist still pending.
+
+## 🟢 Phase 8 — UI Polish & Gradient Themes
+- **Status:** Complete ✅
+- **Notes:**
+  - Added `ThemeGradient.swift` with 4 selectable gradient backgrounds (Midnight Blue, Ocean Deep, Cosmic Purple, Slate Dark)
+  - Added `ColorExtension.swift` with hex color initializer
+  - Updated `RootView.swift` to wrap Phone/Tablet layouts in ZStack with gradient background (fixes black background issue — glass needs content to lens)
+  - Updated `ThreadsListView.swift` with smart timestamp detection (ms vs seconds), UUID name fallback display, and selection visual feedback
+  - Updated `SettingsView.swift` with new Appearance section for gradient picker
+  - Fixed Xcode project.pbxproj to include new utility files in build

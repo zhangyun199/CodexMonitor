@@ -42,17 +42,18 @@ struct ConnectionStatusView: View {
         }
     }
 
-    @ViewBuilder
-    private var statusIndicator: some View {
-        let color: Color
+    private var statusColor: Color {
         switch store.connectionState {
-        case .connected: color = .green
-        case .connecting: color = .orange
-        case .disconnected: color = .gray
-        case .error: color = .red
+        case .connected: return .green
+        case .connecting: return .orange
+        case .disconnected: return .gray
+        case .error: return .red
         }
+    }
+
+    private var statusIndicator: some View {
         Circle()
-            .fill(color)
+            .fill(statusColor)
             .frame(width: 10, height: 10)
     }
 }

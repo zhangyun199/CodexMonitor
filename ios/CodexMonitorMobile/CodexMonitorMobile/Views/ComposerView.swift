@@ -16,81 +16,62 @@ struct ComposerView: View {
     @StateObject private var dictation = DictationController()
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack {
-                TextEditor(text: $message)
-                    .frame(minHeight: 60, maxHeight: 120)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.2)))
-                Button(action: send) {
-                    Image(systemName: "paperplane.fill")
-                        .padding(10)
+        GlassPanel(cornerRadius: 20) {
+            VStack(spacing: 8) {
+                HStack(spacing: 12) {
+                    TextEditor(text: $message)
+                        .frame(minHeight: 60, maxHeight: 120)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.clear)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
+                        )
+
+                    GlassSendButton(action: send)
                 }
-                .buttonStyle(.borderedProminent)
-            }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    PhotosPicker(selection: $photoSelection, matching: .images, photoLibrary: .shared()) {
-                        Label("Photos", systemImage: "photo")
-                    }
-                    .buttonStyle(.bordered)
+                GlassActionBar(
+                    photoSelection: $photoSelection,
+                    showFileImporter: $showFileImporter,
+                    accessMode: $accessMode,
+                    dictation: dictation,
+                    pasteImage: pasteImage
+                )
 
-                    Button(action: { showFileImporter = true }) {
-                        Label("Files", systemImage: "paperclip")
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button(action: pasteImage) {
-                        Label("Paste", systemImage: "doc.on.clipboard")
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button(action: { dictation.toggle() }) {
-                        Label(dictation.isRecording ? "Stop" : "Dictate", systemImage: dictation.isRecording ? "mic.fill" : "mic")
-                    }
-                    .buttonStyle(.bordered)
-
-                    Picker("Access", selection: $accessMode) {
-                        Text("Read").tag(AccessMode.readOnly)
-                        Text("Current").tag(AccessMode.current)
-                        Text("Full").tag(AccessMode.fullAccess)
-                    }
-                    .pickerStyle(.segmented)
-                }
-            }
-            .frame(maxHeight: 32)
-
-            if !attachedImages.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack {
-                        ForEach(Array(attachedImages.enumerated()), id: \.offset) { index, data in
-                            if let uiImage = UIImage(data: data) {
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 48, height: 48)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .overlay(alignment: .topTrailing) {
-                                        Button(action: { attachedImages.remove(at: index) }) {
-                                            Image(systemName: "xmark.circle.fill")
+                if !attachedImages.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack {
+                            ForEach(Array(attachedImages.enumerated()), id: \.offset) { index, data in
+                                if let uiImage = UIImage(data: data) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 48, height: 48)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                        .overlay(alignment: .topTrailing) {
+                                            Button(action: { attachedImages.remove(at: index) }) {
+                                                Image(systemName: "xmark.circle.fill")
+                                            }
                                         }
-                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            if dictation.isRecording || !dictation.transcript.isEmpty {
-                GlassCard {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Dictation")
-                            .font(.caption.weight(.semibold))
-                        Text(dictation.transcript.isEmpty ? "Listening..." : dictation.transcript)
-                            .font(.caption)
+                if dictation.isRecording || !dictation.transcript.isEmpty {
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Dictation")
+                                .font(.caption.weight(.semibold))
+                            Text(dictation.transcript.isEmpty ? "Listening..." : dictation.transcript)
+                                .font(.caption)
+                        }
                     }
                 }
             }
+            .padding(14)
         }
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.image]) { result in
             if case .success(let url) = result, let data = try? Data(contentsOf: url) {
@@ -139,6 +120,150 @@ struct ComposerView: View {
         if let image = UIPasteboard.general.image,
            let data = image.jpegData(compressionQuality: 0.85) {
             attachedImages.append(data)
+        }
+    }
+}
+
+// MARK: - Glass Send Button
+private struct GlassSendButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            if #available(iOS 26.0, *) {
+                Image(systemName: "paperplane.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .glassEffect(.regular.tint(.accentColor).interactive(), in: .circle)
+            } else {
+                Image(systemName: "paperplane.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Color.accentColor, in: Circle())
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Glass Action Bar
+private struct GlassActionBar: View {
+    @Binding var photoSelection: [PhotosPickerItem]
+    @Binding var showFileImporter: Bool
+    @Binding var accessMode: AccessMode
+    @ObservedObject var dictation: DictationController
+    let pasteImage: () -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                PhotosPicker(selection: $photoSelection, matching: .images, photoLibrary: .shared()) {
+                    GlassActionButton(icon: "photo", label: "Photos")
+                }
+
+                Button(action: { showFileImporter = true }) {
+                    GlassActionButton(icon: "paperclip", label: "Files")
+                }
+
+                Button(action: pasteImage) {
+                    GlassActionButton(icon: "doc.on.clipboard", label: "Paste")
+                }
+
+                Button(action: { dictation.toggle() }) {
+                    GlassActionButton(
+                        icon: dictation.isRecording ? "mic.fill" : "mic",
+                        label: dictation.isRecording ? "Stop" : "Dictate",
+                        isActive: dictation.isRecording
+                    )
+                }
+
+                Spacer()
+
+                GlassAccessModePicker(selection: $accessMode)
+            }
+        }
+        .frame(maxHeight: 36)
+    }
+}
+
+private struct GlassActionButton: View {
+    let icon: String
+    let label: String
+    var isActive: Bool = false
+
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .medium))
+                Text(label)
+                    .font(.caption.weight(.medium))
+            }
+            .foregroundStyle(isActive ? .red : .primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .glassEffect(isActive ? .regular.tint(.red).interactive() : .regular.interactive(), in: .capsule)
+        } else {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .medium))
+                Text(label)
+                    .font(.caption.weight(.medium))
+            }
+            .foregroundStyle(isActive ? .red : .primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.ultraThinMaterial, in: Capsule())
+        }
+    }
+}
+
+private struct GlassAccessModePicker: View {
+    @Binding var selection: AccessMode
+
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            HStack(spacing: 2) {
+                ForEach([AccessMode.readOnly, .current, .fullAccess], id: \.self) { mode in
+                    Button(action: { selection = mode }) {
+                        Text(labelFor(mode))
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(selection == mode ? Color.white.opacity(0.2) : Color.clear)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(selection == mode ? .primary : .secondary)
+                }
+            }
+            .glassEffect(.regular, in: .capsule)
+        } else {
+            HStack(spacing: 2) {
+                ForEach([AccessMode.readOnly, .current, .fullAccess], id: \.self) { mode in
+                    Button(action: { selection = mode }) {
+                        Text(labelFor(mode))
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(selection == mode ? Color.white.opacity(0.2) : Color.clear)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(selection == mode ? .primary : .secondary)
+                }
+            }
+            .background(.ultraThinMaterial, in: Capsule())
+        }
+    }
+
+    private func labelFor(_ mode: AccessMode) -> String {
+        switch mode {
+        case .readOnly: return "Read"
+        case .current: return "Current"
+        case .fullAccess: return "Full"
         }
     }
 }

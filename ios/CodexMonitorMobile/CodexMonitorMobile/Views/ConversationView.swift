@@ -91,9 +91,12 @@ private struct ConversationItemView: View {
             Circle()
                 .fill(item.role == .assistant ? Color.blue : Color.green)
                 .frame(width: 8, height: 8)
-                .padding(.top, 6)
-            Text(CodexMonitorRendering.markdown(item.text ?? ""))
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 10)
+
+            GlassMessageBubble(isAssistant: item.role == .assistant) {
+                Text(CodexMonitorRendering.markdown(item.text ?? ""))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 
@@ -159,6 +162,44 @@ private struct ConversationItemView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+        }
+    }
+}
+
+// MARK: - Glass Message Bubble
+private struct GlassMessageBubble<Content: View>: View {
+    let isAssistant: Bool
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            content
+                .padding(12)
+                .glassEffect(
+                    isAssistant ? .regular.tint(.blue.opacity(0.3)) : .regular.tint(.green.opacity(0.3)),
+                    in: .rect(cornerRadius: 14)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(
+                            isAssistant ? Color.blue.opacity(0.2) : Color.green.opacity(0.2),
+                            lineWidth: 0.5
+                        )
+                )
+        } else {
+            content
+                .padding(12)
+                .background(
+                    .ultraThinMaterial,
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .strokeBorder(
+                            isAssistant ? Color.blue.opacity(0.2) : Color.green.opacity(0.2),
+                            lineWidth: 0.5
+                        )
+                )
         }
     }
 }

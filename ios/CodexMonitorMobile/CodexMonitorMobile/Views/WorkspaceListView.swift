@@ -7,34 +7,28 @@ struct WorkspaceListView: View {
     @State private var showAddWorkspace = false
 
     var body: some View {
-        List(selection: $selectedWorkspace) {
-            ForEach(store.workspaces) { workspace in
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(workspace.name)
-                            .font(.headline)
-                        Text(workspace.path)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    Spacer()
-                    Circle()
-                        .fill(workspace.connected ? Color.green : Color.orange)
-                        .frame(width: 10, height: 10)
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    selectedWorkspace = workspace
-                    store.activeWorkspaceId = workspace.id
-                    Task {
-                        await store.connectWorkspace(id: workspace.id)
-                        await store.refreshThreads(for: workspace.id)
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                ForEach(store.workspaces) { workspace in
+                    let isSelected = selectedWorkspace?.id == workspace.id
+
+                    GlassWorkspaceRow(
+                        workspace: workspace,
+                        isSelected: isSelected
+                    )
+                    .onTapGesture {
+                        selectedWorkspace = workspace
+                        store.activeWorkspaceId = workspace.id
+                        Task {
+                            await store.connectWorkspace(id: workspace.id)
+                            await store.refreshThreads(for: workspace.id)
+                        }
                     }
                 }
             }
+            .padding(.horizontal)
+            .padding(.top, 8)
         }
-        .scrollContentBackground(.hidden)
         .background {
             GradientBackground()
         }
@@ -53,6 +47,33 @@ struct WorkspaceListView: View {
         .sheet(isPresented: $showAddWorkspace) {
             AddWorkspaceSheet()
         }
+    }
+}
+
+// MARK: - Glass Workspace Row
+private struct GlassWorkspaceRow: View {
+    let workspace: WorkspaceInfo
+    let isSelected: Bool
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(workspace.name)
+                    .font(.headline)
+                Text(workspace.path)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Circle()
+                .fill(workspace.connected ? Color.green : Color.orange)
+                .frame(width: 10, height: 10)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+        .glassListRow(isSelected: isSelected)
     }
 }
 

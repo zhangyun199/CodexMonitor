@@ -133,13 +133,10 @@ private struct DetailColumnView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Detail", selection: $detailSelection) {
-                ForEach(TabletRootView.TabletDetail.allCases, id: \.self) { item in
-                    Text(item.rawValue).tag(item)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding()
+            // Glass segmented picker header
+            GlassSegmentedPicker(selection: $detailSelection)
+                .padding(.horizontal)
+                .padding(.vertical, 12)
 
             Group {
                 switch detailSelection {
@@ -165,6 +162,85 @@ private struct DetailColumnView: View {
                 Button(action: { showSettings = true }) {
                     Image(systemName: "gearshape")
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Glass Segmented Picker
+private struct GlassSegmentedPicker: View {
+    @Binding var selection: TabletRootView.TabletDetail
+
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            glassPickerContent
+                .glassEffect(.regular, in: .capsule)
+        } else {
+            glassPickerContent
+                .background(.ultraThinMaterial, in: Capsule())
+        }
+    }
+
+    private var glassPickerContent: some View {
+        HStack(spacing: 4) {
+            ForEach(TabletRootView.TabletDetail.allCases, id: \.self) { item in
+                GlassPickerButton(
+                    title: item.rawValue,
+                    icon: iconFor(item),
+                    isSelected: selection == item
+                ) {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selection = item
+                    }
+                }
+            }
+        }
+        .padding(4)
+    }
+
+    private func iconFor(_ item: TabletRootView.TabletDetail) -> String {
+        switch item {
+        case .conversation: return "bubble.left.and.text.bubble.right"
+        case .git: return "arrow.triangle.branch"
+        case .files: return "folder"
+        case .prompts: return "text.alignleft"
+        case .terminal: return "terminal"
+        }
+    }
+}
+
+private struct GlassPickerButton: View {
+    let title: String
+    let icon: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .medium))
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(selectionBackground)
+            .foregroundStyle(isSelected ? .primary : .secondary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var selectionBackground: some View {
+        if isSelected {
+            if #available(iOS 26.0, *) {
+                Capsule()
+                    .fill(.white.opacity(0.2))
+                    .glassEffect(.regular.tint(.accentColor).interactive(), in: .capsule)
+            } else {
+                Capsule()
+                    .fill(.white.opacity(0.25))
             }
         }
     }

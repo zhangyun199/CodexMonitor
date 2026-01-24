@@ -95,3 +95,123 @@ struct GlassChip: View {
         }
     }
 }
+
+// MARK: - Glass Icon Button
+struct GlassIconButton: View {
+    let icon: String
+    var tint: Color = .primary
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            if #available(iOS 26.0, *) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(tint)
+                    .frame(width: 36, height: 36)
+                    .glassEffect(.regular.interactive(), in: .circle)
+            } else {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(tint)
+                    .frame(width: 36, height: 36)
+                    .background(.ultraThinMaterial, in: Circle())
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Glass Section Header
+struct GlassSectionHeader: View {
+    let title: String
+    var icon: String? = nil
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .textCase(.uppercase)
+                .tracking(0.5)
+        }
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 8)
+    }
+}
+
+// MARK: - Glass Panel
+struct GlassPanel<Content: View>: View {
+    var cornerRadius: CGFloat = 16
+    @ViewBuilder var content: Content
+
+    init(cornerRadius: CGFloat = 16, @ViewBuilder content: () -> Content) {
+        self.cornerRadius = cornerRadius
+        self.content = content()
+    }
+
+    var body: some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+                )
+        } else {
+            content
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .strokeBorder(.white.opacity(0.12), lineWidth: 0.5)
+                )
+        }
+    }
+}
+
+// MARK: - Glass List Row Modifier
+struct GlassListRowModifier: ViewModifier {
+    let isSelected: Bool
+    var cornerRadius: CGFloat = 12
+
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(
+                    isSelected ? .regular.tint(.accentColor).interactive() : .regular,
+                    in: .rect(cornerRadius: cornerRadius)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .strokeBorder(
+                            isSelected ? Color.accentColor.opacity(0.4) : Color.white.opacity(0.15),
+                            lineWidth: 1
+                        )
+                )
+        } else {
+            content
+                .background(
+                    .ultraThinMaterial.opacity(isSelected ? 1 : 0.8),
+                    in: RoundedRectangle(cornerRadius: cornerRadius)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .strokeBorder(
+                            isSelected ? Color.accentColor.opacity(0.4) : Color.white.opacity(0.15),
+                            lineWidth: 1
+                        )
+                )
+        }
+    }
+}
+
+extension View {
+    func glassListRow(isSelected: Bool, cornerRadius: CGFloat = 12) -> some View {
+        modifier(GlassListRowModifier(isSelected: isSelected, cornerRadius: cornerRadius))
+    }
+}

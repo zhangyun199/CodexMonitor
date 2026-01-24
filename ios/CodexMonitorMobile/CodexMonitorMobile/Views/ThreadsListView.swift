@@ -34,67 +34,36 @@ struct ThreadsListView: View {
 
     var body: some View {
         let workspace = selectedWorkspace ?? store.workspaces.first
-        List {
-            if let workspace {
-                Section(header: Text("Threads")) {
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                if let workspace {
                     ForEach(store.threadsByWorkspace[workspace.id] ?? []) { thread in
                         let isSelected = selectedThreadId == thread.id
 
-                        HStack(spacing: 12) {
-                            // Green dot for active threads
-                            if isActive(thread) {
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 8, height: 8)
-                            } else {
-                                Circle()
-                                    .fill(Color.clear)
-                                    .frame(width: 8, height: 8)
-                            }
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(displayName(for: thread))
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                Text(formatDate(thread.updatedAt), style: .relative)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            if isActive(thread) {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                            }
-
-                            if store.threadStatusById[thread.id]?.hasUnread == true {
-                                Circle()
-                                    .fill(Color.blue)
-                                    .frame(width: 8, height: 8)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
+                        GlassThreadRow(
+                            thread: thread,
+                            displayName: displayName(for: thread),
+                            formattedDate: formatDate(thread.updatedAt),
+                            isSelected: isSelected,
+                            isActive: isActive(thread),
+                            hasUnread: store.threadStatusById[thread.id]?.hasUnread == true
+                        )
                         .onTapGesture {
                             selectedThreadId = thread.id
                             store.activeWorkspaceId = workspace.id
                             store.activeThreadIdByWorkspace[workspace.id] = thread.id
                             Task { await store.resumeThread(workspaceId: workspace.id, threadId: thread.id) }
                         }
-                        .listRowBackground(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
-                                .padding(.horizontal, 4)
-                        )
                     }
+                } else {
+                    Text("No workspace selected.")
+                        .foregroundStyle(.secondary)
+                        .padding()
                 }
-            } else {
-                Text("No workspace selected.")
-                    .foregroundStyle(.secondary)
             }
+            .padding(.horizontal)
+            .padding(.top, 8)
         }
-        .scrollContentBackground(.hidden)
         .background {
             GradientBackground()
         }
@@ -135,5 +104,50 @@ struct ThreadsListView: View {
                 Task { await store.refreshThreads(for: workspace.id) }
             }
         }
+    }
+}
+
+// MARK: - Glass Thread Row
+private struct GlassThreadRow: View {
+    let thread: ThreadSummary
+    let displayName: String
+    let formattedDate: Date
+    let isSelected: Bool
+    let isActive: Bool
+    let hasUnread: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Status indicator
+            Circle()
+                .fill(isActive ? Color.green : Color.clear)
+                .frame(width: 8, height: 8)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(displayName)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Text(formattedDate, style: .relative)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if isActive {
+                ProgressView()
+                    .scaleEffect(0.8)
+            }
+
+            if hasUnread {
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 8, height: 8)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+        .glassListRow(isSelected: isSelected)
     }
 }

@@ -14,6 +14,12 @@ struct ComposerView: View {
     @State private var photoSelection: [PhotosPickerItem] = []
     @State private var showFileImporter = false
     @StateObject private var dictation = DictationController()
+    @State private var showImageError = false
+    @State private var imageErrorMessage = ""
+
+    private let maxImageBytes = 2 * 1024 * 1024
+    private let maxImageDimension: CGFloat = 1920
+    private let imageCompressionQuality: CGFloat = 0.7
 
     var body: some View {
         GlassPanel(cornerRadius: 20) {
@@ -75,14 +81,14 @@ struct ComposerView: View {
         }
         .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.image]) { result in
             if case .success(let url) = result, let data = try? Data(contentsOf: url) {
-                attachedImages.append(data)
+                handleIncomingImageData(data)
             }
         }
         .onChange(of: photoSelection) { _, newSelection in
             Task {
                 for item in newSelection {
                     if let data = try? await item.loadTransferable(type: Data.self) {
-                        attachedImages.append(data)
+                        handleIncomingImageData(data)
                     }
                 }
                 photoSelection.removeAll()
@@ -93,6 +99,11 @@ struct ComposerView: View {
                 message += (message.isEmpty ? "" : "\n") + dictation.transcript
                 dictation.transcript = ""
             }
+        }
+        .alert("Image Error", isPresented: $showImageError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(imageErrorMessage)
         }
     }
 
@@ -117,10 +128,52 @@ struct ComposerView: View {
     }
 
     private func pasteImage() {
-        if let image = UIPasteboard.general.image,
-           let data = image.jpegData(compressionQuality: 0.85) {
-            attachedImages.append(data)
+        if let image = UIPasteboard.general.image {
+            handleIncomingImage(image)
         }
+    }
+
+    private func handleIncomingImageData(_ data: Data) {
+        guard let image = UIImage(data: data) else {
+            showImageError("Unsupported image format.")
+            return
+        }
+        handleIncomingImage(image)
+    }
+
+    private func handleIncomingImage(_ image: UIImage) {
+        guard let processed = processImageForUpload(image) else { return }
+        attachedImages.append(processed)
+    }
+
+    private func processImageForUpload(_ image: UIImage) -> Data? {
+        var processedImage = image
+        let size = image.size
+        if size.width > maxImageDimension || size.height > maxImageDimension {
+            let scale = maxImageDimension / max(size.width, size.height)
+            let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+            let renderer = UIGraphicsImageRenderer(size: newSize)
+            processedImage = renderer.image { _ in
+                image.draw(in: CGRect(origin: .zero, size: newSize))
+            }
+        }
+
+        guard let data = processedImage.jpegData(compressionQuality: imageCompressionQuality) else {
+            showImageError("Failed to process image.")
+            return nil
+        }
+
+        guard data.count <= maxImageBytes else {
+            showImageError("Image too large. Max size is 2MB after compression.")
+            return nil
+        }
+
+        return data
+    }
+
+    private func showImageError(_ message: String) {
+        imageErrorMessage = message
+        showImageError = true
     }
 }
 

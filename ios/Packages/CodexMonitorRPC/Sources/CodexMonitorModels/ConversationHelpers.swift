@@ -1,7 +1,7 @@
 import Foundation
 
 public enum ConversationHelpers {
-    private static let maxItemsPerThread = 200
+    private static let maxItemsPerThread = 500
     private static let maxItemText = 20_000
     private static let toolOutputRecentItems = 40
     private static let noTruncateToolTypes: Set<String> = ["fileChange", "commandExecution"]

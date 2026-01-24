@@ -79,6 +79,7 @@ final class DictationController: ObservableObject {
     }
 
     func stop() {
+        let session = AVAudioSession.sharedInstance()
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         recognitionRequest?.endAudio()
@@ -86,5 +87,6 @@ final class DictationController: ObservableObject {
         recognitionRequest = nil
         recognitionTask = nil
         isRecording = false
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
     }
 }

@@ -57,6 +57,9 @@ final class CodexStore: ObservableObject {
     @Published var usageSnapshot: LocalUsageSnapshot?
     @Published var debugEntries: [DebugEntry] = []
 
+    private let maxItemsPerThread = 500
+    private let maxTerminalChars = 10_000
+
     private let rpc = RPCClient()
     private var reconnectTask: Task<Void, Never>?
     private var retryDelay: TimeInterval = 1.0
@@ -569,7 +572,12 @@ final class CodexStore: ObservableObject {
     private func handleTerminalOutput(_ event: TerminalOutputEvent) {
         let key = "\(event.workspaceId)-\(event.terminalId)"
         let existing = terminalOutputBySession[key] ?? ""
-        terminalOutputBySession[key] = existing + event.data
+        let combined = existing + event.data
+        if combined.count > maxTerminalChars {
+            terminalOutputBySession[key] = String(combined.suffix(maxTerminalChars))
+        } else {
+            terminalOutputBySession[key] = combined
+        }
     }
 
     private func handleAppServerEvent(_ event: AppServerEvent) {
@@ -750,6 +758,14 @@ final class CodexStore: ObservableObject {
     }
 
     // MARK: - Item helpers
+    private func storeThreadItems(threadId: String, items: [ConversationItem]) {
+        var trimmed = items
+        if trimmed.count > maxItemsPerThread {
+            trimmed = Array(trimmed.suffix(maxItemsPerThread))
+        }
+        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(trimmed)
+    }
+
     private func ensureThread(workspaceId: String, threadId: String) {
         if threadsByWorkspace[workspaceId]?.contains(where: { $0.id == threadId }) == false {
             var list = threadsByWorkspace[workspaceId] ?? []
@@ -767,7 +783,7 @@ final class CodexStore: ObservableObject {
         } else {
             list.append(ConversationItem(id: itemId, kind: .message, role: .assistant, text: delta))
         }
-        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(list)
+        storeThreadItems(threadId: threadId, items: list)
     }
 
     private func completeAgentMessage(workspaceId: String, threadId: String, itemId: String, text: String) {
@@ -779,7 +795,7 @@ final class CodexStore: ObservableObject {
         } else {
             list.append(ConversationItem(id: itemId, kind: .message, role: .assistant, text: text))
         }
-        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(list)
+        storeThreadItems(threadId: threadId, items: list)
 
         let timestamp = Date()
         lastAgentMessageByThread[threadId] = (text: text, timestamp: timestamp)
@@ -793,7 +809,7 @@ final class CodexStore: ObservableObject {
     private func upsertItem(threadId: String, item: ConversationItem) {
         let list = itemsByThread[threadId] ?? []
         let next = ConversationHelpers.upsertItem(list, item: item)
-        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(next)
+        storeThreadItems(threadId: threadId, items: next)
     }
 
     private func appendReasoning(threadId: String, itemId: String, delta: String, isSummary: Bool) {
@@ -811,7 +827,7 @@ final class CodexStore: ObservableObject {
             let item = ConversationItem(id: itemId, kind: .reasoning, summary: isSummary ? delta : "", content: isSummary ? "" : delta)
             list.append(item)
         }
-        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(list)
+        storeThreadItems(threadId: threadId, items: list)
     }
 
     private func appendToolOutput(threadId: String, itemId: String, delta: String) {
@@ -821,14 +837,14 @@ final class CodexStore: ObservableObject {
         var item = list[index]
         item.output = ConversationHelpers.mergeStreamingText(existing: item.output ?? "", delta: delta)
         list[index] = item
-        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(list)
+        storeThreadItems(threadId: threadId, items: list)
     }
 
     private func appendSystemMessage(threadId: String, text: String) {
         guard !threadId.isEmpty else { return }
         var list = itemsByThread[threadId] ?? []
         list.append(ConversationItem(id: UUID().uuidString, kind: .message, role: .assistant, text: text))
-        itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(list)
+        storeThreadItems(threadId: threadId, items: list)
     }
 
     private func loadThreadHistory(workspaceId: String, threadId: String, turns: [ThreadTurn]) {
@@ -851,7 +867,7 @@ final class CodexStore: ObservableObject {
             ])
         )
         if !items.isEmpty {
-            itemsByThread[threadId] = ConversationHelpers.prepareThreadItems(items)
+            storeThreadItems(threadId: threadId, items: items)
             updateThreadTimestamp(workspaceId: workspaceId, threadId: threadId, timestamp: Date())
         }
     }

@@ -55,3 +55,13 @@
   - `resume_thread` now loads historical turns into `itemsByThread`.
   - Conversation history now renders `agentMessage` items as assistant messages.
   - Added debug-panel entry `thread_history_loaded` with turn/item counts.
+
+## 🧩 2026-01-24 — iOS Stability & UX Fixes
+- **Status:** Complete ✅
+- **Notes:**
+  - Added `NSLocalNetworkUsageDescription` to Info.plist for LAN/Tailscale connections.
+  - Capped thread history in memory (max 500 items per thread) and added helper to trim buffers.
+  - Capped terminal output per session (max 10,000 characters).
+  - Fixed dictation audio session leak (deactivate on stop).
+  - Fixed auto-scroll during streaming deltas by tracking last item signature.
+  - Added image upload limits (resize to 1920px max, compress to JPEG 0.7, reject >2MB) with user-facing error alert.

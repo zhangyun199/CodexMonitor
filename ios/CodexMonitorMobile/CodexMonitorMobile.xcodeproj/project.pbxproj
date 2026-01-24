@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 63;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -37,7 +37,7 @@
 		332924F0468527C55DB195B9 /* GitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitView.swift; sourceTree = "<group>"; };
 		37C29E5C3611320FC10D9ED7 /* ConnectionStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusView.swift; sourceTree = "<group>"; };
 		4A254DC55323C0A29A41B82B /* DictationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationController.swift; sourceTree = "<group>"; };
-		4E933C367D3A6008986D2A7B /* CodexMonitorMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CodexMonitorMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4E933C367D3A6008986D2A7B /* CodexMonitorMobile.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CodexMonitorMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5AFA5EAA747E291085498824 /* CodexStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexStore.swift; sourceTree = "<group>"; };
 		5B17E218F80341BE0EAD6EF6 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		5BB4E977DEAE00DB97002B25 /* CodexMonitorRPC */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CodexMonitorRPC; path = ../Packages/CodexMonitorRPC; sourceTree = SOURCE_ROOT; };
@@ -182,7 +182,6 @@
 			packageReferences = (
 				13BA66BB6161FE984EAD1054 /* XCLocalSwiftPackageReference "../Packages/CodexMonitorRPC" */,
 			);
-			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -226,13 +225,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 6462JHJK42;
 				INFOPLIST_FILE = CodexMonitorMobile/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.codexmonitor.mobile;
+				PRODUCT_BUNDLE_IDENTIFIER = com.JMWillis.mobile;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -362,13 +362,14 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = 6462JHJK42;
 				INFOPLIST_FILE = CodexMonitorMobile/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.codexmonitor.mobile;
+				PRODUCT_BUNDLE_IDENTIFIER = com.JMWillis.mobile;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

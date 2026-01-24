@@ -95,7 +95,7 @@ private struct PhoneRootView: View {
                 }
             }
             .background(.clear)
-            .introspect(.tabView, on: .iOS(.v16, .v17, .v18, .v26)) { tabBarVC in
+            .introspect(.tabView, on: .iOS(.v16, .v17, .v18)) { tabBarVC in
                 BackgroundClearer.clearTabBarBackgrounds(tabBarVC)
             }
         }
@@ -171,7 +171,7 @@ private struct TabletRootView: View {
             }
             .navigationSplitViewStyle(.balanced)
             .background(.clear)
-            .introspect(.navigationSplitView, on: .iOS(.v16, .v17, .v18, .v26)) { splitVC in
+            .introspect(.navigationSplitView, on: .iOS(.v16, .v17, .v18)) { splitVC in
                 BackgroundClearer.clearSplitViewBackgrounds(splitVC)
             }
         }

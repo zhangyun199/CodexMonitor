@@ -22,3 +22,4 @@
 - 2026-01-25: Ran npm run tauri build -- --debug; build/bundle succeeded but failed signing due to missing TAURI_SIGNING_PRIVATE_KEY.
 - 2026-01-25: Captured git status/diff to confirm modified/new files for this phase.
 - 2026-01-25: Updated Messages scroll key to include user input count and re-ran npx tsc --noEmit (success).
+- 2026-01-25: Staged Phase 2 files, committed (feat: add CODEX_HOME fix and User Input Collection), and pushed to origin/main (commit 6127866).

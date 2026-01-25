@@ -361,6 +361,16 @@ pub(crate) struct AppSettings {
     pub(crate) dictation_preferred_language: Option<String>,
     #[serde(default = "default_dictation_hold_key", rename = "dictationHoldKey")]
     pub(crate) dictation_hold_key: String,
+    #[serde(default)]
+    pub(crate) memory_enabled: bool,
+    #[serde(default)]
+    pub(crate) supabase_url: String,
+    #[serde(default)]
+    pub(crate) supabase_anon_key: String,
+    #[serde(default)]
+    pub(crate) minimax_api_key: String,
+    #[serde(default = "default_memory_embedding_enabled")]
+    pub(crate) memory_embedding_enabled: bool,
     #[serde(
         default = "default_composer_editor_preset",
         rename = "composerEditorPreset"
@@ -523,6 +533,10 @@ fn default_experimental_unified_exec_enabled() -> bool {
     false
 }
 
+fn default_memory_embedding_enabled() -> bool {
+    false
+}
+
 fn default_dictation_enabled() -> bool {
     false
 }
@@ -612,6 +626,11 @@ impl Default for AppSettings {
             dictation_model_id: default_dictation_model_id(),
             dictation_preferred_language: None,
             dictation_hold_key: default_dictation_hold_key(),
+            memory_enabled: false,
+            supabase_url: String::new(),
+            supabase_anon_key: String::new(),
+            minimax_api_key: String::new(),
+            memory_embedding_enabled: default_memory_embedding_enabled(),
             composer_editor_preset: default_composer_editor_preset(),
             composer_fence_expand_on_space: default_composer_fence_expand_on_space(),
             composer_fence_expand_on_enter: default_composer_fence_expand_on_enter(),
@@ -691,6 +710,11 @@ mod tests {
         assert_eq!(settings.dictation_model_id, "base");
         assert!(settings.dictation_preferred_language.is_none());
         assert_eq!(settings.dictation_hold_key, "alt");
+        assert!(!settings.memory_enabled);
+        assert!(settings.supabase_url.is_empty());
+        assert!(settings.supabase_anon_key.is_empty());
+        assert!(settings.minimax_api_key.is_empty());
+        assert!(!settings.memory_embedding_enabled);
         assert_eq!(settings.composer_editor_preset, "default");
         assert!(!settings.composer_fence_expand_on_space);
         assert!(!settings.composer_fence_expand_on_enter);

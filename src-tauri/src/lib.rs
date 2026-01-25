@@ -15,6 +15,7 @@ mod git;
 mod git_utils;
 mod local_usage;
 mod local_usage_core;
+mod memory;
 mod menu;
 mod prompts;
 mod remote_backend;

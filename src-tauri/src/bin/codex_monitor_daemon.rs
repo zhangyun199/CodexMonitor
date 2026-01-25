@@ -9,6 +9,8 @@ mod codex_home;
 mod git_utils;
 #[path = "../local_usage_core.rs"]
 mod local_usage_core;
+#[path = "../memory/mod.rs"]
+mod memory;
 #[path = "../rules.rs"]
 mod rules;
 #[path = "../storage.rs"]
@@ -54,6 +56,7 @@ use types::{
     GitHubPullRequestsResponse, GitLogResponse, LocalUsageSnapshot, WorkspaceEntry, WorkspaceInfo,
     WorkspaceKind, WorkspaceSettings, WorktreeInfo,
 };
+use memory::MemoryService;
 use utils::normalize_git_path;
 
 const DEFAULT_LISTEN_ADDR: &str = "127.0.0.1:4732";
@@ -95,6 +98,7 @@ struct DaemonState {
     storage_path: PathBuf,
     settings_path: PathBuf,
     app_settings: Mutex<AppSettings>,
+    memory: Option<MemoryService>,
     event_sink: DaemonEventSink,
 }
 
@@ -134,6 +138,23 @@ impl DaemonState {
         let settings_path = config.data_dir.join("settings.json");
         let workspaces = read_workspaces(&storage_path).unwrap_or_default();
         let app_settings = read_settings(&settings_path).unwrap_or_default();
+        let memory = if app_settings.memory_enabled
+            && !app_settings.supabase_url.is_empty()
+            && !app_settings.supabase_anon_key.is_empty()
+        {
+            Some(MemoryService::new(
+                &app_settings.supabase_url,
+                &app_settings.supabase_anon_key,
+                if app_settings.memory_embedding_enabled {
+                    Some(&app_settings.minimax_api_key)
+                } else {
+                    None
+                },
+                true,
+            ))
+        } else {
+            None
+        };
         Self {
             data_dir: config.data_dir.clone(),
             workspaces: Mutex::new(workspaces),
@@ -142,6 +163,7 @@ impl DaemonState {
             storage_path,
             settings_path,
             app_settings: Mutex::new(app_settings),
+            memory,
             event_sink,
         }
     }
@@ -4096,6 +4118,63 @@ async fn handle_rpc_request(
             let updated = state.update_app_settings(settings).await?;
             serde_json::to_value(updated).map_err(|err| err.to_string())
         }
+        "memory_status" => match &state.memory {
+            Some(mem) => mem.status().await.map(|s| serde_json::to_value(s).unwrap()),
+            None => Err("Memory not enabled".to_string()),
+        },
+        "memory_search" => {
+            let query = params
+                .get("query")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing query")?;
+            let limit = params
+                .get("limit")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(10) as usize;
+
+            match &state.memory {
+                Some(mem) => mem
+                    .search(query, limit)
+                    .await
+                    .map(|r| serde_json::to_value(r).unwrap()),
+                None => Err("Memory not enabled".to_string()),
+            }
+        }
+        "memory_append" => {
+            let memory_type = params.get("type").and_then(|v| v.as_str()).unwrap_or("daily");
+            let content = params
+                .get("content")
+                .and_then(|v| v.as_str())
+                .ok_or("Missing content")?;
+            let tags: Vec<String> = params
+                .get("tags")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let workspace_id = params
+                .get("workspace_id")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+
+            match &state.memory {
+                Some(mem) => mem
+                    .append(memory_type, content, tags, workspace_id)
+                    .await
+                    .map(|e| serde_json::to_value(e).unwrap()),
+                None => Err("Memory not enabled".to_string()),
+            }
+        }
+        "memory_bootstrap" => match &state.memory {
+            Some(mem) => mem
+                .bootstrap()
+                .await
+                .map(|r| serde_json::to_value(r).unwrap()),
+            None => Err("Memory not enabled".to_string()),
+        },
         "codex_doctor" => {
             let codex_bin = parse_optional_string(&params, "codexBin");
             let result = state.codex_doctor(codex_bin).await?;

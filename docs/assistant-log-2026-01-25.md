@@ -28,3 +28,8 @@
 - Created search_memory_by_embedding RPC
 - Created search_memory_by_text fallback RPC
 - Created get_memory_bootstrap RPC
+## Phase B: Rust Memory Service - Sun Jan 25 01:45:34 PST 2026
+- Created SupabaseClient for memory operations
+- Created EmbeddingsClient for MiniMax API
+- Created MemoryService combining both
+- Added daemon RPC endpoints: memory_status, memory_search, memory_append, memory_bootstrap

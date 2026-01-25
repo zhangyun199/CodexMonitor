@@ -123,6 +123,11 @@ export type AppSettings = {
   dictationModelId: string;
   dictationPreferredLanguage: string | null;
   dictationHoldKey: string | null;
+  memory_enabled?: boolean;
+  supabase_url?: string;
+  supabase_anon_key?: string;
+  minimax_api_key?: string;
+  memory_embedding_enabled?: boolean;
   composerEditorPreset: ComposerEditorPreset;
   composerFenceExpandOnSpace: boolean;
   composerFenceExpandOnEnter: boolean;

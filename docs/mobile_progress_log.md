@@ -76,3 +76,20 @@
   - Added fallback image compression (0.4) when >2MB after primary compression.
   - Standardized path comparison via URL.standardized.path in `pathsEquivalent`.
   - Verified `swift build` for CodexMonitorRPC package.
+
+## 🧩 2026-01-24 — Glass Effect & Color Unification
+- **Status:** Complete ✅
+- **Notes:**
+  **iOS Changes:**
+  - Fixed portrait orientation on iPad (Info.plist)
+  - Fixed message bubble colors — now uses `.glassEffect(.regular.tint(bubbleColor))` for vibrant sky-blue (assistant) and green (user) glass bubbles
+  - Chat-style layout with bubbles on opposite sides (assistant left, user right)
+  - Dynamic bubble width (~68% max on compact, 60% on regular)
+  - Replaced AppColors with direct hex colors via `Color(hex:)` extension
+
+  **Mac/Desktop Changes:**
+  - Unified glass theme with slate dark default
+  - Matched iOS colors exactly (#0A84FF blue, #3DBD73 green → rgba versions)
+  - Lowered panel opacity so gradient shows through
+  - Fixed empty space on right/bottom with 100vw/100vh fill
+  - Removed internal gradients from bubbles for cleaner look

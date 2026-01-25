@@ -424,7 +424,7 @@ impl Default for BackendMode {
 }
 
 fn default_access_mode() -> String {
-    "current".to_string()
+    "full-access".to_string()
 }
 
 fn default_remote_backend_host() -> String {
@@ -582,7 +582,7 @@ impl Default for AppSettings {
             backend_mode: BackendMode::Local,
             remote_backend_host: default_remote_backend_host(),
             remote_backend_token: None,
-            default_access_mode: "current".to_string(),
+            default_access_mode: "full-access".to_string(),
             composer_model_shortcut: default_composer_model_shortcut(),
             composer_access_shortcut: default_composer_access_shortcut(),
             composer_reasoning_shortcut: default_composer_reasoning_shortcut(),
@@ -641,7 +641,7 @@ mod tests {
         assert!(matches!(settings.backend_mode, BackendMode::Local));
         assert_eq!(settings.remote_backend_host, "127.0.0.1:4732");
         assert!(settings.remote_backend_token.is_none());
-        assert_eq!(settings.default_access_mode, "current");
+        assert_eq!(settings.default_access_mode, "full-access");
         assert_eq!(
             settings.composer_model_shortcut.as_deref(),
             Some("cmd+shift+m")

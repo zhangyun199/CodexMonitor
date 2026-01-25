@@ -29,7 +29,8 @@
   padding: 6px 8px;
   border-radius: 10px;
   background: var(--surface-raised);
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(calc(var(--glass-blur) - 6px)) saturate(var(--glass-saturate));
   color: var(--text-faint);
 }
 

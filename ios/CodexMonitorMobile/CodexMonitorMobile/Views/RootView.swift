@@ -87,6 +87,7 @@ private struct PhoneRootView: View {
                 Label("Log", systemImage: "waveform.path.ecg")
             }
         }
+        .modifier(GlassTabBarStyle())
     }
 }
 
@@ -109,12 +110,14 @@ private struct TabletRootView: View {
         NavigationSplitView {
             WorkspaceListView(selectedWorkspace: $selectedWorkspace)
                 .navigationTitle("Workspaces")
+                .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 240)
         } content: {
             ThreadsListView(
                 selectedWorkspace: $selectedWorkspace,
                 selectedThreadId: $selectedThreadId
             )
             .navigationTitle("Threads")
+            .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 280)
         } detail: {
             DetailColumnView(
                 detailSelection: $detailSelection,
@@ -222,6 +225,9 @@ private struct GlassPickerButton: View {
                     .font(.system(size: 12, weight: .medium))
                 Text(title)
                     .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .allowsTightening(true)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -233,15 +239,28 @@ private struct GlassPickerButton: View {
 
     @ViewBuilder
     private var selectionBackground: some View {
-        if isSelected {
-            if #available(iOS 26.0, *) {
-                Capsule()
-                    .fill(.white.opacity(0.2))
-                    .glassEffect(.regular.tint(.accentColor).interactive(), in: .capsule)
-            } else {
-                Capsule()
-                    .fill(.white.opacity(0.25))
-            }
+        Capsule()
+            .raisedGlassStyle(
+                cornerRadius: 999,
+                tint: isSelected ? .accentColor : nil,
+                colorBoost: isSelected ? 0.16 : 0.06,
+                borderOpacity: isSelected ? 0.5 : 0.2,
+                interactive: isSelected,
+                lift: 3
+            )
+    }
+}
+
+// MARK: - Glass Tab Bar
+private struct GlassTabBarStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
+                .tint(.accentColor)
+        } else {
+            content
         }
     }
 }

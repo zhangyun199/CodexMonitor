@@ -3,7 +3,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--glass-border);
   background: var(--surface-topbar);
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-app-region: no-drag;

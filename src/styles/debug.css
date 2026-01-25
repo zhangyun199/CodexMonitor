@@ -1,11 +1,18 @@
 .debug-panel {
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--glass-border);
   background: var(--surface-debug);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-shadow-soft);
   display: flex;
   flex-direction: column;
   grid-column: 1;
   grid-row: 5;
   -webkit-app-region: no-drag;
+}
+
+.app.reduced-transparency .debug-panel {
+  backdrop-filter: none;
+  box-shadow: none;
 }
 .debug-panel.open {
   height: var(--debug-panel-height, 180px);

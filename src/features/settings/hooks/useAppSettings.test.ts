@@ -47,7 +47,7 @@ describe("useAppSettings", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.settings.uiScale).toBe(UI_SCALE_MAX);
-    expect(result.current.settings.theme).toBe("system");
+    expect(result.current.settings.theme).toBe("dark");
     expect(result.current.settings.uiFontFamily).toContain("SF Pro Text");
     expect(result.current.settings.codeFontFamily).toContain("SF Mono");
     expect(result.current.settings.codeFontSize).toBe(16);
@@ -63,7 +63,7 @@ describe("useAppSettings", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(result.current.settings.uiScale).toBe(UI_SCALE_DEFAULT);
-    expect(result.current.settings.theme).toBe("system");
+    expect(result.current.settings.theme).toBe("dark");
     expect(result.current.settings.uiFontFamily).toContain("SF Pro Text");
     expect(result.current.settings.codeFontFamily).toContain("SF Mono");
     expect(result.current.settings.backendMode).toBe("local");
@@ -103,7 +103,7 @@ describe("useAppSettings", () => {
 
     expect(updateAppSettingsMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        theme: "system",
+        theme: "dark",
         uiScale: 0.1,
         uiFontFamily: expect.stringContaining("SF Pro Text"),
         codeFontFamily: expect.stringContaining("SF Mono"),

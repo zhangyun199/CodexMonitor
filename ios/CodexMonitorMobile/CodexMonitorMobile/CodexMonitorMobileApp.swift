@@ -9,6 +9,7 @@ struct CodexMonitorMobileApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(store)
+                .tint(Color(hex: "3DAAFF"))
                 .onChange(of: scenePhase) { _, phase in
                     store.handleScenePhase(phase)
                 }

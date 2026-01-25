@@ -17,7 +17,7 @@ const defaultSettings: AppSettings = {
   backendMode: "local",
   remoteBackendHost: "127.0.0.1:4732",
   remoteBackendToken: null,
-  defaultAccessMode: "current",
+  defaultAccessMode: "full-access",
   composerModelShortcut: "cmd+shift+m",
   composerAccessShortcut: "cmd+shift+a",
   composerReasoningShortcut: "cmd+shift+r",
@@ -35,7 +35,7 @@ const defaultSettings: AppSettings = {
   lastComposerModelId: null,
   lastComposerReasoningEffort: null,
   uiScale: UI_SCALE_DEFAULT,
-  theme: "system",
+  theme: "dark",
   uiFontFamily: DEFAULT_UI_FONT_FAMILY,
   codeFontFamily: DEFAULT_CODE_FONT_FAMILY,
   codeFontSize: CODE_FONT_SIZE_DEFAULT,
@@ -63,7 +63,7 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
   return {
     ...settings,
     uiScale: clampUiScale(settings.uiScale),
-    theme: allowedThemes.has(settings.theme) ? settings.theme : "system",
+    theme: allowedThemes.has(settings.theme) ? settings.theme : "dark",
     uiFontFamily: normalizeFontFamily(
       settings.uiFontFamily,
       DEFAULT_UI_FONT_FAMILY,

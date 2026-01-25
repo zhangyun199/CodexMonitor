@@ -22,7 +22,7 @@ const baseSettings: AppSettings = {
   backendMode: "local",
   remoteBackendHost: "127.0.0.1:4732",
   remoteBackendToken: null,
-  defaultAccessMode: "current",
+  defaultAccessMode: "full-access",
   composerModelShortcut: null,
   composerAccessShortcut: null,
   composerReasoningShortcut: null,

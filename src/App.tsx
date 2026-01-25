@@ -145,7 +145,7 @@ function MainApp() {
     clearDebugEntries,
   } = useDebugLog();
   useLiquidGlassEffect({ reduceTransparency, onDebug: addDebugEntry });
-  const [accessMode, setAccessMode] = useState<AccessMode>("current");
+  const [accessMode, setAccessMode] = useState<AccessMode>("full-access");
   const [activeTab, setActiveTab] = useState<
     "projects" | "codex" | "git" | "log"
   >("codex");

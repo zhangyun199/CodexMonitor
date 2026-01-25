@@ -7,10 +7,12 @@
 }
 
 .messages-full {
-  background: var(--surface-messages);
+  background: rgba(10, 14, 22, 0.12);
   border-radius: 0;
   padding: 12px var(--main-panel-padding) 16px;
-  border: none;
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-shadow-soft);
 }
 
 .main .messages-full {
@@ -138,6 +140,11 @@
   padding: 10px 14px;
   border-radius: 14px;
   background: var(--surface-bubble);
+  border: 1px solid var(--glass-border-strong);
+  backdrop-filter: blur(calc(var(--glass-blur) - 4px)) saturate(var(--glass-saturate));
+  box-shadow:
+    0 0 0 1px var(--border-accent-soft),
+    0 6px 14px rgba(0, 0, 0, 0.26);
   font-size: 14px;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -211,6 +218,16 @@
 
 .message.user .bubble {
   background: var(--surface-bubble-user);
+  border-color: var(--border-user);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--border-user) 40%, transparent),
+    0 6px 14px rgba(0, 0, 0, 0.24);
+}
+
+.app.reduced-transparency .messages-full,
+.app.reduced-transparency .bubble {
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 .item-card {

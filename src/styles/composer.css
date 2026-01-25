@@ -4,10 +4,17 @@
   gap: 8px;
   -webkit-app-region: no-drag;
   padding: 12px var(--main-panel-padding) 24px;
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--glass-border);
   background: var(--surface-composer);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-shadow-soft);
   grid-column: 1;
   grid-row: 3;
+}
+
+.app.reduced-transparency .composer {
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 .composer-queue {

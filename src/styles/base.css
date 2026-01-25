@@ -20,29 +20,35 @@
   --text-faint: rgba(255, 255, 255, 0.5);
   --text-fainter: rgba(255, 255, 255, 0.45);
   --text-dim: rgba(255, 255, 255, 0.35);
-  --surface-sidebar: rgba(18, 18, 18, 0.5);
-  --surface-sidebar-opaque: rgb(18, 18, 18);
-  --surface-topbar: rgba(10, 14, 20, 0.45);
-  --surface-right-panel: rgba(9, 12, 20, 0.4);
-  --surface-composer: rgba(10, 14, 20, 0.45);
-  --surface-messages: rgba(8, 10, 16, 0.45);
-  --surface-card: rgba(255, 255, 255, 0.04);
-  --surface-card-strong: rgba(255, 255, 255, 0.12);
-  --surface-card-muted: rgba(255, 255, 255, 0.06);
-  --surface-item: rgba(255, 255, 255, 0.02);
+  --surface-sidebar: rgba(12, 16, 24, 0.24);
+  --surface-sidebar-opaque: rgb(12, 16, 24);
+  --surface-topbar: rgba(12, 16, 24, 0.24);
+  --surface-right-panel: rgba(12, 16, 24, 0.22);
+  --surface-composer: rgba(12, 16, 24, 0.22);
+  --surface-messages: rgba(10, 14, 22, 0.2);
+  --surface-card: rgba(255, 255, 255, 0.05);
+  --surface-card-strong: rgba(255, 255, 255, 0.14);
+  --surface-card-muted: rgba(255, 255, 255, 0.08);
+  --surface-item: rgba(255, 255, 255, 0.035);
   --surface-control: rgba(255, 255, 255, 0.08);
-  --surface-control-hover: rgba(255, 255, 255, 0.14);
+  --surface-control-hover: rgba(86, 170, 255, 0.18);
   --surface-control-disabled: rgba(255, 255, 255, 0.05);
-  --surface-hover: rgba(255, 255, 255, 0.05);
-  --surface-active: rgba(100, 200, 255, 0.14);
+  --surface-hover: rgba(255, 255, 255, 0.08);
+  --surface-active: rgba(86, 170, 255, 0.22);
   --surface-approval: rgba(12, 16, 26, 0.6);
-  --surface-debug: rgba(10, 14, 20, 0.55);
-  --surface-command: rgba(10, 12, 18, 0.7);
-  --surface-diff-card: rgba(10, 14, 20, 0.32);
-  --surface-bubble: rgba(255, 255, 255, 0.12);
-  --surface-bubble-user: rgba(77, 153, 255, 0.45);
-  --surface-context-core: rgba(10, 14, 20, 0.9);
-  --surface-popover: rgba(10, 14, 20, 0.995);
+  --surface-debug: rgba(12, 16, 24, 0.22);
+  --surface-command: rgba(10, 14, 20, 0.35);
+  --surface-diff-card: rgba(12, 16, 24, 0.2);
+  --background-gradient: linear-gradient(
+    180deg,
+    #1a1a1a 0%,
+    #2d2d2d 52%,
+    #1f1f1f 100%
+  );
+  --surface-bubble: rgba(61, 170, 255, 0.6);
+  --surface-bubble-user: rgba(67, 227, 138, 0.58);
+  --surface-context-core: rgba(12, 16, 24, 0.9);
+  --surface-popover: rgba(12, 16, 24, 0.985);
   --surface-review: rgba(255, 144, 200, 0.1);
   --border-review: rgba(255, 144, 200, 0.35);
   --surface-review-active: rgba(255, 144, 200, 0.18);
@@ -54,10 +60,21 @@
   --border-strong: rgba(255, 255, 255, 0.14);
   --border-stronger: rgba(255, 255, 255, 0.18);
   --border-quiet: rgba(255, 255, 255, 0.2);
-  --border-accent: rgba(100, 200, 255, 0.6);
-  --border-accent-soft: rgba(100, 200, 255, 0.3);
-  --text-accent: rgba(164, 195, 255, 0.7);
-  --shadow-accent: rgba(92, 168, 255, 0.28);
+  --border-accent: rgba(61, 170, 255, 0.9);
+  --border-accent-soft: rgba(61, 170, 255, 0.55);
+  --text-accent: rgba(190, 230, 255, 0.96);
+  --shadow-accent: rgba(61, 170, 255, 0.5);
+  --border-user: rgba(67, 227, 138, 0.65);
+  --shadow-user: rgba(67, 227, 138, 0.5);
+  --surface-raised: rgba(255, 255, 255, 0.08);
+  --glass-blur: 24px;
+  --glass-saturate: 1.35;
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-border-strong: rgba(255, 255, 255, 0.24);
+  --glass-highlight: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 18px 36px rgba(0, 0, 0, 0.38);
+  --glass-shadow-soft: 0 10px 24px rgba(0, 0, 0, 0.3);
+  --glass-bubble-shadow: 0 14px 28px rgba(0, 0, 0, 0.35);
   --titlebar-inset-left: 72px;
   --titlebar-height: 24px;
   --titlebar-toggle-size: 28px;
@@ -79,28 +96,28 @@
 }
 
 .app.reduced-transparency {
-  --surface-sidebar: rgba(18, 18, 18, 0.92);
-  --surface-sidebar-opaque: rgb(18, 18, 18);
-  --surface-topbar: rgba(10, 14, 20, 0.94);
-  --surface-right-panel: rgba(9, 12, 20, 0.92);
-  --surface-composer: rgba(10, 14, 20, 0.94);
-  --surface-messages: rgba(8, 10, 16, 0.94);
-  --surface-card: rgba(30, 32, 40, 0.94);
-  --surface-card-strong: rgba(38, 40, 48, 0.96);
-  --surface-card-muted: rgba(24, 26, 34, 0.9);
-  --surface-item: rgba(28, 30, 38, 0.88);
-  --surface-control: rgba(40, 44, 55, 0.7);
-  --surface-control-hover: rgba(54, 60, 72, 0.8);
+  --surface-sidebar: rgba(12, 16, 24, 0.95);
+  --surface-sidebar-opaque: rgb(12, 16, 24);
+  --surface-topbar: rgba(12, 16, 24, 0.95);
+  --surface-right-panel: rgba(12, 16, 24, 0.94);
+  --surface-composer: rgba(12, 16, 24, 0.96);
+  --surface-messages: rgba(10, 14, 22, 0.95);
+  --surface-card: rgba(22, 26, 34, 0.96);
+  --surface-card-strong: rgba(30, 34, 44, 0.98);
+  --surface-card-muted: rgba(22, 26, 34, 0.94);
+  --surface-item: rgba(22, 26, 34, 0.92);
+  --surface-control: rgba(32, 36, 46, 0.82);
+  --surface-control-hover: rgba(52, 70, 110, 0.85);
   --surface-control-disabled: rgba(40, 44, 55, 0.5);
-  --surface-hover: rgba(46, 50, 62, 0.7);
-  --surface-active: rgba(100, 200, 255, 0.18);
-  --surface-approval: rgba(12, 16, 26, 0.92);
-  --surface-debug: rgba(12, 16, 26, 0.92);
-  --surface-command: rgba(12, 14, 20, 0.95);
-  --surface-diff-card: rgba(14, 18, 28, 0.9);
-  --surface-bubble: rgba(42, 46, 58, 0.9);
-  --surface-bubble-user: rgba(77, 153, 255, 0.55);
-  --surface-context-core: rgba(16, 20, 30, 0.96);
+  --surface-hover: rgba(36, 40, 52, 0.8);
+  --surface-active: rgba(86, 170, 255, 0.26);
+  --surface-approval: rgba(12, 16, 26, 0.95);
+  --surface-debug: rgba(12, 16, 24, 0.95);
+  --surface-command: rgba(10, 14, 20, 0.98);
+  --surface-diff-card: rgba(12, 16, 24, 0.92);
+  --surface-bubble: rgba(61, 170, 255, 0.78);
+  --surface-bubble-user: rgba(67, 227, 138, 0.72);
+  --surface-context-core: rgba(16, 20, 30, 0.98);
   --surface-popover: rgba(16, 20, 30, 0.995);
 }
 
@@ -285,33 +302,35 @@
 html,
 body {
   margin: 0;
-  background: transparent;
+  background: var(--background-gradient);
   overflow: hidden;
 }
 
 #root {
+  width: 100vw;
   height: 100vh;
   overflow: hidden;
+  background: var(--background-gradient);
 }
 
 .app {
-  height: calc(100vh / var(--ui-scale, 1));
-  width: calc(100vw / var(--ui-scale, 1));
+  height: 100vh;
+  width: 100vw;
   display: grid;
   grid-template-columns: var(--sidebar-width, 280px) 1fr;
-  background: transparent;
+  background: var(--background-gradient);
   border-radius: 0;
   overflow: hidden;
-  position: relative;
-  transform: scale(var(--ui-scale, 1));
-  transform-origin: top left;
+  position: fixed;
+  inset: 0;
+  zoom: var(--ui-scale, 1);
   --main-topbar-height: 44px;
   transition: grid-template-columns 220ms ease;
   font-family: var(--ui-font-family);
 }
 
 .app.ui-scale-default {
-  transform: none;
+  zoom: 1;
 }
 
 .drag-strip {

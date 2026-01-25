@@ -2,8 +2,9 @@
   --sidebar-padding: 20px;
   padding: 36px var(--sidebar-padding) 56px;
   background: var(--surface-sidebar);
-  backdrop-filter: none;
-  border-right: 1px solid var(--border-subtle);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border-right: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-soft);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -12,6 +13,11 @@
   overflow: hidden;
   position: relative;
   transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.app.reduced-transparency .sidebar {
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 .sidebar,
@@ -532,6 +538,7 @@
   gap: 6px;
   padding: 4px 10px 4px calc(6px + var(--thread-indent, 0px));
   border-radius: 6px;
+  border: 1px solid transparent;
   color: var(--text-quiet);
   font-size: 12px;
   cursor: pointer;
@@ -586,8 +593,12 @@
 }
 
 .thread-row.active {
-  background: var(--surface-active);
+  background: var(--surface-bubble);
+  border-color: var(--border-accent-soft);
   color: var(--text-strong);
+  box-shadow:
+    0 0 0 1px var(--border-accent-soft),
+    0 6px 14px rgba(0, 0, 0, 0.24);
 }
 
 .thread-name {

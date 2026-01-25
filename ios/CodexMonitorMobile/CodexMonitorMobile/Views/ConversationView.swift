@@ -82,6 +82,7 @@ private struct ApprovalCard: View {
 
 private struct ConversationItemView: View {
     let item: ConversationItem
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         switch item.kind {
@@ -99,17 +100,41 @@ private struct ConversationItemView: View {
     }
 
     private var messageView: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Circle()
-                .fill(item.role == .assistant ? Color.blue : Color.green)
-                .frame(width: 8, height: 8)
-                .padding(.top, 10)
+        let isAssistant = item.role == .assistant
+        let screenWidth = UIScreen.main.bounds.width
+        let maxBubbleWidth: CGFloat = min(
+            (horizontalSizeClass == .compact) ? 260 : 420,
+            screenWidth * (horizontalSizeClass == .compact ? 0.68 : 0.6)
+        )
 
-            GlassMessageBubble(isAssistant: item.role == .assistant) {
-                Text(CodexMonitorRendering.markdown(item.text ?? ""))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        return HStack(alignment: .top, spacing: 12) {
+            if isAssistant {
+                statusDot(isAssistant: true)
+                bubble(maxWidth: maxBubbleWidth, alignment: .leading)
+                Spacer(minLength: 0)
+            } else {
+                Spacer(minLength: 0)
+                bubble(maxWidth: maxBubbleWidth, alignment: .trailing)
+                statusDot(isAssistant: false)
             }
         }
+        .frame(maxWidth: .infinity, alignment: isAssistant ? .leading : .trailing)
+    }
+
+    private func statusDot(isAssistant: Bool) -> some View {
+        Circle()
+            .fill(isAssistant ? Color(hex: "3DAAFF") : Color(hex: "43E38A"))
+            .frame(width: 8, height: 8)
+            .padding(.top, 10)
+    }
+
+    private func bubble(maxWidth: CGFloat, alignment: Alignment) -> some View {
+        GlassMessageBubble(isAssistant: item.role == .assistant) {
+            Text(CodexMonitorRendering.markdown(item.text ?? ""))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: maxWidth, alignment: alignment)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private var reasoningView: some View {
@@ -183,35 +208,33 @@ private struct GlassMessageBubble<Content: View>: View {
     let isAssistant: Bool
     @ViewBuilder var content: Content
 
+    private var assistantColor: Color {
+        Color(hex: "3DAAFF")
+    }
+
+    private var userColor: Color {
+        Color(hex: "43E38A")
+    }
+
+    private var bubbleColor: Color {
+        isAssistant ? assistantColor : userColor
+    }
+
+    private var bubbleBoost: Double {
+        // Keep assistant vibrant, soften user haze a touch
+        isAssistant ? 0.10 : 0.08
+    }
+
     var body: some View {
-        if #available(iOS 26.0, *) {
-            content
-                .padding(12)
-                .glassEffect(
-                    isAssistant ? .regular.tint(.blue.opacity(0.3)) : .regular.tint(.green.opacity(0.3)),
-                    in: .rect(cornerRadius: 14)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(
-                            isAssistant ? Color.blue.opacity(0.2) : Color.green.opacity(0.2),
-                            lineWidth: 0.5
-                        )
-                )
-        } else {
-            content
-                .padding(12)
-                .background(
-                    .ultraThinMaterial,
-                    in: RoundedRectangle(cornerRadius: 14)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14)
-                        .strokeBorder(
-                            isAssistant ? Color.blue.opacity(0.2) : Color.green.opacity(0.2),
-                            lineWidth: 0.5
-                        )
-                )
-        }
+        content
+            .padding(12)
+            .raisedGlassStyle(
+                cornerRadius: 14,
+                tint: bubbleColor,
+                colorBoost: bubbleBoost, // slightly less haze
+                borderOpacity: 0.6,
+                interactive: true,
+                lift: 5
+            )
     }
 }

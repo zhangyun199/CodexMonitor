@@ -44,8 +44,10 @@
   gap: 8px;
   padding: 10px;
   border-radius: 12px;
-  background: var(--surface-control);
-  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(calc(var(--glass-blur) - 6px)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-shadow-soft);
   transition:
     background 180ms ease-out,
     border-color 180ms ease-out,

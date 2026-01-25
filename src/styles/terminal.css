@@ -1,12 +1,19 @@
 .terminal-panel {
-  border-top: 1px solid var(--border-subtle);
+  border-top: 1px solid var(--glass-border);
   background: var(--surface-debug);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  box-shadow: var(--glass-shadow-soft);
   display: flex;
   flex-direction: column;
   grid-column: 1;
   grid-row: 4;
   height: var(--terminal-panel-height, 220px);
   -webkit-app-region: no-drag;
+}
+
+.app.reduced-transparency .terminal-panel {
+  backdrop-filter: none;
+  box-shadow: none;
 }
 
 .terminal-panel-resizer {

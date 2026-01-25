@@ -9,7 +9,7 @@ struct ComposerView: View {
     let threadId: String
 
     @State private var message = ""
-    @State private var accessMode: AccessMode = .current
+    @State private var accessMode: AccessMode = .fullAccess
     @State private var attachedImages: [Data] = []
     @State private var photoSelection: [PhotosPickerItem] = []
     @State private var showFileImporter = false

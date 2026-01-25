@@ -23,3 +23,8 @@
 - 2026-01-25: Captured git status/diff to confirm modified/new files for this phase.
 - 2026-01-25: Updated Messages scroll key to include user input count and re-ran npx tsc --noEmit (success).
 - 2026-01-25: Staged Phase 2 files, committed (feat: add CODEX_HOME fix and User Input Collection), and pushed to origin/main (commit 6127866).
+## Phase A: Supabase Memory Schema - Sun Jan 25 01:37:22 PST 2026
+- Created memory table with embedding columns
+- Created search_memory_by_embedding RPC
+- Created search_memory_by_text fallback RPC
+- Created get_memory_bootstrap RPC

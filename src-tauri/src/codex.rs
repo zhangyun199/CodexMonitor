@@ -14,7 +14,7 @@ use crate::backend::app_server::{
     build_codex_command_with_bin, build_codex_path_env, check_codex_installation,
     spawn_workspace_session as spawn_workspace_session_inner,
 };
-use crate::codex_home::{resolve_default_codex_home, resolve_workspace_codex_home};
+use crate::codex_home::resolve_workspace_codex_home;
 use crate::event_sink::TauriEventSink;
 use crate::remote_backend;
 use crate::rules;
@@ -525,7 +525,7 @@ pub(crate) async fn skills_list(
 #[tauri::command]
 pub(crate) async fn respond_to_server_request(
     workspace_id: String,
-    request_id: u64,
+    request_id: Value,
     result: Value,
     state: State<'_, AppState>,
     app: AppHandle,
@@ -623,7 +623,6 @@ pub(crate) async fn remember_approval_rule(
     };
 
     let codex_home = resolve_workspace_codex_home(&entry, parent_path.as_deref())
-        .or_else(resolve_default_codex_home)
         .ok_or("Unable to resolve CODEX_HOME".to_string())?;
     let rules_path = rules::default_rules_path(&codex_home);
     rules::append_prefix_rule(&rules_path, &command)?;

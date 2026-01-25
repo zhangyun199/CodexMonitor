@@ -9,6 +9,9 @@ import { useAppServerEvents } from "./useAppServerEvents";
 vi.mock("../../../services/events", () => ({
   subscribeAppServerEvents: vi.fn(),
 }));
+vi.mock("@tauri-apps/api/event", () => ({
+  emit: vi.fn(),
+}));
 
 type Handlers = Parameters<typeof useAppServerEvents>[0];
 

@@ -1037,7 +1037,7 @@ impl DaemonState {
     async fn respond_to_server_request(
         &self,
         workspace_id: String,
-        request_id: u64,
+        request_id: Value,
         result: Value,
     ) -> Result<Value, String> {
         let session = self.get_session(&workspace_id).await?;
@@ -1074,7 +1074,6 @@ impl DaemonState {
         };
 
         let codex_home = codex_home::resolve_workspace_codex_home(&entry, parent_path.as_deref())
-            .or_else(codex_home::resolve_default_codex_home)
             .ok_or("Unable to resolve CODEX_HOME".to_string())?;
         let rules_path = rules::default_rules_path(&codex_home);
         rules::append_prefix_rule(&rules_path, &command)?;
@@ -1319,7 +1318,7 @@ fn resolve_codex_home() -> Option<PathBuf> {
             if path.exists() {
                 return path.canonicalize().ok().or(Some(path));
             }
-            return None;
+            return Some(path);
         }
     }
     resolve_home_dir().map(|home| home.join(".codex"))
@@ -4441,7 +4440,8 @@ async fn handle_rpc_request(
             let map = params.as_object().ok_or("missing requestId")?;
             let request_id = map
                 .get("requestId")
-                .and_then(|value| value.as_u64())
+                .cloned()
+                .filter(|value| value.is_number() || value.is_string())
                 .ok_or("missing requestId")?;
             let result = map.get("result").cloned().ok_or("missing `result`")?;
             state

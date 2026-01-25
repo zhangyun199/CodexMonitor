@@ -1,0 +1,109 @@
+.request-user-input {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+  box-shadow: var(--glass-shadow-soft);
+}
+
+.request-user-input-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: var(--status-warning);
+}
+
+.request-user-input-icon {
+  font-size: 1.2em;
+}
+
+.request-user-input-question {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.request-user-input-question:last-of-type {
+  border-bottom: none;
+}
+
+.question-header {
+  font-size: 0.85em;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.question-text {
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.question-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.option-button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 12px;
+  background: var(--surface-item);
+  border: 1px solid var(--border-muted);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.option-button:hover {
+  border-color: var(--border-accent-soft);
+}
+
+.option-button.selected {
+  border-color: var(--border-accent);
+  background: var(--surface-active);
+}
+
+.option-label {
+  font-weight: 600;
+}
+
+.option-description {
+  font-size: 0.85em;
+  color: var(--text-subtle);
+  margin-top: 4px;
+}
+
+.question-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--surface-control);
+  border: 1px solid var(--border-muted);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 0.95em;
+}
+
+.question-input:focus {
+  outline: none;
+  border-color: var(--border-accent);
+}
+
+.submit-button {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.submit-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

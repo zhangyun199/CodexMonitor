@@ -67,6 +67,18 @@ Conventions:
 
 - [ApprovalRequest](#approvalrequest)
 
+- [RequestUserInputOption](#requestuserinputoption)
+
+- [RequestUserInputQuestion](#requestuserinputquestion)
+
+- [RequestUserInputParams](#requestuserinputparams)
+
+- [RequestUserInputRequest](#requestuserinputrequest)
+
+- [RequestUserInputAnswer](#requestuserinputanswer)
+
+- [RequestUserInputResponse](#requestuserinputresponse)
+
 - [GitFileStatus](#gitfilestatus)
 
 - [GitFileDiff](#gitfilediff)
@@ -1399,6 +1411,258 @@ export type ApprovalRequest = {
   request_id: number;
   method: string;
   params: Record<string, unknown>;
+};
+```
+
+**Rust**
+
+_N/A_
+
+
+---
+
+## RequestUserInputOption
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ❌
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `label` | `string` | no | Display label. |
+| `description` | `string` | no | Helper text for the option. |
+
+
+**Swift**
+
+```swift
+public struct RequestUserInputOption: Codable, Hashable, Sendable {
+    public var label: String
+    public var description: String
+}
+```
+
+**TypeScript**
+
+```ts
+export type RequestUserInputOption = {
+  label: string;
+  description: string;
+};
+```
+
+**Rust**
+
+_N/A_
+
+
+---
+
+## RequestUserInputQuestion
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ❌
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `id` | `string` | no | Question identifier. |
+| `header` | `string` | no | Short label for grouping. |
+| `question` | `string` | no | Prompt text shown to the user. |
+| `options` | `RequestUserInputOption[]` | yes | Multiple-choice options (if omitted, use free text). |
+
+
+**Swift**
+
+```swift
+public struct RequestUserInputQuestion: Codable, Hashable, Sendable {
+    public var id: String
+    public var header: String
+    public var question: String
+    public var options: [RequestUserInputOption]?
+}
+```
+
+**TypeScript**
+
+```ts
+export type RequestUserInputQuestion = {
+  id: string;
+  header: string;
+  question: string;
+  options?: RequestUserInputOption[];
+};
+```
+
+**Rust**
+
+_N/A_
+
+
+---
+
+## RequestUserInputParams
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ❌
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `thread_id` | `string` | no | Thread identifier. |
+| `turn_id` | `string` | no | Turn identifier. |
+| `item_id` | `string` | no | Item identifier. |
+| `questions` | `RequestUserInputQuestion[]` | no | Questions to present to the user. |
+
+
+**Swift**
+
+```swift
+public struct RequestUserInputParams: Codable, Hashable, Sendable {
+    public var threadId: String
+    public var turnId: String
+    public var itemId: String
+    public var questions: [RequestUserInputQuestion]
+
+    enum CodingKeys: String, CodingKey {
+        case threadId = "thread_id"
+        case turnId = "turn_id"
+        case itemId = "item_id"
+        case questions
+    }
+}
+```
+
+**TypeScript**
+
+```ts
+export type RequestUserInputParams = {
+  thread_id: string;
+  turn_id: string;
+  item_id: string;
+  questions: RequestUserInputQuestion[];
+};
+```
+
+**Rust**
+
+_N/A_
+
+
+---
+
+## RequestUserInputRequest
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ❌
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `workspace_id` | `string` | no | Workspace identifier. |
+| `request_id` | `number | string` | no | Request identifier (JSON-RPC id). |
+| `params` | `RequestUserInputParams` | no | Request payload. |
+
+
+**Swift**
+
+```swift
+public struct RequestUserInputRequest: Codable, Hashable, Sendable, Identifiable {
+    public var workspaceId: String
+    public var requestId: JSONValue
+    public var params: RequestUserInputParams
+
+    public var id: String { "\(workspaceId)-\(requestId.asString())" }
+
+    enum CodingKeys: String, CodingKey {
+        case workspaceId = "workspace_id"
+        case requestId = "request_id"
+        case params
+    }
+}
+```
+
+**TypeScript**
+
+```ts
+export type RequestUserInputRequest = {
+  workspace_id: string;
+  request_id: number | string;
+  params: RequestUserInputParams;
+};
+```
+
+**Rust**
+
+_N/A_
+
+
+---
+
+## RequestUserInputAnswer
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ❌
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `answers` | `string[]` | no | Answers for a single question. |
+
+
+**Swift**
+
+```swift
+public struct RequestUserInputAnswer: Codable, Hashable, Sendable {
+    public var answers: [String]
+}
+```
+
+**TypeScript**
+
+```ts
+export type RequestUserInputAnswer = {
+  answers: string[];
+};
+```
+
+**Rust**
+
+_N/A_
+
+
+---
+
+## RequestUserInputResponse
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ❌
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `answers` | `Record<string, RequestUserInputAnswer>` | no | Answers keyed by question id. |
+
+
+**Swift**
+
+```swift
+public struct RequestUserInputResponse: Codable, Hashable, Sendable {
+    public var answers: [String: RequestUserInputAnswer]
+}
+```
+
+**TypeScript**
+
+```ts
+export type RequestUserInputResponse = {
+  answers: Record<string, RequestUserInputAnswer>;
 };
 ```
 

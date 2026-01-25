@@ -179,13 +179,14 @@ export async function startReview(
 
 export async function respondToServerRequest(
   workspaceId: string,
-  requestId: number,
-  decision: "accept" | "decline",
+  requestId: number | string,
+  result: "accept" | "decline" | Record<string, unknown>,
 ) {
+  const payload = typeof result === "string" ? { decision: result } : result;
   return invoke("respond_to_server_request", {
     workspaceId,
     requestId,
-    result: { decision },
+    result: payload,
   });
 }
 

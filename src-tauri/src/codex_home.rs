@@ -19,15 +19,23 @@ pub(crate) fn resolve_workspace_codex_home(
     if legacy_home.is_dir() {
         return Some(legacy_home);
     }
-    None
+    resolve_codex_home()
+}
+
+pub(crate) fn resolve_codex_home() -> Option<PathBuf> {
+    if let Ok(value) = env::var("CODEX_HOME") {
+        if !value.trim().is_empty() {
+            let path = PathBuf::from(value.trim());
+            if path.exists() {
+                return path.canonicalize().ok().or(Some(path));
+            }
+            return Some(path);
+        }
+    }
+    resolve_default_codex_home()
 }
 
 pub(crate) fn resolve_default_codex_home() -> Option<PathBuf> {
-    if let Ok(value) = env::var("CODEX_HOME") {
-        if !value.trim().is_empty() {
-            return Some(PathBuf::from(value.trim()));
-        }
-    }
     resolve_home_dir().map(|home| home.join(".codex"))
 }
 

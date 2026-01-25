@@ -44,7 +44,7 @@ fn resolve_codex_home() -> Option<PathBuf> {
             if path.exists() {
                 return path.canonicalize().ok().or(Some(path));
             }
-            return None;
+            return Some(path);
         }
     }
     resolve_home_dir().map(|home| home.join(".codex"))

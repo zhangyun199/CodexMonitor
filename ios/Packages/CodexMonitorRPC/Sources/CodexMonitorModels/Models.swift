@@ -344,6 +344,54 @@ public struct ApprovalRequest: Codable, Hashable, Sendable, Identifiable {
     }
 }
 
+public struct RequestUserInputOption: Codable, Hashable, Sendable {
+    public var label: String
+    public var description: String
+}
+
+public struct RequestUserInputQuestion: Codable, Hashable, Sendable {
+    public var id: String
+    public var header: String
+    public var question: String
+    public var options: [RequestUserInputOption]?
+}
+
+public struct RequestUserInputParams: Codable, Hashable, Sendable {
+    public var threadId: String
+    public var turnId: String
+    public var itemId: String
+    public var questions: [RequestUserInputQuestion]
+
+    enum CodingKeys: String, CodingKey {
+        case threadId = "thread_id"
+        case turnId = "turn_id"
+        case itemId = "item_id"
+        case questions
+    }
+}
+
+public struct RequestUserInputRequest: Codable, Hashable, Sendable, Identifiable {
+    public var workspaceId: String
+    public var requestId: JSONValue
+    public var params: RequestUserInputParams
+
+    public var id: String { "\(workspaceId)-\(requestId.asString())" }
+
+    enum CodingKeys: String, CodingKey {
+        case workspaceId = "workspace_id"
+        case requestId = "request_id"
+        case params
+    }
+}
+
+public struct RequestUserInputAnswer: Codable, Hashable, Sendable {
+    public var answers: [String]
+}
+
+public struct RequestUserInputResponse: Codable, Hashable, Sendable {
+    public var answers: [String: RequestUserInputAnswer]
+}
+
 public enum ApprovalDecision: String, Codable, Sendable {
     case accept
     case decline

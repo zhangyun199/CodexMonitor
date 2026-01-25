@@ -149,9 +149,43 @@ export type CodexDoctorResult = {
 
 export type ApprovalRequest = {
   workspace_id: string;
-  request_id: number;
+  request_id: number | string;
   method: string;
   params: Record<string, unknown>;
+};
+
+// User Input Collection Types
+export type RequestUserInputOption = {
+  label: string;
+  description: string;
+};
+
+export type RequestUserInputQuestion = {
+  id: string;
+  header: string;
+  question: string;
+  options?: RequestUserInputOption[];
+};
+
+export type RequestUserInputParams = {
+  thread_id: string;
+  turn_id: string;
+  item_id: string;
+  questions: RequestUserInputQuestion[];
+};
+
+export type RequestUserInputRequest = {
+  workspace_id: string;
+  request_id: number | string;
+  params: RequestUserInputParams;
+};
+
+export type RequestUserInputAnswer = {
+  answers: string[];
+};
+
+export type RequestUserInputResponse = {
+  answers: Record<string, RequestUserInputAnswer>;
 };
 
 export type GitFileStatus = {

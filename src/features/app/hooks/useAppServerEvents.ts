@@ -1,5 +1,10 @@
 import { useEffect } from "react";
-import type { AppServerEvent, ApprovalRequest } from "../../../types";
+import { emit } from "@tauri-apps/api/event";
+import type {
+  AppServerEvent,
+  ApprovalRequest,
+  RequestUserInputRequest,
+} from "../../../types";
 import { subscribeAppServerEvents } from "../../../services/events";
 
 type AgentDelta = {
@@ -73,13 +78,29 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
         return;
       }
 
-      if (method.includes("requestApproval") && typeof message.id === "number") {
+      if (method.includes("requestApproval") && (typeof message.id === "number" || typeof message.id === "string")) {
         handlers.onApprovalRequest?.({
           workspace_id,
           request_id: message.id,
           method,
           params: (message.params as Record<string, unknown>) ?? {},
         });
+        return;
+      }
+
+      if (method === "item/tool/requestUserInput" && (typeof message.id === "number" || typeof message.id === "string")) {
+        const params = (message.params as Record<string, unknown>) ?? {};
+        const requestPayload: RequestUserInputRequest = {
+          workspace_id,
+          request_id: message.id,
+          params: {
+            thread_id: String(params.threadId ?? params.thread_id ?? ""),
+            turn_id: String(params.turnId ?? params.turn_id ?? ""),
+            item_id: String(params.itemId ?? params.item_id ?? ""),
+            questions: Array.isArray(params.questions) ? params.questions : [],
+          },
+        };
+        void emit("item/tool/requestUserInput", requestPayload);
         return;
       }
 

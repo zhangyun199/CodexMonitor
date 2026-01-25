@@ -15,6 +15,7 @@ import "./styles/panel-tabs.css";
 import "./styles/prompts.css";
 import "./styles/debug.css";
 import "./styles/terminal.css";
+import "./styles/request-user-input.css";
 import "./styles/plan.css";
 import "./styles/about.css";
 import "./styles/tabbar.css";
@@ -32,6 +33,8 @@ import { MainHeaderActions } from "./features/app/components/MainHeaderActions";
 import { useLayoutNodes } from "./features/layout/hooks/useLayoutNodes";
 import { useWorkspaceDropZone } from "./features/workspaces/hooks/useWorkspaceDropZone";
 import { useThreads } from "./features/threads/hooks/useThreads";
+import { useThreadUserInput } from "./features/threads/hooks/useThreadUserInput";
+import { useThreadUserInputEvents } from "./features/threads/hooks/useThreadUserInputEvents";
 import { useWindowDrag } from "./features/layout/hooks/useWindowDrag";
 import { useGitPanelController } from "./features/app/hooks/useGitPanelController";
 import { useGitRemote } from "./features/git/hooks/useGitRemote";
@@ -588,6 +591,22 @@ function MainApp() {
     customPrompts: prompts,
     onMessageActivity: queueGitStatusRefresh
   });
+  const {
+    pendingRequests: pendingUserInputRequests,
+    addRequest: addUserInputRequest,
+    removeRequest: removeUserInputRequest,
+  } = useThreadUserInput();
+  useThreadUserInputEvents(addUserInputRequest);
+  const activeUserInputRequests = useMemo(() => {
+    if (!activeWorkspaceId || !activeThreadId) {
+      return [];
+    }
+    return pendingUserInputRequests.filter(
+      (request) =>
+        request.workspace_id === activeWorkspaceId &&
+        request.params.thread_id === activeThreadId,
+    );
+  }, [activeThreadId, activeWorkspaceId, pendingUserInputRequests]);
   const activeThreadIdRef = useRef<string | null>(activeThreadId ?? null);
   const { getThreadRows } = useThreadRows(threadParentById);
   useEffect(() => {
@@ -1316,8 +1335,10 @@ function MainApp() {
     activeRateLimits,
     codeBlockCopyUseModifier: appSettings.composerCodeBlockCopyUseModifier,
     approvals,
+    userInputRequests: activeUserInputRequests,
     handleApprovalDecision,
     handleApprovalRemember,
+    onUserInputComplete: removeUserInputRequest,
     onOpenSettings: () => openSettings(),
     onOpenDictationSettings: () => openSettings("dictation"),
     onOpenDebug: handleDebugClick,

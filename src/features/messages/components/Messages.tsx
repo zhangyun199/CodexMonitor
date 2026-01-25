@@ -12,11 +12,12 @@ import Search from "lucide-react/dist/esm/icons/search";
 import Terminal from "lucide-react/dist/esm/icons/terminal";
 import Users from "lucide-react/dist/esm/icons/users";
 import Wrench from "lucide-react/dist/esm/icons/wrench";
-import type { ConversationItem } from "../../../types";
+import type { ConversationItem, RequestUserInputRequest } from "../../../types";
 import { Markdown } from "./Markdown";
 import { DiffBlock } from "../../git/components/DiffBlock";
 import { languageFromPath } from "../../../utils/syntax";
 import { useFileLinkOpener } from "../hooks/useFileLinkOpener";
+import { RequestUserInputMessage } from "../../app/components/RequestUserInputMessage";
 
 type MessagesProps = {
   items: ConversationItem[];
@@ -26,6 +27,8 @@ type MessagesProps = {
   lastDurationMs?: number | null;
   workspacePath?: string | null;
   codeBlockCopyUseModifier?: boolean;
+  userInputRequests?: RequestUserInputRequest[];
+  onUserInputComplete?: (requestId: number | string) => void;
 };
 
 type ToolSummary = {
@@ -790,6 +793,8 @@ export const Messages = memo(function Messages({
   lastDurationMs = null,
   workspacePath = null,
   codeBlockCopyUseModifier = false,
+  userInputRequests = [],
+  onUserInputComplete,
 }: MessagesProps) {
   const SCROLL_THRESHOLD_PX = 120;
   const bottomRef = useRef<HTMLDivElement | null>(null);
@@ -801,7 +806,7 @@ export const Messages = memo(function Messages({
   );
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const copyTimeoutRef = useRef<number | null>(null);
-  const scrollKey = scrollKeyForItems(items);
+  const scrollKey = `${scrollKeyForItems(items)}-${userInputRequests.length}`;
   const { openFileLink, showFileLinkMenu } = useFileLinkOpener(workspacePath);
 
   const isNearBottom = useCallback(
@@ -1023,6 +1028,13 @@ export const Messages = memo(function Messages({
         }
         return renderItem(entry.item);
       })}
+      {userInputRequests.map((request) => (
+        <RequestUserInputMessage
+          key={`${request.workspace_id}-${request.request_id}`}
+          request={request}
+          onComplete={() => onUserInputComplete?.(request.request_id)}
+        />
+      ))}
       <WorkingIndicator
         isThinking={isThinking}
         processingStartedAt={processingStartedAt}

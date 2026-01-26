@@ -26,6 +26,15 @@ struct MemoryView: View {
             GradientBackground()
         }
         .navigationTitle("Memory")
+        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .automatic))
+        .onSubmit(of: .search) {
+            Task { await runSearch() }
+        }
+        .onChange(of: query) { _, newValue in
+            if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Task { await loadBootstrap() }
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: { Task { await refreshAll() } }) {

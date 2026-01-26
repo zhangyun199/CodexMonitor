@@ -13,3 +13,4 @@
 - Wired MCP tool handling to MemoryService (Supabase-backed)
 - 2026-01-26: Added MCP Memory Server setup instructions to docs/DEPLOYMENT.md.
 - 2026-01-26: Wired MCP server in ~/.codex/config.toml and built release binary for memory MCP.
+- 2026-01-26: Added native iOS Memory search bar (searchable + submit handling).

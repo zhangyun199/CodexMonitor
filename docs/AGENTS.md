@@ -81,10 +81,48 @@ Full details: `docs/API_REFERENCE.md`
 
 ## Gotchas & landmines
 
-- **Mixed JSON naming**: some payloads are snake_case (`codex_bin`, `workspace_id`), others camelCase (`parentId`, request params). Don’t “normalize” without changing all clients.
+- **Mixed JSON naming**: some payloads are snake_case (`codex_bin`, `workspace_id`), others camelCase (`parentId`, request params). Don't "normalize" without changing all clients.
 - **Codex responses are nested**: many RPC methods return the raw app-server response envelope; clients often need `result.result`.
 - **Auth vs insecure mode**: iOS always performs `auth` and will not connect to a daemon started with `--insecure-no-auth` (unless mobile is changed).
 - **Terminal output is unbounded**: output streams can flood UI; trim buffers and consider backpressure if adding new streams.
 - **Approval rules are security-sensitive**: `remember_approval_rule` changes CODEX_HOME rules; treat it like editing sudoers.
+
+---
+
+## Supabase + Embeddings Infrastructure
+
+> Existing infrastructure for semantic search - reuse for memory features.
+
+### What exists
+| Component | Location |
+|-----------|----------|
+| Supabase client | `/Volumes/YouTube 4TB/code/_archive/life-mcp/src/supabase/client.js` |
+| MiniMax embeddings | `/Volumes/YouTube 4TB/code/_archive/life-mcp/src/clients/minimax-embeddings.js` |
+| Embedding pipeline | `/Volumes/YouTube 4TB/code/_archive/life-mcp/src/supabase/note-embeddings.js` |
+| Knowledge MCP tools | `/Volumes/YouTube 4TB/code/_archive/life-mcp/src/tools/knowledge.js` |
+| SQL migrations | `/Volumes/YouTube 4TB/code/_archive/life-mcp/migrations/` |
+
+### Supabase tables (existing)
+`notes`, `inbox_items`, `tasks`, `deliveries`, `meals`, `workouts`, `youtube_ideas`, `media`
+
+### Embedding pattern
+```javascript
+// 1. Generate embedding via MiniMax embo-01
+const embedding = await minimax.createEmbedding(text);  // returns 1536-dim vector
+
+// 2. Search via pgvector RPC
+const { data } = await supabase.rpc('search_notes_by_embedding', {
+  query_embedding: embedding,
+  match_count: 10,
+  max_distance: 0.5
+});
+```
+
+### For memory integration
+See `docs/PLAN-memory-integration.md` for the phased implementation plan. Key points:
+- Add `memory` table to Supabase (not SQLite)
+- Port MiniMax client to Rust
+- Add memory RPC methods to daemon
+- Add iOS Memory tab
 
 ---

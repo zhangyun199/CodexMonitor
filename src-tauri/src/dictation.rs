@@ -54,16 +54,28 @@ fn trigger_microphone_permission_request() -> Result<(), String> {
 /// Returns Ok(true) if permission was granted, Ok(false) if denied,
 /// or Err with a message if the request failed.
 #[cfg(target_os = "macos")]
-async fn request_microphone_permission() -> Result<bool, String> {
+async fn request_microphone_permission(app: &AppHandle) -> Result<bool, String> {
     let status = check_microphone_authorization()?;
 
     match status {
         AVAuthorizationStatus::Authorized => Ok(true),
         AVAuthorizationStatus::Denied | AVAuthorizationStatus::Restricted => Ok(false),
         AVAuthorizationStatus::NotDetermined | _ => {
-            // Trigger the permission request (this shows the system dialog)
-            // We do this in a sync context to avoid RcBlock Send issues
-            trigger_microphone_permission_request()?;
+            // Trigger the permission request on the main thread (this shows the system dialog)
+            // We use oneshot channel to handle RcBlock Send issues on macOS 15
+            let (tx, rx) = oneshot::channel();
+            let app_handle = app.clone();
+            app_handle
+                .run_on_main_thread(move || {
+                    let _ = tx.send(trigger_microphone_permission_request());
+                })
+                .map_err(|error| error.to_string())?;
+
+            match rx.await {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => return Err(error),
+                Err(_) => return Err("Failed to request microphone permission.".to_string()),
+            }
 
             // Poll the authorization status until it changes from NotDetermined
             let mut attempts = 0;
@@ -84,7 +96,7 @@ async fn request_microphone_permission() -> Result<bool, String> {
 }
 
 #[cfg(not(target_os = "macos"))]
-async fn request_microphone_permission() -> Result<bool, String> {
+async fn request_microphone_permission(_app: &AppHandle) -> Result<bool, String> {
     // On non-macOS platforms, assume permission is granted
     // (Linux doesn't have the same permission model)
     Ok(true)
@@ -748,7 +760,7 @@ pub(crate) async fn dictation_start(
     }
 
     // Request microphone permission before attempting to capture audio
-    match request_microphone_permission().await {
+    match request_microphone_permission(&app).await {
         Ok(true) => {
             // Permission granted, continue
         }

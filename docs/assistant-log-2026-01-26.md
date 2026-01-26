@@ -11,3 +11,5 @@
 ## Phase D: MCP Server for Codex - Sun Jan 25 21:47:56 PST 2026
 - Added codex_monitor_memory_mcp binary exposing memory_bootstrap, memory_search, memory_append
 - Wired MCP tool handling to MemoryService (Supabase-backed)
+- 2026-01-26: Added MCP Memory Server setup instructions to docs/DEPLOYMENT.md.
+- 2026-01-26: Wired MCP server in ~/.codex/config.toml and built release binary for memory MCP.

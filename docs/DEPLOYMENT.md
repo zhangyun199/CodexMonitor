@@ -165,6 +165,36 @@ Notes:
 
 ---
 
+## MCP Memory Server (Codex tools)
+
+The Memory MCP server runs as a local stdio process and must be registered in Codex config.
+
+### Build the MCP binary
+
+```bash
+cd "/Volumes/YouTube 4TB/CodexMonitor"
+cargo build --manifest-path src-tauri/Cargo.toml --release
+```
+
+### Add to Codex config
+
+Edit `~/.codex/config.toml` and add:
+
+```toml
+[mcp_servers.codex_monitor_memory]
+command = "/Volumes/YouTube 4TB/CodexMonitor/target/release/codex_monitor_memory_mcp"
+args = []
+env = {
+  SUPABASE_URL = "https://<project>.supabase.co",
+  SUPABASE_ANON_KEY = "<anon key>",
+  MINIMAX_API_KEY = "<optional>"
+}
+```
+
+Restart Codex/app-server after updating the config so the MCP tools are loaded.
+
+---
+
 ## Operational checklist
 
 - ✅ Daemon listens on `127.0.0.1:4732` (not `0.0.0.0`)

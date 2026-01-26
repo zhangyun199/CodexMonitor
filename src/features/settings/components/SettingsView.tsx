@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ask, open } from "@tauri-apps/plugin-dialog";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
@@ -259,6 +259,19 @@ export function SettingsView({
       ) ?? DICTATION_MODELS[1]
     );
   }, [appSettings.dictationModelId]);
+
+  const updateAutoMemory = useCallback(
+    (patch: Partial<AppSettings["autoMemory"]>) => {
+      void onUpdateAppSettings({
+        ...appSettings,
+        autoMemory: {
+          ...appSettings.autoMemory,
+          ...patch,
+        },
+      });
+    },
+    [appSettings, onUpdateAppSettings],
+  );
 
   const projects = useMemo(
     () => groupedWorkspaces.flatMap((group) => group.workspaces),
@@ -2196,6 +2209,146 @@ export function SettingsView({
                     </div>
                   </div>
                 )}
+
+                <div className="settings-subsection-title">Auto Memory</div>
+                <div className="settings-subsection-subtitle">
+                  Automatically flush key context to memory before compaction.
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label" htmlFor="auto-memory-enabled">
+                    Enable auto memory
+                  </label>
+                  <input
+                    id="auto-memory-enabled"
+                    type="checkbox"
+                    checked={appSettings.autoMemory.enabled}
+                    onChange={(event) =>
+                      updateAutoMemory({ enabled: event.target.checked })
+                    }
+                  />
+                </div>
+                <div className="settings-grid">
+                  <div className="settings-field">
+                    <label className="settings-field-label" htmlFor="auto-memory-reserve">
+                      Reserve tokens floor
+                    </label>
+                    <input
+                      id="auto-memory-reserve"
+                      className="settings-input"
+                      type="number"
+                      value={appSettings.autoMemory.reserveTokensFloor}
+                      onChange={(event) =>
+                        updateAutoMemory({
+                          reserveTokensFloor: Number(event.target.value || 0),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="settings-field">
+                    <label className="settings-field-label" htmlFor="auto-memory-threshold">
+                      Soft threshold tokens
+                    </label>
+                    <input
+                      id="auto-memory-threshold"
+                      className="settings-input"
+                      type="number"
+                      value={appSettings.autoMemory.softThresholdTokens}
+                      onChange={(event) =>
+                        updateAutoMemory({
+                          softThresholdTokens: Number(event.target.value || 0),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="settings-field">
+                    <label className="settings-field-label" htmlFor="auto-memory-interval">
+                      Min interval (sec)
+                    </label>
+                    <input
+                      id="auto-memory-interval"
+                      className="settings-input"
+                      type="number"
+                      value={appSettings.autoMemory.minIntervalSeconds}
+                      onChange={(event) =>
+                        updateAutoMemory({
+                          minIntervalSeconds: Number(event.target.value || 0),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="settings-field">
+                    <label className="settings-field-label" htmlFor="auto-memory-turns">
+                      Max turns
+                    </label>
+                    <input
+                      id="auto-memory-turns"
+                      className="settings-input"
+                      type="number"
+                      value={appSettings.autoMemory.maxTurns}
+                      onChange={(event) =>
+                        updateAutoMemory({
+                          maxTurns: Number(event.target.value || 0),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="settings-field">
+                    <label className="settings-field-label" htmlFor="auto-memory-chars">
+                      Max snapshot chars
+                    </label>
+                    <input
+                      id="auto-memory-chars"
+                      className="settings-input"
+                      type="number"
+                      value={appSettings.autoMemory.maxSnapshotChars}
+                      onChange={(event) =>
+                        updateAutoMemory({
+                          maxSnapshotChars: Number(event.target.value || 0),
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label">Include tool output</label>
+                  <input
+                    type="checkbox"
+                    checked={appSettings.autoMemory.includeToolOutput}
+                    onChange={(event) =>
+                      updateAutoMemory({ includeToolOutput: event.target.checked })
+                    }
+                  />
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label">Include git status</label>
+                  <input
+                    type="checkbox"
+                    checked={appSettings.autoMemory.includeGitStatus}
+                    onChange={(event) =>
+                      updateAutoMemory({ includeGitStatus: event.target.checked })
+                    }
+                  />
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label">Write daily memory</label>
+                  <input
+                    type="checkbox"
+                    checked={appSettings.autoMemory.writeDaily}
+                    onChange={(event) =>
+                      updateAutoMemory({ writeDaily: event.target.checked })
+                    }
+                  />
+                </div>
+                <div className="settings-field">
+                  <label className="settings-field-label">Write curated memory</label>
+                  <input
+                    type="checkbox"
+                    checked={appSettings.autoMemory.writeCurated}
+                    onChange={(event) =>
+                      updateAutoMemory({ writeCurated: event.target.checked })
+                    }
+                  />
+                </div>
 
                 <div className="settings-field">
                   <div className="settings-field-label">Workspace overrides</div>

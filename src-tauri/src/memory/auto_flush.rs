@@ -483,3 +483,50 @@ pub async fn write_memory_flush(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn should_flush_respects_thresholds() {
+        let mut settings = AutoMemorySettings::default();
+        settings.enabled = true;
+        settings.reserve_tokens_floor = 10_000;
+        settings.soft_threshold_tokens = 2_000;
+        let model_window = 32_000;
+
+        // usable window = 22k, trigger when context >= 20k
+        assert!(!should_flush(&settings, 19_500, model_window));
+        assert!(should_flush(&settings, 20_000, model_window));
+        assert!(should_flush(&settings, 25_000, model_window));
+    }
+
+    #[test]
+    fn should_flush_disabled_is_false() {
+        let mut settings = AutoMemorySettings::default();
+        settings.enabled = false;
+        assert!(!should_flush(&settings, 50_000, 128_000));
+    }
+
+    #[test]
+    fn compaction_epoch_increments_on_drop() {
+        let epoch = 3;
+        let next = detect_compaction_epoch(Some(20_000), 8_000, epoch);
+        assert_eq!(next, epoch + 1);
+        let same = detect_compaction_epoch(Some(20_000), 16_000, epoch);
+        assert_eq!(same, epoch);
+    }
+
+    #[test]
+    fn parse_memory_flush_result_handles_invalid_json() {
+        let raw = "not json";
+        let result = parse_memory_flush_result(raw);
+        assert!(!result.no_reply);
+        assert!(result.daily_markdown.contains("not json"));
+        assert!(result
+            .tags
+            .iter()
+            .any(|tag| tag == "auto_memory_parse_error"));
+    }
+}

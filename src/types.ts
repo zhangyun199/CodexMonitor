@@ -187,6 +187,13 @@ export type MemoryEntry = {
   created_at?: string | null;
 };
 
+export type SkillValidationResult = {
+  name: string;
+  path: string;
+  issues: string[];
+  description?: string | null;
+};
+
 export type CodexDoctorResult = {
   ok: boolean;
   codexBin: string | null;

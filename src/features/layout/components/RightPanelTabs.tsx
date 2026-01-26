@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import GitBranch from "lucide-react/dist/esm/icons/git-branch";
 import Brain from "lucide-react/dist/esm/icons/brain";
+import Globe from "lucide-react/dist/esm/icons/globe";
+import Sparkles from "lucide-react/dist/esm/icons/sparkles";
 
-export type RightPanelTabId = "git" | "memory";
+export type RightPanelTabId = "git" | "memory" | "browser" | "skills";
 
 type RightPanelTab = {
   id: RightPanelTabId;
@@ -18,6 +20,8 @@ type RightPanelTabsProps = {
 const tabs: RightPanelTab[] = [
   { id: "git", label: "Git", icon: <GitBranch aria-hidden /> },
   { id: "memory", label: "Memory", icon: <Brain aria-hidden /> },
+  { id: "browser", label: "Browser", icon: <Globe aria-hidden /> },
+  { id: "skills", label: "Skills", icon: <Sparkles aria-hidden /> },
 ];
 
 export function RightPanelTabs({ active, onSelect }: RightPanelTabsProps) {

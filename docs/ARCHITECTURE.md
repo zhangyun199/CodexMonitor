@@ -709,3 +709,26 @@ pub struct SkillDescriptor {
 - `"global"` — installs to `$CODEX_HOME/skills/`
 - `"workspace"` — installs to `<workspace>/.codex/skills/`
 
+
+---
+
+## Auto-Memory (2026-01-26)
+
+- **AutoMemoryCoordinator** lives in daemon (`src-tauri/src/bin/codex_monitor_daemon.rs` + `memory/auto_flush.rs`).
+- Watches `thread/tokenUsage/updated` events.
+- When near model context limit, it:
+  1. Calls `thread/resume` → snapshot recent turns.
+  2. Runs background summarizer turn (hidden thread).
+  3. Writes daily/curated memory via `MemoryService`.
+
+## Browser Control (2026-01-26)
+
+- **BrowserService** (Rust) spawns a **Playwright worker** (`browser-worker/`).
+- Worker protocol is line-delimited JSON over stdin/stdout.
+- Daemon exposes browser RPCs; MCP server (`codex_monitor_browser_mcp`) proxies to daemon.
+
+## Skills Management (2026-01-26)
+
+- `skills/config/write` is proxied via daemon RPC `skills_config_write`.
+- `SKILL.md` frontmatter parsing + validation in `skills/skill_md.rs`.
+- Install/uninstall supported via git clone into `.codex/skills`.

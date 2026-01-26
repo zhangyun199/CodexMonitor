@@ -18,6 +18,8 @@ import { TabletNav } from "../../app/components/TabletNav";
 import { TerminalDock } from "../../terminal/components/TerminalDock";
 import { TerminalPanel } from "../../terminal/components/TerminalPanel";
 import { MemoryPanel } from "../../memory/components/MemoryPanel";
+import { BrowserPanel } from "../../browser/components/BrowserPanel";
+import { SkillsPanel } from "../../skills/components/SkillsPanel";
 import {
   RightPanelTabs,
   type RightPanelTabId,
@@ -732,6 +734,8 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
   );
 
   const memoryPanelNode = <MemoryPanel workspaceId={options.activeWorkspaceId} />;
+  const browserPanelNode = <BrowserPanel />;
+  const skillsPanelNode = <SkillsPanel workspaceId={options.activeWorkspaceId} />;
 
   const rightPanelNode = (
     <div className="right-panel-stack">
@@ -743,7 +747,13 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
         />
       </div>
       <div className="right-panel-content">
-        {options.rightPanelMode === "memory" ? memoryPanelNode : gitDiffPanelNode}
+        {options.rightPanelMode === "memory"
+          ? memoryPanelNode
+          : options.rightPanelMode === "browser"
+            ? browserPanelNode
+            : options.rightPanelMode === "skills"
+              ? skillsPanelNode
+              : gitDiffPanelNode}
       </div>
     </div>
   );

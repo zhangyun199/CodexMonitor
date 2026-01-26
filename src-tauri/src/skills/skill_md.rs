@@ -125,3 +125,43 @@ fn split_frontmatter(content: &str) -> (Option<String>, String) {
         .join("\n");
     (Some(frontmatter), body)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn parse_skill_md_with_frontmatter() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("SKILL.md");
+        let content = r#"---
+name: Test Skill
+description: Fancy skill
+requirements:
+  bins: ["git"]
+  env: ["API_KEY"]
+  os: ["macos"]
+---
+
+Body content
+"#;
+        std::fs::write(&path, content).expect("write");
+        let desc = parse_skill_md(&path).expect("parse");
+        assert_eq!(desc.name, "Test Skill");
+        assert_eq!(desc.description.as_deref(), Some("Fancy skill"));
+        assert!(desc.requirements.bins.contains(&"git".to_string()));
+        assert!(desc.requirements.env.contains(&"API_KEY".to_string()));
+        assert!(desc.requirements.os.contains(&"macos".to_string()));
+    }
+
+    #[test]
+    fn parse_skill_md_without_frontmatter_uses_body() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("SKILL.md");
+        let content = "First line description\nMore details";
+        std::fs::write(&path, content).expect("write");
+        let desc = parse_skill_md(&path).expect("parse");
+        assert_eq!(desc.description.as_deref(), Some("First line description"));
+    }
+}

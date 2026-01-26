@@ -202,3 +202,31 @@ Restart Codex/app-server after updating the config so the MCP tools are loaded.
 - ✅ Tailscale serve enabled (if remote access needed)
 - ✅ `codex` and `node` available in launchd `PATH`
 - ✅ Logs monitored for crashes
+
+---
+
+## Browser Worker + MCP (2026-01-26)
+
+### Browser Worker
+```bash
+cd browser-worker
+npm install
+npm run build
+```
+
+Set optional override:
+```bash
+export CODEX_MONITOR_BROWSER_WORKER=/absolute/path/to/browser-worker/dist/index.js
+```
+
+### Browser MCP
+```bash
+export CODEX_MONITOR_DAEMON_ADDR=127.0.0.1:4732
+export CODEX_MONITOR_DAEMON_TOKEN=your-token
+```
+
+Add to `~/.codex/config.toml`:
+```toml
+[mcp_servers.codex_monitor_browser]
+command = "codex_monitor_browser_mcp"
+```

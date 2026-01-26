@@ -32,6 +32,7 @@ import { AppLayout } from "./features/app/components/AppLayout";
 import { AppModals } from "./features/app/components/AppModals";
 import { MainHeaderActions } from "./features/app/components/MainHeaderActions";
 import { useLayoutNodes } from "./features/layout/hooks/useLayoutNodes";
+import type { RightPanelTabId } from "./features/layout/components/RightPanelTabs";
 import { useWorkspaceDropZone } from "./features/workspaces/hooks/useWorkspaceDropZone";
 import { useThreads } from "./features/threads/hooks/useThreads";
 import { useThreadUserInput } from "./features/threads/hooks/useThreadUserInput";
@@ -153,7 +154,9 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState<
     "projects" | "codex" | "git" | "log"
   >("codex");
-  const [rightPanelMode, setRightPanelMode] = useState<"git" | "memory">("git");
+  const [rightPanelMode, setRightPanelMode] = useState<
+    "git" | "memory" | "browser" | "skills"
+  >("git");
   const tabletTab = activeTab === "projects" ? "codex" : activeTab;
   const {
     workspaces,
@@ -431,7 +434,7 @@ function MainApp() {
   });
 
   const handleSelectRightPanelMode = useCallback(
-    (mode: "git" | "memory") => {
+    (mode: RightPanelTabId) => {
       setRightPanelMode(mode);
       if (rightPanelCollapsed) {
         expandRightPanel();

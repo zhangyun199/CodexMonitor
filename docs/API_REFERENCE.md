@@ -4417,3 +4417,105 @@ Example:
 
 Notes:
 - This is raw PTY output. Clients are responsible for emulation/rendering.
+
+---
+
+## Browser (Updated 2026-01-26)
+
+All browser methods are daemon RPCs that proxy to the Playwright worker. No `workspaceId` required.
+
+### `browser_create_session`
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `headless` | `boolean` | no | Defaults true |
+| `viewport` | `object` | no | `{ width, height }` |
+| `userDataDir` | `string` | no | Persistent profile dir |
+| `startUrl` | `string` | no | Optional initial URL |
+
+**Response**
+
+```json
+{ "sessionId": "b-..." }
+```
+
+### `browser_list_sessions`
+
+**Response**
+
+```json
+{ "sessions": ["b-..."] }
+```
+
+### `browser_navigate`
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `sessionId` | `string` | yes | Session id |
+| `url` | `string` | yes | URL |
+| `waitUntil` | `string` | no | `load`/`domcontentloaded`/`networkidle` |
+| `timeoutMs` | `number` | no | Timeout |
+
+### `browser_screenshot`
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `sessionId` | `string` | yes | Session id |
+| `fullPage` | `boolean` | no | Full page screenshot |
+
+**Response**
+
+```json
+{ "base64Png": "...", "url": "...", "title": "...", "width": 1280, "height": 720 }
+```
+
+### `browser_click`, `browser_type`, `browser_press`, `browser_evaluate`, `browser_snapshot`, `browser_close_session`
+
+See worker protocol in `browser-worker/src/index.ts` for exact params.
+
+---
+
+## Skills (Updated 2026-01-26)
+
+### `skills_config_write`
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Connected workspace |
+| `config` | `object` | yes | Passed to `skills/config/write` |
+
+### `skills_validate`
+
+**Response**
+
+```json
+[{ "name": "...", "path": "...", "issues": [], "description": "..." }]
+```
+
+### `skills_install_from_git`
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `sourceUrl` | `string` | yes | Git URL |
+| `target` | `string` | yes | `global` or `workspace` |
+| `workspaceId` | `string` | no | Required for `workspace` target |
+
+### `skills_uninstall`
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `name` | `string` | yes | Repo folder name |
+| `target` | `string` | yes | `global` or `workspace` |
+| `workspaceId` | `string` | no | Required for `workspace` target |

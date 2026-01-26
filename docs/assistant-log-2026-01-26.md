@@ -25,3 +25,8 @@
 - 2026-01-26: Updated MCP binary path in docs + local config to src-tauri/target/release.
 - 2026-01-26: Ran MCP memory tools end-to-end; search now falls back to text when embeddings fail.
 - 2026-01-26: Ran cargo build --release and npm run build (warnings only).
+
+## 2026-01-26 – Phase E polish / MiniMax rate-limit fix (follow-up)
+- ✅ Rebuilt release after MiniMax client changes (cargo build --release).
+- 🔧 Added MiniMax rate-limit handling (min interval + retry/backoff) in embeddings client.
+- 🧪 MCP test run without env vars showed memory disabled (expected when SUPABASE_* not set).

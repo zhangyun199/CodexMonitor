@@ -518,6 +518,48 @@ final class CodexStore: ObservableObject {
         }
     }
 
+    // MARK: - Memory
+    func memoryStatus() async -> MemoryStatus? {
+        do {
+            return try await api.memoryStatus()
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    func memorySearch(query: String, limit: Int = 10) async -> [MemorySearchResult] {
+        do {
+            return try await api.memorySearch(query: query, limit: limit)
+        } catch {
+            lastError = error.localizedDescription
+            return []
+        }
+    }
+
+    func memoryBootstrap() async -> [MemorySearchResult] {
+        do {
+            return try await api.memoryBootstrap()
+        } catch {
+            lastError = error.localizedDescription
+            return []
+        }
+    }
+
+    func memoryAppend(
+        type: MemoryType,
+        content: String,
+        tags: [String] = [],
+        workspaceId: String? = nil
+    ) async -> MemoryEntry? {
+        do {
+            return try await api.memoryAppend(type: type, content: content, tags: tags, workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
     func openTerminal(workspaceId: String, terminalId: String, cols: Int, rows: Int) async {
         do {
             _ = try await api.terminalOpen(workspaceId: workspaceId, terminalId: terminalId, cols: cols, rows: rows)

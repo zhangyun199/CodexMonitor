@@ -117,6 +117,11 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var dictationModelId: String
     public var dictationPreferredLanguage: String?
     public var dictationHoldKey: String
+    public var memory_enabled: Bool?
+    public var supabase_url: String?
+    public var supabase_anon_key: String?
+    public var minimax_api_key: String?
+    public var memory_embedding_enabled: Bool?
     public var composerEditorPreset: ComposerEditorPreset
     public var composerFenceExpandOnSpace: Bool
     public var composerFenceExpandOnEnter: Bool
@@ -127,6 +132,66 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var composerListContinuation: Bool
     public var composerCodeBlockCopyUseModifier: Bool
     public var workspaceGroups: [WorkspaceGroup]
+}
+
+// MARK: - Memory
+
+public struct MemoryStatus: Codable, Sendable {
+    public let enabled: Bool
+    public let embeddingsEnabled: Bool
+    public let total: Int
+    public let pending: Int
+    public let ready: Int
+    public let error: Int
+
+    enum CodingKeys: String, CodingKey {
+        case enabled
+        case embeddingsEnabled = "embeddings_enabled"
+        case total, pending, ready, error
+    }
+}
+
+public struct MemorySearchResult: Codable, Sendable, Identifiable {
+    public let id: String
+    public let content: String
+    public let memoryType: String
+    public let tags: [String]
+    public let workspaceId: String?
+    public let createdAt: String
+    public let distance: Double?
+    public let score: Double?
+    public let rank: Float?
+
+    enum CodingKeys: String, CodingKey {
+        case id, content, tags
+        case memoryType = "memory_type"
+        case workspaceId = "workspace_id"
+        case createdAt = "created_at"
+        case distance, score, rank
+    }
+}
+
+public struct MemoryEntry: Codable, Sendable {
+    public let id: String?
+    public let content: String
+    public let memoryType: String
+    public let tags: [String]
+    public let workspaceId: String?
+    public let embeddingStatus: String?
+    public let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, content, tags
+        case memoryType = "memory_type"
+        case workspaceId = "workspace_id"
+        case embeddingStatus = "embedding_status"
+        case createdAt = "created_at"
+    }
+}
+
+public enum MemoryType: String, Codable, Sendable, CaseIterable {
+    case daily
+    case curated
 }
 
 // MARK: - App Server Events

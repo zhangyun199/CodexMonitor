@@ -60,6 +60,20 @@ private struct PhoneRootView: View {
             }
 
             NavigationStack {
+                MemoryView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showSettings = true }) {
+                                Image(systemName: "gearshape")
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Memory", systemImage: "brain.head.profile")
+            }
+
+            NavigationStack {
                 GitView()
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
@@ -100,6 +114,7 @@ private struct TabletRootView: View {
 
     enum TabletDetail: String, CaseIterable {
         case conversation = "Conversation"
+        case memory = "Memory"
         case git = "Git"
         case files = "Files"
         case prompts = "Prompts"
@@ -145,6 +160,8 @@ private struct DetailColumnView: View {
                 switch detailSelection {
                 case .conversation:
                     ConversationTabView(selectedThreadId: selectedThreadId)
+                case .memory:
+                    MemoryView()
                 case .git:
                     GitView()
                 case .files:
@@ -204,6 +221,7 @@ private struct GlassSegmentedPicker: View {
     private func iconFor(_ item: TabletRootView.TabletDetail) -> String {
         switch item {
         case .conversation: return "bubble.left.and.text.bubble.right"
+        case .memory: return "brain.head.profile"
         case .git: return "arrow.triangle.branch"
         case .files: return "folder"
         case .prompts: return "text.alignleft"

@@ -17,6 +17,7 @@
 		A01122334455667788990011 /* GradientBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = B01122334455667788990011 /* GradientBackground.swift */; };
 		1A3E8FBDE1ADAEE4363F8302 /* ComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDF38ECB2DE05396E6A7682A /* ComposerView.swift */; };
 		1A66DD6B664167EFE7A62F58 /* DebugLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31AB4D3EF9E188DAB8DA7C75 /* DebugLogView.swift */; };
+		A1B2C3D4E5F60718293A4B5C /* MemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E4F5061728394A5B6C /* MemoryView.swift */; };
 		47D2F022DA79E1A866DBD505 /* GitView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 332924F0468527C55DB195B9 /* GitView.swift */; };
 		4DCA804591D7518EA4F3D66B /* CodexMonitorModels in Frameworks */ = {isa = PBXBuildFile; productRef = 0A9EC750B192FD6003382EAD /* CodexMonitorModels */; };
 		6019E2E4BC78C505DD3EB259 /* CodexMonitorMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67B95E6A79A2C82BED050601 /* CodexMonitorMobileApp.swift */; };
@@ -43,6 +44,7 @@
 		FF1122334455667788990011 /* BackgroundClearer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundClearer.swift; sourceTree = "<group>"; };
 		B01122334455667788990011 /* GradientBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GradientBackground.swift; sourceTree = "<group>"; };
 		31AB4D3EF9E188DAB8DA7C75 /* DebugLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLogView.swift; sourceTree = "<group>"; };
+		B1C2D3E4F5061728394A5B6C /* MemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryView.swift; sourceTree = "<group>"; };
 		332924F0468527C55DB195B9 /* GitView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitView.swift; sourceTree = "<group>"; };
 		37C29E5C3611320FC10D9ED7 /* ConnectionStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatusView.swift; sourceTree = "<group>"; };
 		4A254DC55323C0A29A41B82B /* DictationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DictationController.swift; sourceTree = "<group>"; };
@@ -95,6 +97,7 @@
 				9606326EE37D6F9B6A25ABB7 /* ConversationTabView.swift */,
 				9AAE9939D738929B6D5E1D4F /* ConversationView.swift */,
 				31AB4D3EF9E188DAB8DA7C75 /* DebugLogView.swift */,
+				B1C2D3E4F5061728394A5B6C /* MemoryView.swift */,
 				E762517F828F5A45F3DF01D2 /* FilesView.swift */,
 				332924F0468527C55DB195B9 /* GitView.swift */,
 				8287D1567CA2373C9878A4A4 /* GlassComponents.swift */,
@@ -222,6 +225,7 @@
 				102D26955010C65D4C73468E /* ConversationTabView.swift in Sources */,
 				A8AD5AA1B23B0B8D4E706E35 /* ConversationView.swift in Sources */,
 				1A66DD6B664167EFE7A62F58 /* DebugLogView.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5C /* MemoryView.swift in Sources */,
 				A5B3D2FDB4230E940082D05D /* DictationController.swift in Sources */,
 				E2194F8B70D18C7797193374 /* FilesView.swift in Sources */,
 				47D2F022DA79E1A866DBD505 /* GitView.swift in Sources */,

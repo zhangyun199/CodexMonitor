@@ -141,6 +141,43 @@ public struct CodexMonitorAPI: Sendable {
         return try await call("codex_doctor", params: dict.isEmpty ? nil : .object(dict), as: CodexDoctorResult.self)
     }
 
+    // MARK: - Memory
+    public func memoryStatus() async throws -> MemoryStatus {
+        return try await call("memory_status", as: MemoryStatus.self)
+    }
+
+    public func memorySearch(query: String, limit: Int = 10) async throws -> [MemorySearchResult] {
+        return try await call(
+            "memory_search",
+            params: .object([
+                "query": .string(query),
+                "limit": .number(Double(limit)),
+            ]),
+            as: [MemorySearchResult].self
+        )
+    }
+
+    public func memoryAppend(
+        type: MemoryType,
+        content: String,
+        tags: [String] = [],
+        workspaceId: String? = nil
+    ) async throws -> MemoryEntry {
+        var params: [String: JSONValue] = [
+            "type": .string(type.rawValue),
+            "content": .string(content),
+            "tags": .array(tags.map { .string($0) }),
+        ]
+        if let workspaceId {
+            params["workspace_id"] = .string(workspaceId)
+        }
+        return try await call("memory_append", params: .object(params), as: MemoryEntry.self)
+    }
+
+    public func memoryBootstrap() async throws -> [MemorySearchResult] {
+        return try await call("memory_bootstrap", params: .object([:]), as: [MemorySearchResult].self)
+    }
+
     // MARK: - Threads / Codex
     public func startThread(workspaceId: String) async throws -> ThreadStartResponse {
         let value = try await rpc.call(method: "start_thread", params: .object(["workspaceId": .string(workspaceId)]))

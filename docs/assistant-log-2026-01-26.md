@@ -8,3 +8,6 @@
 - 2026-01-26: Implemented Phase C iOS Memory tab (Swift models, RPC methods, MemoryView UI, and RootView/segmented navigation updates).
 - 2026-01-26: Added MemoryView to Xcode project sources and updated CodexStore memory helpers.
 - 2026-01-26: Ran cargo build and npm run build (warnings only).
+## Phase D: MCP Server for Codex - Sun Jan 25 21:47:56 PST 2026
+- Added codex_monitor_memory_mcp binary exposing memory_bootstrap, memory_search, memory_append
+- Wired MCP tool handling to MemoryService (Supabase-backed)

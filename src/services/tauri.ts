@@ -271,6 +271,89 @@ export async function memoryBootstrap(): Promise<MemorySearchResult[]> {
   return invoke<MemorySearchResult[]>("memory_bootstrap");
 }
 
+export async function memoryFlushNow(
+  workspaceId: string,
+  threadId: string,
+  force = false,
+): Promise<unknown> {
+  return invoke("memory_flush_now", { workspaceId, threadId, force });
+}
+
+export async function browserCreateSession(params: Record<string, unknown> = {}) {
+  return invoke("browser_create_session", params);
+}
+
+export async function browserListSessions() {
+  return invoke("browser_list_sessions", {});
+}
+
+export async function browserCloseSession(sessionId: string) {
+  return invoke("browser_close_session", { sessionId });
+}
+
+export async function browserNavigate(params: Record<string, unknown>) {
+  return invoke("browser_navigate", params);
+}
+
+export async function browserScreenshot(params: Record<string, unknown>) {
+  return invoke("browser_screenshot", params);
+}
+
+export async function browserClick(params: Record<string, unknown>) {
+  return invoke("browser_click", params);
+}
+
+export async function browserType(params: Record<string, unknown>) {
+  return invoke("browser_type", params);
+}
+
+export async function browserPress(params: Record<string, unknown>) {
+  return invoke("browser_press", params);
+}
+
+export async function browserSnapshot(params: Record<string, unknown>) {
+  return invoke("browser_snapshot", params);
+}
+
+export async function browserEvaluate(params: Record<string, unknown>) {
+  return invoke("browser_evaluate", params);
+}
+
+export async function skillsConfigWrite(
+  workspaceId: string,
+  config: Record<string, unknown>,
+) {
+  return invoke("skills_config_write", { workspaceId, config });
+}
+
+export async function skillsValidate(workspaceId: string) {
+  return invoke("skills_validate", { workspaceId });
+}
+
+export async function skillsInstallFromGit(
+  sourceUrl: string,
+  target: "global" | "workspace",
+  workspaceId?: string | null,
+) {
+  return invoke("skills_install_from_git", {
+    sourceUrl,
+    target,
+    workspaceId: workspaceId ?? null,
+  });
+}
+
+export async function skillsUninstall(
+  name: string,
+  target: "global" | "workspace",
+  workspaceId?: string | null,
+) {
+  return invoke("skills_uninstall", {
+    name,
+    target,
+    workspaceId: workspaceId ?? null,
+  });
+}
+
 export async function stageGitFile(workspaceId: string, path: string) {
   return invoke("stage_git_file", { workspaceId, path });
 }

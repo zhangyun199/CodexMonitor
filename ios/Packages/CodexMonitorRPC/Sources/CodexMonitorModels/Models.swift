@@ -124,6 +124,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var supabase_anon_key: String?
     public var minimax_api_key: String?
     public var memory_embedding_enabled: Bool?
+    public var autoMemory: AutoMemorySettings
     public var composerEditorPreset: ComposerEditorPreset
     public var composerFenceExpandOnSpace: Bool
     public var composerFenceExpandOnEnter: Bool
@@ -134,6 +135,19 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var composerListContinuation: Bool
     public var composerCodeBlockCopyUseModifier: Bool
     public var workspaceGroups: [WorkspaceGroup]
+}
+
+public struct AutoMemorySettings: Codable, Hashable, Sendable {
+    public var enabled: Bool
+    public var reserveTokensFloor: Int
+    public var softThresholdTokens: Int
+    public var minIntervalSeconds: Int
+    public var maxTurns: Int
+    public var maxSnapshotChars: Int
+    public var includeToolOutput: Bool
+    public var includeGitStatus: Bool
+    public var writeDaily: Bool
+    public var writeCurated: Bool
 }
 
 // MARK: - Memory
@@ -194,6 +208,51 @@ public struct MemoryEntry: Codable, Sendable {
 public enum MemoryType: String, Codable, Sendable, CaseIterable {
     case daily
     case curated
+}
+
+// MARK: - Browser
+
+public struct BrowserSessionCreated: Codable, Sendable {
+    public let sessionId: String
+}
+
+public struct BrowserSessionList: Codable, Sendable {
+    public let sessions: [String]
+}
+
+public struct BrowserScreenshot: Codable, Sendable {
+    public let base64Png: String
+    public let url: String?
+    public let title: String?
+    public let width: Int?
+    public let height: Int?
+}
+
+public struct BrowserElement: Codable, Sendable {
+    public let tag: String
+    public let text: String
+    public let name: String?
+    public let id: String?
+    public let href: String?
+}
+
+public struct BrowserSnapshot: Codable, Sendable {
+    public let base64Png: String
+    public let url: String?
+    public let title: String?
+    public let width: Int?
+    public let height: Int?
+    public let elements: [BrowserElement]
+}
+
+// MARK: - Skills
+
+public struct SkillValidationResult: Codable, Sendable, Identifiable {
+    public var id: String { name }
+    public let name: String
+    public let path: String
+    public let issues: [String]
+    public let description: String?
 }
 
 // MARK: - App Server Events

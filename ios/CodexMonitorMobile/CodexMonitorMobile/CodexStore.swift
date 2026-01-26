@@ -648,6 +648,85 @@ final class CodexStore: ObservableObject {
         }
     }
 
+    func memoryFlushNow(workspaceId: String, threadId: String, force: Bool = false) async {
+        do {
+            _ = try await api.memoryFlushNow(workspaceId: workspaceId, threadId: threadId, force: force)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    // MARK: - Browser
+    func browserCreateSession(headless: Bool = true, startUrl: String? = nil) async -> BrowserSessionCreated? {
+        do {
+            return try await api.browserCreateSession(headless: headless, startUrl: startUrl)
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    func browserListSessions() async -> [String] {
+        do {
+            let list = try await api.browserListSessions()
+            return list.sessions
+        } catch {
+            lastError = error.localizedDescription
+            return []
+        }
+    }
+
+    func browserNavigate(sessionId: String, url: String) async {
+        do {
+            _ = try await api.browserNavigate(sessionId: sessionId, url: url)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func browserScreenshot(sessionId: String) async -> BrowserScreenshot? {
+        do {
+            return try await api.browserScreenshot(sessionId: sessionId)
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
+    func browserClick(sessionId: String, x: Double, y: Double) async {
+        do {
+            _ = try await api.browserClick(sessionId: sessionId, x: x, y: y)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    // MARK: - Skills
+    func skillsValidate(workspaceId: String) async -> [SkillValidationResult] {
+        do {
+            return try await api.skillsValidate(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+            return []
+        }
+    }
+
+    func skillsInstallFromGit(sourceUrl: String, target: String, workspaceId: String? = nil) async {
+        do {
+            _ = try await api.skillsInstallFromGit(sourceUrl: sourceUrl, target: target, workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func skillsUninstall(name: String, target: String, workspaceId: String? = nil) async {
+        do {
+            _ = try await api.skillsUninstall(name: name, target: target, workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
     func openTerminal(workspaceId: String, terminalId: String, cols: Int, rows: Int) async {
         do {
             _ = try await api.terminalOpen(workspaceId: workspaceId, terminalId: terminalId, cols: cols, rows: rows)

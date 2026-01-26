@@ -58,6 +58,18 @@ const defaultSettings: AppSettings = {
   composerFenceAutoWrapPasteCodeLike: false,
   composerListContinuation: false,
   composerCodeBlockCopyUseModifier: false,
+  autoMemory: {
+    enabled: false,
+    reserveTokensFloor: 20000,
+    softThresholdTokens: 4000,
+    minIntervalSeconds: 300,
+    maxTurns: 12,
+    maxSnapshotChars: 12000,
+    includeToolOutput: false,
+    includeGitStatus: false,
+    writeDaily: true,
+    writeCurated: true,
+  },
   workspaceGroups: [],
 };
 

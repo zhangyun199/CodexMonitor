@@ -3570,6 +3570,796 @@ LocalUsageSnapshot (see DATA_MODELS.md)
 
 ---
 
+## Memory
+
+### `memory_flush_now`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `threadId` | `string` | yes | Thread id to flush memory for. |
+
+
+**Response**
+
+Codex app-server response envelope for `memory/flushNow`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "memory_flush_now",
+  "params": {
+    "workspaceId": "...",
+    "threadId": "..."
+  }
+}
+```
+```json
+{
+  "id": 100,
+  "result": {
+    "id": 1,
+    "result": {
+      "ok": true
+    }
+  }
+}
+```
+
+**Notes**
+
+- Manually triggers a memory flush for the specified thread.
+
+- Useful when you want to persist conversation context immediately rather than waiting for automatic flush.
+
+
+
+---
+
+## Browser
+
+### `browser_create_session`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+
+
+**Response**
+
+Codex app-server response envelope for `browser/createSession`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "browser_create_session",
+  "params": {
+    "workspaceId": "..."
+  }
+}
+```
+```json
+{
+  "id": 101,
+  "result": {
+    "id": 1,
+    "result": {
+      "sessionId": "browser-session-abc123"
+    }
+  }
+}
+```
+
+**Notes**
+
+- Creates a new browser automation session.
+
+- Returns a session ID to use with other browser methods.
+
+
+
+### `browser_list_sessions`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+
+
+**Response**
+
+Codex app-server response envelope for `browser/listSessions`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "browser_list_sessions",
+  "params": {
+    "workspaceId": "..."
+  }
+}
+```
+```json
+{
+  "id": 102,
+  "result": {
+    "id": 1,
+    "result": {
+      "sessions": [
+        {
+          "sessionId": "browser-session-abc123",
+          "url": "https://example.com"
+        }
+      ]
+    }
+  }
+}
+```
+
+**Notes**
+
+- Lists all active browser sessions for the workspace.
+
+
+
+### `browser_close_session`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `sessionId` | `string` | yes | Browser session id to close. |
+
+
+**Response**
+
+Codex app-server response envelope for `browser/closeSession`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "browser_close_session",
+  "params": {
+    "workspaceId": "...",
+    "sessionId": "..."
+  }
+}
+```
+```json
+{
+  "id": 103,
+  "result": {
+    "id": 1,
+    "result": {
+      "ok": true
+    }
+  }
+}
+```
+
+**Notes**
+
+- Closes and cleans up a browser session.
+
+
+
+### `browser_navigate`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `sessionId` | `string` | yes | Browser session id. |
+| `url` | `string` | yes | URL to navigate to. |
+
+
+**Response**
+
+Codex app-server response envelope for `browser/navigate`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "browser_navigate",
+  "params": {
+    "workspaceId": "...",
+    "sessionId": "...",
+    "url": "https://example.com"
+  }
+}
+```
+```json
+{
+  "id": 104,
+  "result": {
+    "id": 1,
+    "result": {
+      "ok": true,
+      "url": "https://example.com"
+    }
+  }
+}
+```
+
+**Notes**
+
+- Navigates the browser session to the specified URL.
+
+
+
+### `browser_screenshot`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `sessionId` | `string` | yes | Browser session id. |
+
+
+**Response**
+
+Codex app-server response envelope for `browser/screenshot`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "browser_screenshot",
+  "params": {
+    "workspaceId": "...",
+    "sessionId": "..."
+  }
+}
+```
+```json
+{
+  "id": 105,
+  "result": {
+    "id": 1,
+    "result": {
+      "data": "data:image/png;base64,..."
+    }
+  }
+}
+```
+
+**Notes**
+
+- Takes a screenshot of the current browser page.
+
+- Returns a base64-encoded image.
+
+
+
+### `browser_click`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `sessionId` | `string` | yes | Browser session id. |
+| `x` | `number` | no | X coordinate (pixels). Required if selector not provided. |
+| `y` | `number` | no | Y coordinate (pixels). Required if selector not provided. |
+| `selector` | `string` | no | CSS selector to click. Alternative to x/y coordinates. |
+
+
+**Response**
+
+Codex app-server response envelope for `browser/click`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "browser_click",
+  "params": {
+    "workspaceId": "...",
+    "sessionId": "...",
+    "x": 100,
+    "y": 200
+  }
+}
+```
+```json
+{
+  "id": 106,
+  "result": {
+    "id": 1,
+    "result": {
+      "ok": true
+    }
+  }
+}
+```
+
+**Notes**
+
+- Clicks at the specified coordinates or CSS selector.
+
+- Either x/y or selector must be provided.
+
+
+
+### `browser_type`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `sessionId` | `string` | yes | Browser session id. |
+| `text` | `string` | yes | Text to type. |
+
+
+**Response**
+
+Codex app-server response envelope for `browser/type`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "browser_type",
+  "params": {
+    "workspaceId": "...",
+    "sessionId": "...",
+    "text": "Hello, world!"
+  }
+}
+```
+```json
+{
+  "id": 107,
+  "result": {
+    "id": 1,
+    "result": {
+      "ok": true
+    }
+  }
+}
+```
+
+**Notes**
+
+- Types the specified text into the currently focused element.
+
+
+
+### `browser_press`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `sessionId` | `string` | yes | Browser session id. |
+| `key` | `string` | yes | Key to press (e.g., "Enter", "Tab", "Escape", "ArrowDown"). |
+
+
+**Response**
+
+Codex app-server response envelope for `browser/press`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "browser_press",
+  "params": {
+    "workspaceId": "...",
+    "sessionId": "...",
+    "key": "Enter"
+  }
+}
+```
+```json
+{
+  "id": 108,
+  "result": {
+    "id": 1,
+    "result": {
+      "ok": true
+    }
+  }
+}
+```
+
+**Notes**
+
+- Presses a keyboard key.
+
+- Common keys: Enter, Tab, Escape, Backspace, ArrowUp, ArrowDown, ArrowLeft, ArrowRight.
+
+
+
+### `browser_snapshot`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `sessionId` | `string` | yes | Browser session id. |
+
+
+**Response**
+
+Codex app-server response envelope for `browser/snapshot`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "browser_snapshot",
+  "params": {
+    "workspaceId": "...",
+    "sessionId": "..."
+  }
+}
+```
+```json
+{
+  "id": 109,
+  "result": {
+    "id": 1,
+    "result": {
+      "screenshot": "data:image/png;base64,...",
+      "dom": "<html>...</html>",
+      "url": "https://example.com"
+    }
+  }
+}
+```
+
+**Notes**
+
+- Gets a full page snapshot including screenshot and DOM content.
+
+- Useful for understanding the current page state.
+
+
+
+### `browser_evaluate`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `sessionId` | `string` | yes | Browser session id. |
+| `script` | `string` | yes | JavaScript code to execute. |
+
+
+**Response**
+
+Codex app-server response envelope for `browser/evaluate`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "browser_evaluate",
+  "params": {
+    "workspaceId": "...",
+    "sessionId": "...",
+    "script": "document.title"
+  }
+}
+```
+```json
+{
+  "id": 110,
+  "result": {
+    "id": 1,
+    "result": {
+      "value": "Example Page Title"
+    }
+  }
+}
+```
+
+**Notes**
+
+- Executes JavaScript in the browser context and returns the result.
+
+- The script runs in the page's execution context.
+
+
+
+---
+
+## Skills (Extended)
+
+### `skills_config_write`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `skillName` | `string` | yes | Name of the skill to configure. |
+| `enabled` | `boolean` | yes | Whether the skill should be enabled. |
+
+
+**Response**
+
+Codex app-server response envelope for `skills/configWrite`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "skills_config_write",
+  "params": {
+    "workspaceId": "...",
+    "skillName": "format",
+    "enabled": true
+  }
+}
+```
+```json
+{
+  "id": 111,
+  "result": {
+    "id": 1,
+    "result": {
+      "ok": true
+    }
+  }
+}
+```
+
+**Notes**
+
+- Enables or disables a skill in the configuration.
+
+
+
+### `skills_validate`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `skillName` | `string` | yes | Name of the skill to validate. |
+
+
+**Response**
+
+Codex app-server response envelope for `skills/validate`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "skills_validate",
+  "params": {
+    "workspaceId": "...",
+    "skillName": "format"
+  }
+}
+```
+```json
+{
+  "id": 112,
+  "result": {
+    "id": 1,
+    "result": {
+      "valid": true,
+      "requirements": [],
+      "errors": []
+    }
+  }
+}
+```
+
+**Notes**
+
+- Checks whether a skill's requirements are met.
+
+- Returns validation status and any missing requirements.
+
+
+
+### `skills_install_from_git`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `gitUrl` | `string` | yes | Git repository URL containing the skill. |
+| `branch` | `string` | no | Optional branch to install from (defaults to main/master). |
+
+
+**Response**
+
+Codex app-server response envelope for `skills/installFromGit`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "skills_install_from_git",
+  "params": {
+    "workspaceId": "...",
+    "gitUrl": "https://github.com/example/my-skill.git"
+  }
+}
+```
+```json
+{
+  "id": 113,
+  "result": {
+    "id": 1,
+    "result": {
+      "ok": true,
+      "skillName": "my-skill"
+    }
+  }
+}
+```
+
+**Notes**
+
+- Installs a skill from a git repository.
+
+- Clones the repository and registers the skill.
+
+
+
+### `skills_uninstall`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+| `skillName` | `string` | yes | Name of the skill to uninstall. |
+
+
+**Response**
+
+Codex app-server response envelope for `skills/uninstall`.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "skills_uninstall",
+  "params": {
+    "workspaceId": "...",
+    "skillName": "my-skill"
+  }
+}
+```
+```json
+{
+  "id": 114,
+  "result": {
+    "id": 1,
+    "result": {
+      "ok": true
+    }
+  }
+}
+```
+
+**Notes**
+
+- Removes an installed skill.
+
+- Only works for user-installed skills, not built-in skills.
+
+
+
+---
+
 ## Server → client notifications
 
 Once authenticated, a client connection subscribes to a broadcast stream.

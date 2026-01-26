@@ -130,6 +130,7 @@ export type AppSettings = {
   supabase_anon_key?: string;
   minimax_api_key?: string;
   memory_embedding_enabled?: boolean;
+  autoMemory: AutoMemorySettings;
   composerEditorPreset: ComposerEditorPreset;
   composerFenceExpandOnSpace: boolean;
   composerFenceExpandOnEnter: boolean;
@@ -140,6 +141,19 @@ export type AppSettings = {
   composerListContinuation: boolean;
   composerCodeBlockCopyUseModifier: boolean;
   workspaceGroups: WorkspaceGroup[];
+};
+
+export type AutoMemorySettings = {
+  enabled: boolean;
+  reserveTokensFloor: number;
+  softThresholdTokens: number;
+  minIntervalSeconds: number;
+  maxTurns: number;
+  maxSnapshotChars: number;
+  includeToolOutput: boolean;
+  includeGitStatus: boolean;
+  writeDaily: boolean;
+  writeCurated: boolean;
 };
 
 export type MemoryStatus = {

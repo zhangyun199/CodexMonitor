@@ -308,3 +308,404 @@ Until authenticated:
 - Treat the token as a password. Do not expose the daemon port on the public internet.
 - Recommended approach is to bind daemon to localhost and expose it privately via **Tailscale** (see `docs/DEPLOYMENT.md`).
 
+---
+
+## Memory System (Supabase + pgvector)
+
+CodexMonitor includes a semantic memory system for storing and retrieving context across sessions.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Supabase (Cloud)                            │
+│  ├── memory table (content, tags, embedding)                        │
+│  ├── pgvector extension (cosine similarity search)                  │
+│  └── search_memory_by_embedding() RPC function                      │
+└─────────────────────────────────────────────────────────────────────┘
+         │
+         ▼ (REST API + anon key)
+┌─────────────────────────────────────────────────────────────────────┐
+│              Daemon (Rust) - Memory Service                         │
+│  ├── MemoryService (src-tauri/src/memory/service.rs)                │
+│  │   └── Calls Supabase REST API for CRUD + search                  │
+│  ├── EmbeddingsClient (src-tauri/src/memory/embeddings.rs)          │
+│  │   └── Calls MiniMax API for text → vector embeddings             │
+│  └── JSON-RPC endpoints:                                            │
+│      ├── memory_append      - Add new memory entry                  │
+│      ├── memory_search      - Semantic search by query              │
+│      ├── memory_bootstrap   - Fetch recent entries (cold start)     │
+│      └── memory_delete      - Remove entry by ID                    │
+└─────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌───────────────┐     ┌───────────────┐     ┌───────────────┐
+│   iOS App     │     │  Desktop App  │     │    Codex      │
+│  Memory Tab   │     │  (Future)     │     │  MCP Server   │
+│  (SwiftUI)    │     │               │     │  (Standalone) │
+└───────────────┘     └───────────────┘     └───────────────┘
+```
+
+### Components
+
+#### 1. Supabase Memory Table
+
+PostgreSQL table with pgvector extension for semantic search:
+
+```sql
+CREATE TABLE memory (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  content TEXT NOT NULL,
+  memory_type TEXT DEFAULT 'daily',      -- 'daily' or 'curated'
+  tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+  source TEXT DEFAULT 'codexmonitor',
+  workspace_id TEXT,
+
+  -- Embedding columns
+  embedding vector,
+  embedding_model TEXT,
+  embedding_dim INT,
+  embedding_status TEXT DEFAULT 'pending',
+
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+#### 2. MiniMax Embeddings
+
+- **Model**: `embo-01` (1536 dimensions)
+- **API**: `https://api.minimax.io/v1/embeddings`
+- **Rate limit**: 15 seconds between requests
+- **Types**: `"db"` for storage, `"query"` for search
+
+Implementation: `src-tauri/src/memory/embeddings.rs`
+
+#### 3. Daemon Memory Service
+
+- **Path**: `src-tauri/src/memory/service.rs`
+- Handles:
+  - Append with auto-embedding generation
+  - Semantic search via RPC function call
+  - Bootstrap (fetch recent 50 entries)
+  - CRUD operations
+
+#### 4. MCP Server (Standalone)
+
+For Codex CLI integration:
+
+- **Binary**: `src-tauri/src/bin/codex_monitor_memory_mcp.rs`
+- **Config**: Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.codex_monitor_memory]
+command = "/path/to/codex_monitor_memory_mcp"
+args = []
+env = {
+  SUPABASE_URL = "https://xxx.supabase.co",
+  SUPABASE_ANON_KEY = "...",
+  MINIMAX_API_KEY = "..."
+}
+```
+
+**MCP Tools**:
+| Tool | Description |
+|------|-------------|
+| `memory_append` | Store new memory with auto-embedding |
+| `memory_search` | Semantic search by natural language query |
+| `memory_bootstrap` | Get recent entries for context |
+
+### Data Flow: Memory Search
+
+1. **User query**: "What did I work on yesterday?"
+2. **MiniMax API**: Query → 1536-dim embedding vector
+3. **Supabase RPC**: `search_memory_by_embedding(vector, limit)`
+4. **pgvector**: Cosine similarity search → ranked results
+5. **Return**: Top N matching memory entries
+
+### Configuration
+
+Environment variables (daemon or MCP server):
+- `SUPABASE_URL` - Supabase project URL
+- `SUPABASE_ANON_KEY` - Supabase anonymous key
+- `MINIMAX_API_KEY` - MiniMax API key for embeddings
+
+---
+
+## Auto-Memory System
+
+CodexMonitor includes an automatic memory system inspired by ClawdBot that captures context before the model's context window fills.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Daemon (Rust)                               │
+│  ├── AutoMemoryRuntime (src-tauri/src/memory/auto_flush.rs)         │
+│  │   └── Tracks per-thread token usage, compaction epochs           │
+│  ├── AutoMemoryCoordinator (in daemon main loop)                    │
+│  │   └── Monitors thread/tokenUsage/updated events                  │
+│  └── Background Summarizer                                          │
+│      └── Spawns ephemeral Codex thread for commit-message style     │
+│          summarization → writes to Supabase memory table            │
+└─────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              Supabase Memory (daily + curated entries)              │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Components
+
+#### 1. AutoMemoryRuntime
+
+- **Path**: `src-tauri/src/memory/auto_flush.rs`
+- Maintains per-thread state:
+  - `last_seen_context_tokens` — token count from last event
+  - `last_compaction_epoch` — increments when Codex compacts context
+  - `last_flush_at` — timestamp of last flush (rate limiting)
+  - `last_flush_epoch` — prevents duplicate flushes per compaction
+
+#### 2. Flush Trigger Logic
+
+```rust
+fn should_flush(settings, context_tokens, model_context_window) -> bool {
+    let usable_window = model_context_window - reserve_tokens_floor;
+    context_tokens >= usable_window - soft_threshold_tokens
+}
+```
+
+Compaction detection: if `new_tokens + (new_tokens / 2) < previous_tokens`, a compaction occurred and epoch increments.
+
+#### 3. Snapshot Builder
+
+When a flush triggers:
+1. Call `thread/resume` to fetch recent turns
+2. Extract user/assistant messages (optionally tool output)
+3. Collect `git status -sb` + `git diff --stat` if configured
+4. Build `MemoryFlushSnapshot` struct
+
+#### 4. Background Summarizer
+
+Spawns an ephemeral Codex thread with a structured prompt:
+- Input: `MemoryFlushSnapshot` as JSON
+- Output: JSON with `{ no_reply, title, tags, daily_markdown, curated_markdown }`
+- Timeout: 60 seconds
+- Thread is archived after completion
+
+The summarizer uses a "commit message" pattern — extract durable facts, decisions, TODOs, and project state worth remembering.
+
+### Configuration
+
+`AutoMemorySettings` in `settings.json`:
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `enabled` | `false` | Enable auto-memory |
+| `reserveTokensFloor` | `20000` | Tokens to reserve for output |
+| `softThresholdTokens` | `4000` | Buffer before flush trigger |
+| `minIntervalSeconds` | `300` | Minimum time between flushes |
+| `maxTurns` | `12` | Max turns to include in snapshot |
+| `maxSnapshotChars` | `12000` | Max chars for tool output |
+| `includeToolOutput` | `false` | Include tool results |
+| `includeGitStatus` | `false` | Include git status/diff |
+| `writeDaily` | `true` | Write to daily memory type |
+| `writeCurated` | `true` | Write to curated memory type |
+
+### RPC Endpoints
+
+| Method | Description |
+|--------|-------------|
+| `memory_flush_now` | Force immediate flush for a thread (params: `workspaceId`, `threadId`, `force`) |
+
+---
+
+## Browser Control System
+
+CodexMonitor provides browser automation capabilities through a Playwright-based worker process.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Daemon (Rust)                                  │
+│  └── BrowserService (src-tauri/src/browser/service.rs)              │
+│      └── Spawns and manages browser-worker process                  │
+│      └── JSON-RPC over stdio                                        │
+└─────────────────────────────────────────────────────────────────────┘
+         │ stdio (newline-delimited JSON)
+         ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│               browser-worker (Node.js + Playwright)                 │
+│  └── browser-worker/src/index.ts                                    │
+│      └── Manages browser sessions (Chromium)                        │
+│      └── Handles navigation, clicks, typing, screenshots            │
+└─────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌───────────────┐
+│   Chromium    │
+│   Browser     │
+└───────────────┘
+```
+
+### Components
+
+#### 1. BrowserService (Rust)
+
+- **Path**: `src-tauri/src/browser/service.rs`
+- Lazy-spawns `browser-worker` on first request
+- Maintains persistent connection via stdin/stdout
+- Request/response matching by JSON-RPC `id`
+
+Environment variable:
+- `CODEX_MONITOR_BROWSER_WORKER` — path to worker script (default: `browser-worker/dist/index.js`)
+
+#### 2. Browser Worker (Node.js)
+
+- **Path**: `browser-worker/src/index.ts`
+- Dependencies: `playwright` (Chromium)
+- Session management: `Map<sessionId, Session>`
+- Each session holds: `Browser`, `BrowserContext`, `Page`
+
+Supported features:
+- Headless or headed mode
+- Custom viewport sizes
+- Persistent user data directories
+- DOM element extraction for snapshot
+
+#### 3. Browser MCP Server
+
+- **Binary**: `src-tauri/src/bin/codex_monitor_browser_mcp.rs`
+- Exposes browser tools to Codex CLI via MCP protocol
+- Connects to daemon over TCP, proxies browser RPC calls
+
+**Config**: Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.codex_monitor_browser]
+command = "/path/to/codex_monitor_browser_mcp"
+args = []
+env = {
+  CODEX_MONITOR_DAEMON_ADDR = "127.0.0.1:4732",
+  CODEX_MONITOR_DAEMON_TOKEN = "..."
+}
+```
+
+### RPC Endpoints
+
+| Method | Description |
+|--------|-------------|
+| `browser_create_session` | Create new browser session (params: `headless`, `viewport`, `userDataDir`, `startUrl`) |
+| `browser_list_sessions` | List active session IDs |
+| `browser_close_session` | Close session (params: `sessionId`) |
+| `browser_navigate` | Navigate to URL (params: `sessionId`, `url`, `waitUntil`, `timeoutMs`) |
+| `browser_screenshot` | Capture screenshot (params: `sessionId`, `fullPage`) → returns `base64Png` |
+| `browser_click` | Click by selector or coordinates (params: `sessionId`, `selector` or `x`/`y`) |
+| `browser_type` | Type into element (params: `sessionId`, `selector`, `text`, `clearFirst`) |
+| `browser_press` | Press keyboard key (params: `sessionId`, `key`) |
+| `browser_evaluate` | Execute JavaScript (params: `sessionId`, `js`) |
+| `browser_snapshot` | Screenshot + DOM element list (params: `sessionId`, `fullPage`) |
+
+### MCP Tools
+
+The browser MCP server exposes the same tools with identical names and parameters.
+
+---
+
+## Skills Management System
+
+CodexMonitor includes a skills system for managing reusable agent capabilities defined in SKILL.md files.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Daemon (Rust)                                  │
+│  ├── SKILL.md Parser (src-tauri/src/skills/skill_md.rs)             │
+│  │   └── Parses YAML frontmatter + markdown body                    │
+│  └── Skills Service (in daemon RPC handlers)                        │
+│      └── List, validate, install from git, uninstall                │
+└─────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   Filesystem                                        │
+│  ├── $CODEX_HOME/skills/           (global skills)                  │
+│  └── <workspace>/.codex/skills/    (workspace skills)               │
+│      └── <skill-name>/SKILL.md                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### SKILL.md Format
+
+Skills are defined using markdown files with YAML frontmatter:
+
+```markdown
+---
+name: my-skill
+description: A helpful skill for doing X
+requirements:
+  bins:
+    - jq
+    - curl
+  env:
+    - MY_API_KEY
+  os:
+    - macos
+    - linux
+---
+
+# My Skill
+
+Instructions for the agent when this skill is invoked...
+```
+
+### Components
+
+#### 1. SKILL.md Parser
+
+- **Path**: `src-tauri/src/skills/skill_md.rs`
+- Extracts:
+  - `name` — from frontmatter or parent directory name
+  - `description` — from frontmatter or first non-empty line of body
+  - `requirements.bins` — required CLI binaries
+  - `requirements.env` — required environment variables
+  - `requirements.os` — supported operating systems
+
+#### 2. Skill Validation
+
+The `validate_skill()` function checks:
+1. **OS compatibility**: current OS in `requirements.os` list
+2. **Binary availability**: all `requirements.bins` found via `which`
+3. **Environment variables**: all `requirements.env` are set
+
+Returns a list of issues (empty = valid).
+
+#### 3. SkillDescriptor
+
+```rust
+pub struct SkillDescriptor {
+    pub name: String,
+    pub description: Option<String>,
+    pub path: String,
+    pub requirements: Requirements,
+}
+```
+
+### RPC Endpoints
+
+| Method | Description |
+|--------|-------------|
+| `skills_list` | List installed skills (params: `workspaceId`) |
+| `skills_config_write` | Write skills configuration (params: `workspaceId`, `config`) |
+| `skills_validate` | Validate all installed skills (params: `workspaceId`) → returns issues per skill |
+| `skills_install_from_git` | Clone skill from git repo (params: `sourceUrl`, `target`) |
+| `skills_uninstall` | Remove installed skill (params: `name`, `target`) |
+
+### Installation Targets
+
+- `"global"` — installs to `$CODEX_HOME/skills/`
+- `"workspace"` — installs to `<workspace>/.codex/skills/`
+

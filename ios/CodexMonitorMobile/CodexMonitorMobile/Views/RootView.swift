@@ -100,6 +100,34 @@ private struct PhoneRootView: View {
             .tabItem {
                 Label("Log", systemImage: "waveform.path.ecg")
             }
+
+            NavigationStack {
+                BrowserView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showSettings = true }) {
+                                Image(systemName: "gearshape")
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Browser", systemImage: "safari")
+            }
+
+            NavigationStack {
+                SkillsView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showSettings = true }) {
+                                Image(systemName: "gearshape")
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Skills", systemImage: "sparkles")
+            }
         }
         .modifier(GlassTabBarStyle())
     }
@@ -119,6 +147,8 @@ private struct TabletRootView: View {
         case files = "Files"
         case prompts = "Prompts"
         case terminal = "Terminal"
+        case browser = "Browser"
+        case skills = "Skills"
     }
 
     var body: some View {
@@ -170,6 +200,10 @@ private struct DetailColumnView: View {
                     PromptsView()
                 case .terminal:
                     TerminalView()
+                case .browser:
+                    BrowserView()
+                case .skills:
+                    SkillsView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -226,6 +260,8 @@ private struct GlassSegmentedPicker: View {
         case .files: return "folder"
         case .prompts: return "text.alignleft"
         case .terminal: return "terminal"
+        case .browser: return "safari"
+        case .skills: return "sparkles"
         }
     }
 }

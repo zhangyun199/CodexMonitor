@@ -381,6 +381,8 @@ pub(crate) struct AppSettings {
     pub(crate) minimax_api_key: String,
     #[serde(default = "default_memory_embedding_enabled")]
     pub(crate) memory_embedding_enabled: bool,
+    #[serde(default, rename = "autoMemory")]
+    pub(crate) auto_memory: AutoMemorySettings,
     #[serde(
         default = "default_composer_editor_preset",
         rename = "composerEditorPreset"
@@ -428,6 +430,35 @@ pub(crate) struct AppSettings {
     pub(crate) composer_code_block_copy_use_modifier: bool,
     #[serde(default = "default_workspace_groups", rename = "workspaceGroups")]
     pub(crate) workspace_groups: Vec<WorkspaceGroup>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct AutoMemorySettings {
+    pub(crate) enabled: bool,
+    #[serde(rename = "reserveTokensFloor")]
+    pub(crate) reserve_tokens_floor: u32,
+    #[serde(rename = "softThresholdTokens")]
+    pub(crate) soft_threshold_tokens: u32,
+    #[serde(rename = "minIntervalSeconds")]
+    pub(crate) min_interval_seconds: u32,
+    #[serde(rename = "maxTurns")]
+    pub(crate) max_turns: usize,
+    #[serde(rename = "maxSnapshotChars")]
+    pub(crate) max_snapshot_chars: usize,
+    #[serde(rename = "includeToolOutput")]
+    pub(crate) include_tool_output: bool,
+    #[serde(rename = "includeGitStatus")]
+    pub(crate) include_git_status: bool,
+    #[serde(rename = "writeDaily")]
+    pub(crate) write_daily: bool,
+    #[serde(rename = "writeCurated")]
+    pub(crate) write_curated: bool,
+}
+
+impl Default for AutoMemorySettings {
+    fn default() -> Self {
+        default_auto_memory_settings()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -555,6 +586,21 @@ fn default_memory_embedding_enabled() -> bool {
     false
 }
 
+fn default_auto_memory_settings() -> AutoMemorySettings {
+    AutoMemorySettings {
+        enabled: false,
+        reserve_tokens_floor: 20_000,
+        soft_threshold_tokens: 4_000,
+        min_interval_seconds: 300,
+        max_turns: 12,
+        max_snapshot_chars: 12_000,
+        include_tool_output: false,
+        include_git_status: false,
+        write_daily: true,
+        write_curated: true,
+    }
+}
+
 fn default_dictation_enabled() -> bool {
     false
 }
@@ -651,6 +697,7 @@ impl Default for AppSettings {
             supabase_anon_key: String::new(),
             minimax_api_key: String::new(),
             memory_embedding_enabled: default_memory_embedding_enabled(),
+            auto_memory: default_auto_memory_settings(),
             composer_editor_preset: default_composer_editor_preset(),
             composer_fence_expand_on_space: default_composer_fence_expand_on_space(),
             composer_fence_expand_on_enter: default_composer_fence_expand_on_enter(),
@@ -670,7 +717,8 @@ impl Default for AppSettings {
 #[cfg(test)]
 mod tests {
     use super::{
-        AppSettings, BackendMode, WorkspaceEntry, WorkspaceGroup, WorkspaceKind, WorkspaceSettings,
+        AppSettings, AutoMemorySettings, BackendMode, WorkspaceEntry, WorkspaceGroup, WorkspaceKind,
+        WorkspaceSettings,
     };
 
     #[test]
@@ -743,6 +791,21 @@ mod tests {
         assert!(settings.supabase_anon_key.is_empty());
         assert!(settings.minimax_api_key.is_empty());
         assert!(!settings.memory_embedding_enabled);
+        assert!(matches!(
+            settings.auto_memory,
+            AutoMemorySettings {
+                enabled: false,
+                reserve_tokens_floor: 20000,
+                soft_threshold_tokens: 4000,
+                min_interval_seconds: 300,
+                max_turns: 12,
+                max_snapshot_chars: 12000,
+                include_tool_output: false,
+                include_git_status: false,
+                write_daily: true,
+                write_curated: true,
+            }
+        ));
         assert_eq!(settings.composer_editor_preset, "default");
         assert!(!settings.composer_fence_expand_on_space);
         assert!(!settings.composer_fence_expand_on_enter);

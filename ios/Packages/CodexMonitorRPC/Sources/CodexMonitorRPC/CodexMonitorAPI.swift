@@ -178,6 +178,119 @@ public struct CodexMonitorAPI: Sendable {
         return try await call("memory_bootstrap", params: .object([:]), as: [MemorySearchResult].self)
     }
 
+    public func memoryFlushNow(workspaceId: String, threadId: String, force: Bool = false) async throws -> JSONValue {
+        return try await rpc.call(
+            method: "memory_flush_now",
+            params: .object([
+                "workspaceId": .string(workspaceId),
+                "threadId": .string(threadId),
+                "force": .bool(force),
+            ])
+        )
+    }
+
+    // MARK: - Browser
+    public func browserCreateSession(headless: Bool = true, viewport: [String: JSONValue]? = nil, userDataDir: String? = nil, startUrl: String? = nil) async throws -> BrowserSessionCreated {
+        var params: [String: JSONValue] = ["headless": .bool(headless)]
+        if let viewport { params["viewport"] = .object(viewport) }
+        if let userDataDir { params["userDataDir"] = .string(userDataDir) }
+        if let startUrl { params["startUrl"] = .string(startUrl) }
+        return try await call("browser_create_session", params: .object(params), as: BrowserSessionCreated.self)
+    }
+
+    public func browserListSessions() async throws -> BrowserSessionList {
+        return try await call("browser_list_sessions", params: .object([:]), as: BrowserSessionList.self)
+    }
+
+    public func browserCloseSession(sessionId: String) async throws -> JSONValue {
+        return try await rpc.call(method: "browser_close_session", params: .object(["sessionId": .string(sessionId)]))
+    }
+
+    public func browserNavigate(sessionId: String, url: String, waitUntil: String? = nil, timeoutMs: Int? = nil) async throws -> JSONValue {
+        var params: [String: JSONValue] = ["sessionId": .string(sessionId), "url": .string(url)]
+        if let waitUntil { params["waitUntil"] = .string(waitUntil) }
+        if let timeoutMs { params["timeoutMs"] = .number(Double(timeoutMs)) }
+        return try await rpc.call(method: "browser_navigate", params: .object(params))
+    }
+
+    public func browserScreenshot(sessionId: String, fullPage: Bool = true) async throws -> BrowserScreenshot {
+        return try await call(
+            "browser_screenshot",
+            params: .object(["sessionId": .string(sessionId), "fullPage": .bool(fullPage)]),
+            as: BrowserScreenshot.self
+        )
+    }
+
+    public func browserClick(sessionId: String, selector: String? = nil, x: Double? = nil, y: Double? = nil) async throws -> JSONValue {
+        var params: [String: JSONValue] = ["sessionId": .string(sessionId)]
+        if let selector { params["selector"] = .string(selector) }
+        if let x { params["x"] = .number(x) }
+        if let y { params["y"] = .number(y) }
+        return try await rpc.call(method: "browser_click", params: .object(params))
+    }
+
+    public func browserType(sessionId: String, selector: String, text: String, clearFirst: Bool = false) async throws -> JSONValue {
+        return try await rpc.call(
+            method: "browser_type",
+            params: .object([
+                "sessionId": .string(sessionId),
+                "selector": .string(selector),
+                "text": .string(text),
+                "clearFirst": .bool(clearFirst),
+            ])
+        )
+    }
+
+    public func browserPress(sessionId: String, key: String) async throws -> JSONValue {
+        return try await rpc.call(method: "browser_press", params: .object(["sessionId": .string(sessionId), "key": .string(key)]))
+    }
+
+    public func browserEvaluate(sessionId: String, js: String) async throws -> JSONValue {
+        return try await rpc.call(method: "browser_evaluate", params: .object(["sessionId": .string(sessionId), "js": .string(js)]))
+    }
+
+    public func browserSnapshot(sessionId: String, fullPage: Bool = true) async throws -> BrowserSnapshot {
+        return try await call(
+            "browser_snapshot",
+            params: .object(["sessionId": .string(sessionId), "fullPage": .bool(fullPage)]),
+            as: BrowserSnapshot.self
+        )
+    }
+
+    // MARK: - Skills
+    public func skillsList(workspaceId: String) async throws -> JSONValue {
+        return try await rpc.call(method: "skills_list", params: .object(["workspaceId": .string(workspaceId)]))
+    }
+
+    public func skillsConfigWrite(workspaceId: String, config: JSONValue) async throws -> JSONValue {
+        return try await rpc.call(
+            method: "skills_config_write",
+            params: .object(["workspaceId": .string(workspaceId), "config": config])
+        )
+    }
+
+    public func skillsValidate(workspaceId: String) async throws -> [SkillValidationResult] {
+        return try await call("skills_validate", params: .object(["workspaceId": .string(workspaceId)]), as: [SkillValidationResult].self)
+    }
+
+    public func skillsInstallFromGit(sourceUrl: String, target: String, workspaceId: String? = nil) async throws -> JSONValue {
+        var params: [String: JSONValue] = [
+            "sourceUrl": .string(sourceUrl),
+            "target": .string(target),
+        ]
+        if let workspaceId { params["workspaceId"] = .string(workspaceId) }
+        return try await rpc.call(method: "skills_install_from_git", params: .object(params))
+    }
+
+    public func skillsUninstall(name: String, target: String, workspaceId: String? = nil) async throws -> JSONValue {
+        var params: [String: JSONValue] = [
+            "name": .string(name),
+            "target": .string(target),
+        ]
+        if let workspaceId { params["workspaceId"] = .string(workspaceId) }
+        return try await rpc.call(method: "skills_uninstall", params: .object(params))
+    }
+
     // MARK: - Threads / Codex
     public func startThread(workspaceId: String) async throws -> ThreadStartResponse {
         let value = try await rpc.call(method: "start_thread", params: .object(["workspaceId": .string(workspaceId)]))

@@ -5,14 +5,20 @@ mod backend;
 mod codex_config;
 #[path = "../codex_home.rs"]
 mod codex_home;
+#[path = "../browser/mod.rs"]
+mod browser;
 #[path = "../git_utils.rs"]
 mod git_utils;
 #[path = "../local_usage_core.rs"]
 mod local_usage_core;
 #[path = "../memory/mod.rs"]
 mod memory;
+#[path = "../memory/auto_flush.rs"]
+mod auto_flush;
 #[path = "../rules.rs"]
 mod rules;
+#[path = "../skills/mod.rs"]
+mod skills;
 #[path = "../storage.rs"]
 mod storage;
 #[allow(dead_code)]
@@ -39,24 +45,30 @@ use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::process::Command;
-use tokio::sync::{broadcast, mpsc, Mutex};
+use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tokio::task;
 use uuid::Uuid;
 
 use backend::app_server::{spawn_workspace_session, WorkspaceSession};
 use backend::events::{AppServerEvent, EventSink, TerminalOutput};
+use browser::service::BrowserService;
 use git_utils::{
     checkout_branch, commit_to_entry, diff_patch_to_string, diff_stats_for_path,
     list_git_roots as scan_git_roots, parse_github_repo, resolve_git_root,
 };
 use storage::{read_settings, read_workspaces, write_settings, write_workspaces};
 use types::{
-    AppSettings, BranchInfo, GitCommitDiff, GitFileDiff, GitFileStatus, GitHubIssue,
-    GitHubIssuesResponse, GitHubPullRequest, GitHubPullRequestComment, GitHubPullRequestDiff,
-    GitHubPullRequestsResponse, GitLogResponse, LocalUsageSnapshot, WorkspaceEntry, WorkspaceInfo,
-    WorkspaceKind, WorkspaceSettings, WorktreeInfo,
+    AppSettings, AutoMemorySettings, BranchInfo, GitCommitDiff, GitFileDiff, GitFileStatus,
+    GitHubIssue, GitHubIssuesResponse, GitHubPullRequest, GitHubPullRequestComment,
+    GitHubPullRequestDiff, GitHubPullRequestsResponse, GitLogResponse, LocalUsageSnapshot,
+    WorkspaceEntry, WorkspaceInfo, WorkspaceKind, WorkspaceSettings, WorktreeInfo,
+};
+use auto_flush::{
+    build_snapshot, parse_memory_flush_result, run_memory_flush_summarizer, write_memory_flush,
+    AutoMemoryRuntime,
 };
 use memory::MemoryService;
+use skills::skill_md::{parse_skill_md, validate_skill};
 use utils::normalize_git_path;
 
 const DEFAULT_LISTEN_ADDR: &str = "127.0.0.1:4732";
@@ -98,7 +110,9 @@ struct DaemonState {
     storage_path: PathBuf,
     settings_path: PathBuf,
     app_settings: Mutex<AppSettings>,
-    memory: Option<MemoryService>,
+    memory: RwLock<Option<MemoryService>>,
+    auto_memory_runtime: Mutex<AutoMemoryRuntime>,
+    browser: BrowserService,
     event_sink: DaemonEventSink,
 }
 
@@ -163,7 +177,9 @@ impl DaemonState {
             storage_path,
             settings_path,
             app_settings: Mutex::new(app_settings),
-            memory,
+            memory: RwLock::new(memory),
+            auto_memory_runtime: Mutex::new(AutoMemoryRuntime::default()),
+            browser: BrowserService::new(),
             event_sink,
         }
     }
@@ -839,7 +855,55 @@ impl DaemonState {
         write_settings(&self.settings_path, &settings)?;
         let mut current = self.app_settings.lock().await;
         *current = settings.clone();
+        let mut memory_lock = self.memory.write().await;
+        *memory_lock = if settings.memory_enabled
+            && !settings.supabase_url.is_empty()
+            && !settings.supabase_anon_key.is_empty()
+        {
+            Some(MemoryService::new(
+                &settings.supabase_url,
+                &settings.supabase_anon_key,
+                if settings.memory_embedding_enabled {
+                    Some(&settings.minimax_api_key)
+                } else {
+                    None
+                },
+                true,
+            ))
+        } else {
+            None
+        };
         Ok(settings)
+    }
+
+    async fn memory_flush_now(
+        &self,
+        workspace_id: String,
+        thread_id: String,
+        force: bool,
+    ) -> Result<Value, String> {
+        let settings = self.app_settings.lock().await.clone();
+        if !settings.auto_memory.enabled && !force {
+            return Err("Auto memory disabled".to_string());
+        }
+
+        let memory = self
+            .memory
+            .read()
+            .await
+            .clone()
+            .ok_or("Memory not enabled")?;
+        let session = self.get_session(&workspace_id).await?;
+        perform_memory_flush(
+            session,
+            memory,
+            settings.auto_memory,
+            workspace_id,
+            thread_id,
+            0,
+            0,
+        )
+        .await
     }
 
     async fn get_session(&self, workspace_id: &str) -> Result<Arc<WorkspaceSession>, String> {
@@ -1056,6 +1120,137 @@ impl DaemonState {
         session.send_request("skills/list", params).await
     }
 
+    async fn skills_config_write(&self, workspace_id: String, config: Value) -> Result<Value, String> {
+        let session = self.get_session(&workspace_id).await?;
+        let mut payload = match config {
+            Value::Object(map) => map,
+            _ => Map::new(),
+        };
+        payload.entry("cwd".to_string()).or_insert(json!(session.entry.path));
+        session
+            .send_request("skills/config/write", Value::Object(payload))
+            .await
+    }
+
+    async fn skills_validate(&self, workspace_id: String) -> Result<Value, String> {
+        let skills_list = self.skills_list(workspace_id).await?;
+        let skills = skills_list
+            .pointer("/result/skills")
+            .or_else(|| skills_list.pointer("/skills"))
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        let mut results = Vec::new();
+        for entry in skills {
+            let path = entry
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            if path.is_empty() {
+                continue;
+            }
+            let skill_md_path = if path.ends_with("SKILL.md") {
+                PathBuf::from(&path)
+            } else {
+                PathBuf::from(&path).join("SKILL.md")
+            };
+            if !skill_md_path.exists() {
+                continue;
+            }
+            if let Ok(desc) = parse_skill_md(&skill_md_path) {
+                let issues = validate_skill(&desc);
+                results.push(json!({
+                    "name": desc.name,
+                    "path": desc.path,
+                    "issues": issues,
+                    "description": desc.description
+                }));
+            }
+        }
+
+        Ok(json!(results))
+    }
+
+    async fn skills_install_from_git(
+        &self,
+        source_url: String,
+        target: String,
+        workspace_id: Option<String>,
+    ) -> Result<Value, String> {
+        let root = self.resolve_skill_root(&target, workspace_id.as_deref()).await?;
+        std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
+
+        let repo_name = source_url
+            .split('/')
+            .last()
+            .unwrap_or("skill")
+            .trim_end_matches(".git")
+            .to_string();
+        let dest = root.join(repo_name);
+        if dest.exists() {
+            return Err("Destination already exists".to_string());
+        }
+
+        let status = Command::new("git")
+            .arg("clone")
+            .arg(&source_url)
+            .arg(&dest)
+            .status()
+            .await
+            .map_err(|e| e.to_string())?;
+
+        if !status.success() {
+            return Err("git clone failed".to_string());
+        }
+
+        let skill_md = dest.join("SKILL.md");
+        if !skill_md.exists() {
+            return Err("SKILL.md not found in repo".to_string());
+        }
+
+        Ok(json!({ "ok": true, "path": dest }))
+    }
+
+    async fn skills_uninstall(
+        &self,
+        name: String,
+        target: String,
+        workspace_id: Option<String>,
+    ) -> Result<Value, String> {
+        let root = self.resolve_skill_root(&target, workspace_id.as_deref()).await?;
+        let dest = root.join(&name);
+        if !dest.exists() {
+            return Err("Skill not found".to_string());
+        }
+        std::fs::remove_dir_all(&dest).map_err(|e| e.to_string())?;
+        Ok(json!({ "ok": true }))
+    }
+
+    async fn resolve_skill_root(
+        &self,
+        target: &str,
+        workspace_id: Option<&str>,
+    ) -> Result<PathBuf, String> {
+        match target {
+            "global" => {
+                let home = std::env::var("HOME").map_err(|_| "Missing HOME".to_string())?;
+                Ok(PathBuf::from(home).join(".codex").join("skills"))
+            }
+            "workspace" => {
+                let workspace_id =
+                    workspace_id.ok_or("workspaceId required for workspace target")?;
+                let workspaces = self.workspaces.lock().await;
+                let entry = workspaces
+                    .get(workspace_id)
+                    .ok_or("workspace not found")?;
+                Ok(PathBuf::from(&entry.path).join(".codex").join("skills"))
+            }
+            _ => Err("Invalid target (use 'global' or 'workspace')".to_string()),
+        }
+    }
+
     async fn respond_to_server_request(
         &self,
         workspace_id: String,
@@ -1105,6 +1300,36 @@ impl DaemonState {
             "rulesPath": rules_path,
         }))
     }
+}
+
+async fn perform_memory_flush(
+    session: Arc<WorkspaceSession>,
+    memory: MemoryService,
+    settings: AutoMemorySettings,
+    workspace_id: String,
+    thread_id: String,
+    context_tokens: u32,
+    model_context_window: u32,
+) -> Result<Value, String> {
+    let snapshot = build_snapshot(
+        &session,
+        &workspace_id,
+        &thread_id,
+        context_tokens,
+        model_context_window,
+        &settings,
+    )
+    .await?;
+
+    let raw = run_memory_flush_summarizer(&session, &snapshot).await?;
+    let result = parse_memory_flush_result(&raw);
+    write_memory_flush(&memory, &snapshot, &result, &settings).await?;
+
+    Ok(json!({
+        "ok": true,
+        "noReply": result.no_reply,
+        "tags": result.tags,
+    }))
 }
 
 fn sort_workspaces(workspaces: &mut [WorkspaceInfo]) {
@@ -4118,10 +4343,13 @@ async fn handle_rpc_request(
             let updated = state.update_app_settings(settings).await?;
             serde_json::to_value(updated).map_err(|err| err.to_string())
         }
-        "memory_status" => match &state.memory {
-            Some(mem) => mem.status().await.map(|s| serde_json::to_value(s).unwrap()),
-            None => Err("Memory not enabled".to_string()),
-        },
+        "memory_status" => {
+            let memory = state.memory.read().await;
+            match memory.as_ref() {
+                Some(mem) => mem.status().await.map(|s| serde_json::to_value(s).unwrap()),
+                None => Err("Memory not enabled".to_string()),
+            }
+        }
         "memory_search" => {
             let query = params
                 .get("query")
@@ -4132,7 +4360,8 @@ async fn handle_rpc_request(
                 .and_then(|v| v.as_u64())
                 .unwrap_or(10) as usize;
 
-            match &state.memory {
+            let memory = state.memory.read().await;
+            match memory.as_ref() {
                 Some(mem) => mem
                     .search(query, limit)
                     .await
@@ -4160,7 +4389,8 @@ async fn handle_rpc_request(
                 .and_then(|v| v.as_str())
                 .map(String::from);
 
-            match &state.memory {
+            let memory = state.memory.read().await;
+            match memory.as_ref() {
                 Some(mem) => mem
                     .append(memory_type, content, tags, workspace_id)
                     .await
@@ -4168,13 +4398,65 @@ async fn handle_rpc_request(
                 None => Err("Memory not enabled".to_string()),
             }
         }
-        "memory_bootstrap" => match &state.memory {
-            Some(mem) => mem
-                .bootstrap()
-                .await
-                .map(|r| serde_json::to_value(r).unwrap()),
-            None => Err("Memory not enabled".to_string()),
-        },
+        "memory_bootstrap" => {
+            let memory = state.memory.read().await;
+            match memory.as_ref() {
+                Some(mem) => mem
+                    .bootstrap()
+                    .await
+                    .map(|r| serde_json::to_value(r).unwrap()),
+                None => Err("Memory not enabled".to_string()),
+            }
+        }
+        "memory_flush_now" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let thread_id = parse_string(&params, "threadId")?;
+            let force = params
+                .get("force")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            state.memory_flush_now(workspace_id, thread_id, force).await
+        }
+        "browser_create_session" => {
+            let params = if params.is_object() { params } else { json!({}) };
+            state.browser.request("browser.create", params).await
+        }
+        "browser_list_sessions" => {
+            let params = if params.is_object() { params } else { json!({}) };
+            state.browser.request("browser.list", params).await
+        }
+        "browser_close_session" => {
+            let params = if params.is_object() { params } else { json!({}) };
+            state.browser.request("browser.close", params).await
+        }
+        "browser_navigate" => {
+            let params = if params.is_object() { params } else { json!({}) };
+            state.browser.request("browser.navigate", params).await
+        }
+        "browser_screenshot" => {
+            let params = if params.is_object() { params } else { json!({}) };
+            state.browser.request("browser.screenshot", params).await
+        }
+        "browser_click" => {
+            let params = if params.is_object() { params } else { json!({}) };
+            state.browser.request("browser.click", params).await
+        }
+        "browser_type" => {
+            let params = if params.is_object() { params } else { json!({}) };
+            state.browser.request("browser.type", params).await
+        }
+        "browser_press" => {
+            let params = if params.is_object() { params } else { json!({}) };
+            state.browser.request("browser.press", params).await
+        }
+        "browser_snapshot" => {
+            let params = if params.is_object() { params } else { json!({}) };
+            state.browser.request("browser.snapshot", params).await
+        }
+        "browser_evaluate" => {
+            let params = if params.is_object() { params } else { json!({}) };
+            state.browser.request("browser.evaluate", params).await
+        }
         "codex_doctor" => {
             let codex_bin = parse_optional_string(&params, "codexBin");
             let result = state.codex_doctor(codex_bin).await?;
@@ -4266,6 +4548,35 @@ async fn handle_rpc_request(
         "skills_list" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
             state.skills_list(workspace_id).await
+        }
+        "skills_config_write" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let config = match params {
+                Value::Object(map) => map
+                    .get("config")
+                    .cloned()
+                    .unwrap_or_else(|| json!({})),
+                _ => json!({}),
+            };
+            state.skills_config_write(workspace_id, config).await
+        }
+        "skills_validate" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            state.skills_validate(workspace_id).await
+        }
+        "skills_install_from_git" => {
+            let source_url = parse_string(&params, "sourceUrl")?;
+            let target = parse_string(&params, "target")?;
+            let workspace_id = parse_optional_string(&params, "workspaceId");
+            state
+                .skills_install_from_git(source_url, target, workspace_id)
+                .await
+        }
+        "skills_uninstall" => {
+            let name = parse_string(&params, "name")?;
+            let target = parse_string(&params, "target")?;
+            let workspace_id = parse_optional_string(&params, "workspaceId");
+            state.skills_uninstall(name, target, workspace_id).await
         }
         "list_git_roots" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
@@ -4557,6 +4868,61 @@ async fn forward_events(
     }
 }
 
+async fn maybe_trigger_auto_memory(
+    state: Arc<DaemonState>,
+    workspace_id: String,
+    thread_id: String,
+    context_tokens: u32,
+    model_context_window: u32,
+) {
+    let settings = state.app_settings.lock().await.clone();
+    if !settings.auto_memory.enabled {
+        return;
+    }
+
+    let key = format!("{workspace_id}:{thread_id}");
+    let should_flush = {
+        let mut runtime = state.auto_memory_runtime.lock().await;
+        runtime.update_and_check(
+            &key,
+            context_tokens,
+            model_context_window,
+            &settings.auto_memory,
+        )
+    };
+
+    if !should_flush {
+        return;
+    }
+
+    let memory = match state.memory.read().await.clone() {
+        Some(mem) => mem,
+        None => return,
+    };
+
+    let session = match state.get_session(&workspace_id).await {
+        Ok(session) => session,
+        Err(_) => return,
+    };
+
+    let auto_settings = settings.auto_memory.clone();
+    tokio::spawn(async move {
+        let result = perform_memory_flush(
+            session,
+            memory,
+            auto_settings,
+            workspace_id,
+            thread_id,
+            context_tokens,
+            model_context_window,
+        )
+        .await;
+        if let Err(err) = result {
+            eprintln!("Auto memory flush failed: {err}");
+        }
+    });
+}
+
 async fn handle_client(
     socket: TcpStream,
     config: Arc<DaemonConfig>,
@@ -4674,6 +5040,76 @@ fn main() {
         };
         let state = Arc::new(DaemonState::load(&config, event_sink));
         let config = Arc::new(config);
+
+        {
+            let state = Arc::clone(&state);
+            let mut rx = events_tx.subscribe();
+            tokio::spawn(async move {
+                loop {
+                    let event = match rx.recv().await {
+                        Ok(event) => event,
+                        Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                        Err(broadcast::error::RecvError::Closed) => break,
+                    };
+                    let DaemonEvent::AppServer(app_event) = event else {
+                        continue;
+                    };
+                    let method = app_event
+                        .message
+                        .get("method")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    if method != "thread/tokenUsage/updated" {
+                        continue;
+                    }
+                    let params = app_event
+                        .message
+                        .get("params")
+                        .and_then(|v| v.as_object())
+                        .cloned()
+                        .unwrap_or_default();
+                    let thread_id = params
+                        .get("threadId")
+                        .or_else(|| params.get("thread_id"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    if thread_id.is_empty() {
+                        continue;
+                    }
+                    let token_usage = params
+                        .get("tokenUsage")
+                        .or_else(|| params.get("token_usage"))
+                        .cloned()
+                        .unwrap_or(Value::Null);
+                    let total_tokens = token_usage
+                        .pointer("/total/totalTokens")
+                        .or_else(|| token_usage.pointer("/total/total_tokens"))
+                        .or_else(|| token_usage.get("totalTokens"))
+                        .or_else(|| token_usage.get("total_tokens"))
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as u32;
+                    let model_context_window = token_usage
+                        .get("modelContextWindow")
+                        .or_else(|| token_usage.get("model_context_window"))
+                        .or_else(|| params.get("modelContextWindow"))
+                        .or_else(|| params.get("model_context_window"))
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as u32;
+                    if total_tokens == 0 || model_context_window == 0 {
+                        continue;
+                    }
+                    maybe_trigger_auto_memory(
+                        Arc::clone(&state),
+                        app_event.workspace_id.clone(),
+                        thread_id,
+                        total_tokens,
+                        model_context_window,
+                    )
+                    .await;
+                }
+            });
+        }
 
         let listener = TcpListener::bind(config.listen)
             .await

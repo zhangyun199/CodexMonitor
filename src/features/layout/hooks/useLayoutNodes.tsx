@@ -17,6 +17,11 @@ import { TabBar } from "../../app/components/TabBar";
 import { TabletNav } from "../../app/components/TabletNav";
 import { TerminalDock } from "../../terminal/components/TerminalDock";
 import { TerminalPanel } from "../../terminal/components/TerminalPanel";
+import { MemoryPanel } from "../../memory/components/MemoryPanel";
+import {
+  RightPanelTabs,
+  type RightPanelTabId,
+} from "../components/RightPanelTabs";
 import type {
   AccessMode,
   ApprovalRequest,
@@ -183,6 +188,8 @@ type LayoutNodesOptions = {
   activeTab: "projects" | "codex" | "git" | "log";
   onSelectTab: (tab: "projects" | "codex" | "git" | "log") => void;
   tabletNavTab: "codex" | "git" | "log";
+  rightPanelMode: RightPanelTabId;
+  onSelectRightPanelMode: (mode: RightPanelTabId) => void;
   gitPanelMode: "diff" | "log" | "issues" | "prs";
   onGitPanelModeChange: (mode: "diff" | "log" | "issues" | "prs") => void;
   gitDiffViewStyle: "split" | "unified";
@@ -373,6 +380,7 @@ type LayoutNodesResult = {
   tabletNavNode: ReactNode;
   tabBarNode: ReactNode;
   gitDiffPanelNode: ReactNode;
+  rightPanelNode: ReactNode;
   gitDiffViewerNode: ReactNode;
   planPanelNode: ReactNode;
   debugPanelNode: ReactNode;
@@ -723,6 +731,23 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
     />
   );
 
+  const memoryPanelNode = <MemoryPanel workspaceId={options.activeWorkspaceId} />;
+
+  const rightPanelNode = (
+    <div className="right-panel-stack">
+      <div className="right-panel-switch">
+        <span className="right-panel-switch-title">Panel</span>
+        <RightPanelTabs
+          active={options.rightPanelMode}
+          onSelect={options.onSelectRightPanelMode}
+        />
+      </div>
+      <div className="right-panel-content">
+        {options.rightPanelMode === "memory" ? memoryPanelNode : gitDiffPanelNode}
+      </div>
+    </div>
+  );
+
   const planPanelNode = <PlanPanel plan={options.plan} isProcessing={options.isProcessing} />;
 
   const terminalPanelNode = options.terminalState ? (
@@ -805,6 +830,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
     tabletNavNode,
     tabBarNode,
     gitDiffPanelNode,
+    rightPanelNode,
     gitDiffViewerNode,
     planPanelNode,
     debugPanelNode,

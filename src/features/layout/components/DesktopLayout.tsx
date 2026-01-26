@@ -12,7 +12,7 @@ type DesktopLayoutProps = {
   centerMode: "chat" | "diff";
   messagesNode: ReactNode;
   gitDiffViewerNode: ReactNode;
-  gitDiffPanelNode: ReactNode;
+  rightPanelNode: ReactNode;
   planPanelNode: ReactNode;
   composerNode: ReactNode;
   terminalDockNode: ReactNode;
@@ -34,7 +34,7 @@ export function DesktopLayout({
   centerMode,
   messagesNode,
   gitDiffViewerNode,
-  gitDiffPanelNode,
+  rightPanelNode,
   planPanelNode,
   composerNode,
   terminalDockNode,
@@ -122,7 +122,7 @@ export function DesktopLayout({
               onMouseDown={onRightPanelResizeStart}
             />
             <div className={`right-panel ${hasActivePlan ? "" : "plan-collapsed"}`}>
-              <div className="right-panel-top">{gitDiffPanelNode}</div>
+              <div className="right-panel-top">{rightPanelNode}</div>
               <div
                 className="right-panel-divider"
                 role="separator"

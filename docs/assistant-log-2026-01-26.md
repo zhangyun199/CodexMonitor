@@ -14,3 +14,9 @@
 - 2026-01-26: Added MCP Memory Server setup instructions to docs/DEPLOYMENT.md.
 - 2026-01-26: Wired MCP server in ~/.codex/config.toml and built release binary for memory MCP.
 - 2026-01-26: Added native iOS Memory search bar (searchable + submit handling).
+- 2026-01-26: Added desktop Memory panel (Supabase-backed) with search, status, and append UI.
+- 2026-01-26: Added right-panel tabs (Git/Memory) and wiring in desktop layout.
+- 2026-01-26: Added composer plan-mode shortcut (Shift+Tab default) + settings field.
+- 2026-01-26: Added iOS plan-mode toggle and collaboration mode wiring (list + send). 
+- 2026-01-26: Added memory RPC helpers in web app and updated shared types.
+- 2026-01-26: Ran cargo build and npm run build (warnings only).

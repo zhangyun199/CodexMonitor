@@ -134,6 +134,7 @@ type ShortcutSettingKey =
   | "composerModelShortcut"
   | "composerAccessShortcut"
   | "composerReasoningShortcut"
+  | "composerPlanModeShortcut"
   | "newAgentShortcut"
   | "newWorktreeAgentShortcut"
   | "newCloneAgentShortcut"
@@ -149,6 +150,7 @@ type ShortcutDraftKey =
   | "model"
   | "access"
   | "reasoning"
+  | "planMode"
   | "newAgent"
   | "newWorktreeAgent"
   | "newCloneAgent"
@@ -165,6 +167,7 @@ const shortcutDraftKeyBySetting: Record<ShortcutSettingKey, ShortcutDraftKey> = 
   composerModelShortcut: "model",
   composerAccessShortcut: "access",
   composerReasoningShortcut: "reasoning",
+  composerPlanModeShortcut: "planMode",
   newAgentShortcut: "newAgent",
   newWorktreeAgentShortcut: "newWorktreeAgent",
   newCloneAgentShortcut: "newCloneAgent",
@@ -230,6 +233,7 @@ export function SettingsView({
     model: appSettings.composerModelShortcut ?? "",
     access: appSettings.composerAccessShortcut ?? "",
     reasoning: appSettings.composerReasoningShortcut ?? "",
+    planMode: appSettings.composerPlanModeShortcut ?? "",
     newAgent: appSettings.newAgentShortcut ?? "",
     newWorktreeAgent: appSettings.newWorktreeAgentShortcut ?? "",
     newCloneAgent: appSettings.newCloneAgentShortcut ?? "",
@@ -317,6 +321,7 @@ export function SettingsView({
       model: appSettings.composerModelShortcut ?? "",
       access: appSettings.composerAccessShortcut ?? "",
       reasoning: appSettings.composerReasoningShortcut ?? "",
+      planMode: appSettings.composerPlanModeShortcut ?? "",
       newAgent: appSettings.newAgentShortcut ?? "",
       newWorktreeAgent: appSettings.newWorktreeAgentShortcut ?? "",
       newCloneAgent: appSettings.newCloneAgentShortcut ?? "",
@@ -333,6 +338,7 @@ export function SettingsView({
     appSettings.composerAccessShortcut,
     appSettings.composerModelShortcut,
     appSettings.composerReasoningShortcut,
+    appSettings.composerPlanModeShortcut,
     appSettings.newAgentShortcut,
     appSettings.newWorktreeAgentShortcut,
     appSettings.newCloneAgentShortcut,
@@ -1753,6 +1759,30 @@ export function SettingsView({
                   </div>
                   <div className="settings-help">
                     Default: {formatShortcut("cmd+shift+r")}
+                  </div>
+                </div>
+                <div className="settings-field">
+                  <div className="settings-field-label">Toggle plan mode</div>
+                  <div className="settings-field-row">
+                    <input
+                      className="settings-input settings-input--shortcut"
+                      value={formatShortcut(shortcutDrafts.planMode)}
+                      onKeyDown={(event) =>
+                        handleShortcutKeyDown(event, "composerPlanModeShortcut")
+                      }
+                      placeholder="Type shortcut"
+                      readOnly
+                    />
+                    <button
+                      type="button"
+                      className="ghost settings-button-compact"
+                      onClick={() => void updateShortcut("composerPlanModeShortcut", null)}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="settings-help">
+                    Default: {formatShortcut("shift+tab")}
                   </div>
                 </div>
                 <div className="settings-divider" />

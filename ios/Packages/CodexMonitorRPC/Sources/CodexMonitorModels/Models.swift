@@ -91,6 +91,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var composerModelShortcut: String?
     public var composerAccessShortcut: String?
     public var composerReasoningShortcut: String?
+    public var composerPlanModeShortcut: String?
     public var newAgentShortcut: String?
     public var newWorktreeAgentShortcut: String?
     public var newCloneAgentShortcut: String?

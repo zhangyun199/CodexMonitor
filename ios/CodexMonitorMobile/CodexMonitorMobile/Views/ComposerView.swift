@@ -22,6 +22,14 @@ struct ComposerView: View {
     private let imageCompressionQuality: CGFloat = 0.7
     private let fallbackCompressionQuality: CGFloat = 0.4
 
+    private var planModeAvailable: Bool {
+        store.hasPlanMode(workspaceId: workspaceId)
+    }
+
+    private var planModeEnabled: Bool {
+        store.isPlanModeEnabled(workspaceId: workspaceId)
+    }
+
     var body: some View {
         GlassPanel(cornerRadius: 20) {
             VStack(spacing: 8) {
@@ -35,7 +43,12 @@ struct ComposerView: View {
                                 .strokeBorder(Color.white.opacity(0.15), lineWidth: 1)
                         )
 
-                    GlassSendButton(action: send)
+                    VStack(spacing: 8) {
+                        GlassSendButton(action: send)
+                        if showQueueButton {
+                            GlassQueueButton(action: queue, count: queueCount)
+                        }
+                    }
                 }
 
                 GlassActionBar(
@@ -43,7 +56,10 @@ struct ComposerView: View {
                     showFileImporter: $showFileImporter,
                     accessMode: $accessMode,
                     dictation: dictation,
-                    pasteImage: pasteImage
+                    pasteImage: pasteImage,
+                    planModeAvailable: planModeAvailable,
+                    planModeEnabled: planModeEnabled,
+                    onTogglePlanMode: { store.togglePlanMode(workspaceId: workspaceId) }
                 )
 
                 if !attachedImages.isEmpty {
@@ -106,14 +122,14 @@ struct ComposerView: View {
         } message: {
             Text(imageErrorMessage)
         }
+        .task {
+            await store.refreshCollaborationModes(workspaceId: workspaceId)
+        }
     }
 
     private func send() {
         let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
-        let images = attachedImages.map { data -> String in
-            let base64 = data.base64EncodedString()
-            return "data:image/jpeg;base64,\(base64)"
-        }
+        let images = buildImagePayloads()
         guard !text.isEmpty || !images.isEmpty else { return }
         message = ""
         attachedImages.removeAll()
@@ -126,6 +142,42 @@ struct ComposerView: View {
                 images: images
             )
         }
+    }
+
+    private func queue() {
+        let text = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        let images = buildImagePayloads()
+        guard !text.isEmpty || !images.isEmpty else { return }
+        message = ""
+        attachedImages.removeAll()
+        Task {
+            await store.queueMessage(
+                workspaceId: workspaceId,
+                threadId: threadId,
+                text: text,
+                accessMode: accessMode,
+                images: images
+            )
+        }
+    }
+
+    private func buildImagePayloads() -> [String] {
+        attachedImages.map { data -> String in
+            let base64 = data.base64EncodedString()
+            return "data:image/jpeg;base64,\(base64)"
+        }
+    }
+
+    private var isProcessing: Bool {
+        store.threadStatusById[threadId]?.isProcessing == true
+    }
+
+    private var queueCount: Int {
+        store.queuedByThread[threadId]?.count ?? 0
+    }
+
+    private var showQueueButton: Bool {
+        isProcessing || queueCount > 0
     }
 
     private func pasteImage() {
@@ -206,6 +258,43 @@ private struct GlassSendButton: View {
     }
 }
 
+// MARK: - Glass Queue Button
+private struct GlassQueueButton: View {
+    let action: () -> Void
+    let count: Int
+
+    var body: some View {
+        Button(action: action) {
+            ZStack(alignment: .topTrailing) {
+                if #available(iOS 26.0, *) {
+                    Image(systemName: "tray.and.arrow.down.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .glassEffect(.regular.tint(.orange).interactive(), in: .circle)
+                } else {
+                    Image(systemName: "tray.and.arrow.down.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Color.orange, in: Circle())
+                }
+
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(4)
+                        .background(Color.red, in: Circle())
+                        .offset(x: 6, y: -6)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Queue Message")
+    }
+}
+
 // MARK: - Glass Action Bar
 private struct GlassActionBar: View {
     @Binding var photoSelection: [PhotosPickerItem]
@@ -213,6 +302,9 @@ private struct GlassActionBar: View {
     @Binding var accessMode: AccessMode
     @ObservedObject var dictation: DictationController
     let pasteImage: () -> Void
+    let planModeAvailable: Bool
+    let planModeEnabled: Bool
+    let onTogglePlanMode: () -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -235,6 +327,16 @@ private struct GlassActionBar: View {
                         label: dictation.isRecording ? "Stop" : "Dictate",
                         isActive: dictation.isRecording
                     )
+                }
+
+                if planModeAvailable {
+                    Button(action: onTogglePlanMode) {
+                        GlassActionButton(
+                            icon: "list.bullet",
+                            label: "Plan",
+                            isActive: planModeEnabled
+                        )
+                    }
                 }
 
                 Spacer()

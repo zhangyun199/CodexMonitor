@@ -20,6 +20,14 @@ final class CodexStore: ObservableObject {
         var lastDurationMs: Double?
     }
 
+    struct QueuedMessage: Identifiable, Hashable {
+        var id: String
+        var text: String
+        var createdAt: Date
+        var images: [String]
+        var accessMode: AccessMode?
+    }
+
     struct DebugEntry: Identifiable, Hashable {
         var id: String
         var timestamp: Date
@@ -56,6 +64,12 @@ final class CodexStore: ObservableObject {
     @Published var terminalOutputBySession: [String: String] = [:]
     @Published var usageSnapshot: LocalUsageSnapshot?
     @Published var debugEntries: [DebugEntry] = []
+    @Published var queuedByThread: [String: [QueuedMessage]] = [:]
+    @Published var collaborationModesByWorkspace: [String: [CollaborationModeOption]] = [:]
+    @Published var selectedCollaborationModeIdByWorkspace: [String: String?] = [:]
+
+    private var inFlightByThread: [String: QueuedMessage?] = [:]
+    private var hasStartedByThread: [String: Bool] = [:]
 
     private let maxItemsPerThread = 500
     private let maxTerminalCharsPerSession = 50_000
@@ -172,6 +186,7 @@ final class CodexStore: ObservableObject {
         guard let workspaceId = activeWorkspaceId ?? workspaces.first?.id else { return }
         await connectWorkspace(id: workspaceId)
         await refreshThreads(for: workspaceId)
+        await refreshCollaborationModes(workspaceId: workspaceId)
         await refreshUsage()
     }
 
@@ -199,6 +214,7 @@ final class CodexStore: ObservableObject {
     func connectWorkspace(id: String) async {
         do {
             try await api.connectWorkspace(id: id)
+            await refreshCollaborationModes(workspaceId: id)
         } catch {
             lastError = error.localizedDescription
         }
@@ -286,12 +302,33 @@ final class CodexStore: ObservableObject {
                 model: model,
                 effort: effort,
                 accessMode: accessMode,
-                images: images
+                images: images,
+                collaborationMode: collaborationModeValue(for: workspaceId)
             )
         } catch {
             lastError = error.localizedDescription
             appendSystemMessage(threadId: threadId, text: "Send failed: \(error.localizedDescription)")
         }
+    }
+
+    func queueMessage(
+        workspaceId: String,
+        threadId: String,
+        text: String,
+        accessMode: AccessMode? = nil,
+        images: [String] = []
+    ) async {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty || !images.isEmpty else { return }
+        let item = QueuedMessage(
+            id: UUID().uuidString,
+            text: trimmed,
+            createdAt: Date(),
+            images: images,
+            accessMode: accessMode
+        )
+        enqueueMessage(threadId: threadId, item: item)
+        await flushQueueIfNeeded(workspaceId: workspaceId, threadId: threadId)
     }
 
     func interruptTurn(workspaceId: String, threadId: String) async {
@@ -518,6 +555,57 @@ final class CodexStore: ObservableObject {
         }
     }
 
+    func refreshCollaborationModes(workspaceId: String) async {
+        do {
+            let modes = try await api.collaborationModeList(workspaceId: workspaceId)
+            collaborationModesByWorkspace[workspaceId] = modes
+            if let selectedId = selectedCollaborationModeIdByWorkspace[workspaceId] ?? nil,
+               !modes.contains(where: { $0.id == selectedId }) {
+                selectedCollaborationModeIdByWorkspace[workspaceId] = nil
+            }
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func togglePlanMode(workspaceId: String) {
+        guard let plan = planModeOption(for: workspaceId) else { return }
+        if isPlanModeEnabled(workspaceId: workspaceId) {
+            selectedCollaborationModeIdByWorkspace[workspaceId] = nil
+        } else {
+            selectedCollaborationModeIdByWorkspace[workspaceId] = plan.id
+        }
+    }
+
+    func isPlanModeEnabled(workspaceId: String) -> Bool {
+        guard let plan = planModeOption(for: workspaceId) else { return false }
+        return selectedCollaborationModeIdByWorkspace[workspaceId] == plan.id
+    }
+
+    func hasPlanMode(workspaceId: String) -> Bool {
+        return planModeOption(for: workspaceId) != nil
+    }
+
+    private func planModeOption(for workspaceId: String) -> CollaborationModeOption? {
+        let modes = collaborationModesByWorkspace[workspaceId] ?? []
+        return modes.first { mode in
+            let id = mode.id.lowercased()
+            let rawMode = mode.mode.lowercased()
+            return id == "plan" || rawMode == "plan"
+        }
+    }
+
+    private func collaborationModeValue(for workspaceId: String) -> JSONValue? {
+        guard let selectedId = selectedCollaborationModeIdByWorkspace[workspaceId] ?? nil else {
+            return nil
+        }
+        let modes = collaborationModesByWorkspace[workspaceId] ?? []
+        guard let selected = modes.first(where: { $0.id == selectedId }) else {
+            return nil
+        }
+        return .object(selected.value)
+    }
+
     // MARK: - Memory
     func memoryStatus() async -> MemoryStatus? {
         do {
@@ -656,7 +744,7 @@ final class CodexStore: ObservableObject {
             let delta = params["delta"]?.asString() ?? ""
             guard !threadId.isEmpty, !itemId.isEmpty, !delta.isEmpty else { return }
             ensureThread(workspaceId: event.workspaceId, threadId: threadId)
-            markProcessing(threadId: threadId, isProcessing: true)
+            markProcessing(workspaceId: event.workspaceId, threadId: threadId, isProcessing: true)
             appendAgentDelta(workspaceId: event.workspaceId, threadId: threadId, itemId: itemId, delta: delta)
             return
         }
@@ -734,7 +822,7 @@ final class CodexStore: ObservableObject {
                 ?? params["turn"]?.objectValue?["id"]?.asString()
                 ?? ""
             if !threadId.isEmpty {
-                markProcessing(threadId: threadId, isProcessing: true)
+                markProcessing(workspaceId: event.workspaceId, threadId: threadId, isProcessing: true)
                 if !turnId.isEmpty {
                     activeTurnIdByThread[threadId] = turnId
                 }
@@ -750,7 +838,7 @@ final class CodexStore: ObservableObject {
                 ?? params["turn"]?.objectValue?["thread_id"]?.asString()
                 ?? ""
             if !threadId.isEmpty {
-                markProcessing(threadId: threadId, isProcessing: false)
+                markProcessing(workspaceId: event.workspaceId, threadId: threadId, isProcessing: false)
                 activeTurnIdByThread.removeValue(forKey: threadId)
             }
             return
@@ -792,7 +880,7 @@ final class CodexStore: ObservableObject {
             let params = message["params"]?.objectValue ?? [:]
             let threadId = params["threadId"]?.asString() ?? params["thread_id"]?.asString() ?? ""
             let errorMessage = params["error"]?.objectValue?["message"]?.asString() ?? "Turn failed."
-            markProcessing(threadId: threadId, isProcessing: false)
+            markProcessing(workspaceId: event.workspaceId, threadId: threadId, isProcessing: false)
             appendSystemMessage(threadId: threadId, text: errorMessage)
             return
         }
@@ -840,7 +928,7 @@ final class CodexStore: ObservableObject {
 
         let timestamp = Date()
         lastAgentMessageByThread[threadId] = (text: text, timestamp: timestamp)
-        markProcessing(threadId: threadId, isProcessing: false)
+        markProcessing(workspaceId: workspaceId, threadId: threadId, isProcessing: false)
         updateThreadTimestamp(workspaceId: workspaceId, threadId: threadId, timestamp: timestamp)
         if activeThreadIdByWorkspace[workspaceId] ?? nil != threadId {
             markUnread(threadId: threadId, hasUnread: true)
@@ -913,7 +1001,7 @@ final class CodexStore: ObservableObject {
         }
     }
 
-    private func markProcessing(threadId: String, isProcessing: Bool) {
+    private func markProcessing(workspaceId: String, threadId: String, isProcessing: Bool) {
         var status = threadStatusById[threadId] ?? ThreadActivityStatus()
         status.isProcessing = isProcessing
         if isProcessing {
@@ -922,6 +1010,68 @@ final class CodexStore: ObservableObject {
             status.lastDurationMs = Date().timeIntervalSince(started) * 1000
         }
         threadStatusById[threadId] = status
+
+        if isProcessing {
+            if inFlightByThread[threadId] != nil, hasStartedByThread[threadId] != true {
+                hasStartedByThread[threadId] = true
+            }
+            return
+        }
+
+        if inFlightByThread[threadId] != nil, hasStartedByThread[threadId] == true {
+            inFlightByThread[threadId] = nil
+            hasStartedByThread[threadId] = false
+        }
+
+        Task {
+            await flushQueueIfNeeded(workspaceId: workspaceId, threadId: threadId)
+        }
+    }
+
+    private func enqueueMessage(threadId: String, item: QueuedMessage) {
+        queuedByThread[threadId, default: []].append(item)
+    }
+
+    private func prependQueuedMessage(threadId: String, item: QueuedMessage) {
+        queuedByThread[threadId, default: []].insert(item, at: 0)
+    }
+
+    private func dequeueNext(threadId: String) -> QueuedMessage? {
+        guard let queue = queuedByThread[threadId], !queue.isEmpty else { return nil }
+        let next = queue[0]
+        queuedByThread[threadId] = Array(queue.dropFirst())
+        return next
+    }
+
+    private func flushQueueIfNeeded(workspaceId: String, threadId: String) async {
+        let isProcessing = threadStatusById[threadId]?.isProcessing == true
+        if isProcessing {
+            return
+        }
+        if inFlightByThread[threadId] != nil {
+            return
+        }
+        guard let nextItem = dequeueNext(threadId: threadId) else { return }
+        inFlightByThread[threadId] = nextItem
+        hasStartedByThread[threadId] = false
+        do {
+            _ = try await api.sendUserMessage(
+                workspaceId: workspaceId,
+                threadId: threadId,
+                text: nextItem.text,
+                model: nil,
+                effort: nil,
+                accessMode: nextItem.accessMode,
+                images: nextItem.images,
+                collaborationMode: collaborationModeValue(for: workspaceId)
+            )
+        } catch {
+            lastError = error.localizedDescription
+            appendSystemMessage(threadId: threadId, text: "Queued send failed: \(error.localizedDescription)")
+            inFlightByThread[threadId] = nil
+            hasStartedByThread[threadId] = false
+            prependQueuedMessage(threadId: threadId, item: nextItem)
+        }
     }
 
     private func markUnread(threadId: String, hasUnread: Bool) {

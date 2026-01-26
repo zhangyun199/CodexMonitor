@@ -9,6 +9,7 @@ type UseComposerShortcutsOptions = {
   modelShortcut: string | null;
   accessShortcut: string | null;
   reasoningShortcut: string | null;
+  planModeShortcut: string | null;
   models: ModelOption[];
   selectedModelId: string | null;
   onSelectModel: (id: string) => void;
@@ -17,6 +18,7 @@ type UseComposerShortcutsOptions = {
   reasoningOptions: string[];
   selectedEffort: string | null;
   onSelectEffort: (effort: string) => void;
+  onTogglePlanMode?: () => void;
 };
 
 const ACCESS_ORDER: AccessMode[] = ["read-only", "current", "full-access"];
@@ -26,6 +28,7 @@ export function useComposerShortcuts({
   modelShortcut,
   accessShortcut,
   reasoningShortcut,
+  planModeShortcut,
   models,
   selectedModelId,
   onSelectModel,
@@ -34,6 +37,7 @@ export function useComposerShortcuts({
   reasoningOptions,
   selectedEffort,
   onSelectEffort,
+  onTogglePlanMode,
 }: UseComposerShortcutsOptions) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -78,6 +82,14 @@ export function useComposerShortcuts({
         if (nextEffort) {
           onSelectEffort(nextEffort);
         }
+        return;
+      }
+      if (matchesShortcut(event, planModeShortcut)) {
+        if (!onTogglePlanMode) {
+          return;
+        }
+        event.preventDefault();
+        onTogglePlanMode();
       }
     };
 
@@ -87,10 +99,12 @@ export function useComposerShortcuts({
     accessMode,
     accessShortcut,
     modelShortcut,
+    planModeShortcut,
     models,
     onSelectAccessMode,
     onSelectEffort,
     onSelectModel,
+    onTogglePlanMode,
     reasoningOptions,
     reasoningShortcut,
     selectedEffort,

@@ -6,6 +6,9 @@ import type {
   DictationModelStatus,
   DictationSessionState,
   LocalUsageSnapshot,
+  MemoryEntry,
+  MemorySearchResult,
+  MemoryStatus,
   WorkspaceInfo,
   WorkspaceSettings,
 } from "../types";
@@ -237,6 +240,35 @@ export async function getGitCommitDiff(
 
 export async function getGitRemote(workspace_id: string): Promise<string | null> {
   return invoke("get_git_remote", { workspaceId: workspace_id });
+}
+
+export async function memoryStatus(): Promise<MemoryStatus> {
+  return invoke<MemoryStatus>("memory_status");
+}
+
+export async function memorySearch(
+  query: string,
+  limit = 10,
+): Promise<MemorySearchResult[]> {
+  return invoke<MemorySearchResult[]>("memory_search", { query, limit });
+}
+
+export async function memoryAppend(
+  type: "daily" | "curated",
+  content: string,
+  tags: string[] = [],
+  workspaceId?: string | null,
+): Promise<MemoryEntry> {
+  return invoke<MemoryEntry>("memory_append", {
+    type,
+    content,
+    tags,
+    workspace_id: workspaceId ?? null,
+  });
+}
+
+export async function memoryBootstrap(): Promise<MemorySearchResult[]> {
+  return invoke<MemorySearchResult[]>("memory_bootstrap");
 }
 
 export async function stageGitFile(workspaceId: string, path: string) {

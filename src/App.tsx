@@ -17,6 +17,7 @@ import "./styles/debug.css";
 import "./styles/terminal.css";
 import "./styles/request-user-input.css";
 import "./styles/plan.css";
+import "./styles/memory.css";
 import "./styles/about.css";
 import "./styles/tabbar.css";
 import "./styles/worktree-modal.css";
@@ -152,6 +153,7 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState<
     "projects" | "codex" | "git" | "log"
   >("codex");
+  const [rightPanelMode, setRightPanelMode] = useState<"git" | "memory">("git");
   const tabletTab = activeTab === "projects" ? "codex" : activeTab;
   const {
     workspaces,
@@ -368,11 +370,23 @@ function MainApp() {
     preferredEffort: appSettings.lastComposerReasoningEffort,
   });
 
+  const {
+    collaborationModes,
+    selectedCollaborationMode,
+    selectedCollaborationModeId,
+    setSelectedCollaborationModeId,
+  } = useCollaborationModes({
+    activeWorkspace,
+    enabled: appSettings.experimentalCollabEnabled,
+    onDebug: addDebugEntry,
+  });
+
   useComposerShortcuts({
     textareaRef: composerInputRef,
     modelShortcut: appSettings.composerModelShortcut,
     accessShortcut: appSettings.composerAccessShortcut,
     reasoningShortcut: appSettings.composerReasoningShortcut,
+    planModeShortcut: appSettings.composerPlanModeShortcut,
     models,
     selectedModelId,
     onSelectModel: setSelectedModelId,
@@ -381,6 +395,17 @@ function MainApp() {
     reasoningOptions,
     selectedEffort,
     onSelectEffort: setSelectedEffort,
+    onTogglePlanMode: () => {
+      const planMode = collaborationModes.find(
+        (mode) => mode.id.toLowerCase() === "plan" || mode.mode?.toLowerCase() === "plan",
+      );
+      if (!planMode) {
+        return;
+      }
+      setSelectedCollaborationModeId((current) =>
+        current === planMode.id ? null : planMode.id,
+      );
+    },
   });
 
   useComposerMenuActions({
@@ -395,16 +420,15 @@ function MainApp() {
     onFocusComposer: () => composerInputRef.current?.focus(),
   });
 
-  const {
-    collaborationModes,
-    selectedCollaborationMode,
-    selectedCollaborationModeId,
-    setSelectedCollaborationModeId,
-  } = useCollaborationModes({
-    activeWorkspace,
-    enabled: appSettings.experimentalCollabEnabled,
-    onDebug: addDebugEntry,
-  });
+  const handleSelectRightPanelMode = useCallback(
+    (mode: "git" | "memory") => {
+      setRightPanelMode(mode);
+      if (rightPanelCollapsed) {
+        expandRightPanel();
+      }
+    },
+    [expandRightPanel, rightPanelCollapsed],
+  );
   const { skills } = useSkills({ activeWorkspace, onDebug: addDebugEntry });
   const {
     prompts,
@@ -1310,6 +1334,7 @@ function MainApp() {
     tabletNavNode,
     tabBarNode,
     gitDiffPanelNode,
+    rightPanelNode,
     gitDiffViewerNode,
     planPanelNode,
     debugPanelNode,
@@ -1467,6 +1492,8 @@ function MainApp() {
     activeTab,
     onSelectTab: setActiveTab,
     tabletNavTab: tabletTab,
+    rightPanelMode,
+    onSelectRightPanelMode: handleSelectRightPanelMode,
     gitPanelMode,
     onGitPanelModeChange: handleGitPanelModeChange,
     gitDiffViewStyle,
@@ -1723,6 +1750,7 @@ function MainApp() {
         tabletNavNode={tabletNavNode}
         tabBarNode={tabBarNode}
         gitDiffPanelNode={gitDiffPanelNode}
+        rightPanelNode={rightPanelNode}
         gitDiffViewerNode={gitDiffViewerNode}
         planPanelNode={planPanelNode}
         debugPanelNode={debugPanelNode}

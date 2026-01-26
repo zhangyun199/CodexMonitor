@@ -267,6 +267,11 @@ pub(crate) struct AppSettings {
         rename = "composerReasoningShortcut"
     )]
     pub(crate) composer_reasoning_shortcut: Option<String>,
+    #[serde(
+        default = "default_composer_plan_mode_shortcut",
+        rename = "composerPlanModeShortcut"
+    )]
+    pub(crate) composer_plan_mode_shortcut: Option<String>,
     #[serde(default = "default_new_agent_shortcut", rename = "newAgentShortcut")]
     pub(crate) new_agent_shortcut: Option<String>,
     #[serde(
@@ -473,6 +478,10 @@ fn default_composer_reasoning_shortcut() -> Option<String> {
     Some("cmd+shift+r".to_string())
 }
 
+fn default_composer_plan_mode_shortcut() -> Option<String> {
+    Some("shift+tab".to_string())
+}
+
 fn default_new_agent_shortcut() -> Option<String> {
     Some("cmd+n".to_string())
 }
@@ -526,7 +535,7 @@ fn default_experimental_collab_enabled() -> bool {
 }
 
 fn default_experimental_steer_enabled() -> bool {
-    false
+    true
 }
 
 fn default_experimental_unified_exec_enabled() -> bool {
@@ -600,6 +609,7 @@ impl Default for AppSettings {
             composer_model_shortcut: default_composer_model_shortcut(),
             composer_access_shortcut: default_composer_access_shortcut(),
             composer_reasoning_shortcut: default_composer_reasoning_shortcut(),
+            composer_plan_mode_shortcut: default_composer_plan_mode_shortcut(),
             new_agent_shortcut: default_new_agent_shortcut(),
             new_worktree_agent_shortcut: default_new_worktree_agent_shortcut(),
             new_clone_agent_shortcut: default_new_clone_agent_shortcut(),
@@ -674,6 +684,10 @@ mod tests {
             Some("cmd+shift+r")
         );
         assert_eq!(
+            settings.composer_plan_mode_shortcut.as_deref(),
+            Some("shift+tab")
+        );
+        assert_eq!(
             settings.toggle_debug_panel_shortcut.as_deref(),
             Some("cmd+shift+d")
         );
@@ -705,7 +719,7 @@ mod tests {
         assert!(settings.code_font_family.contains("SF Mono"));
         assert_eq!(settings.code_font_size, 11);
         assert!(settings.notification_sounds_enabled);
-        assert!(!settings.experimental_steer_enabled);
+        assert!(settings.experimental_steer_enabled);
         assert!(!settings.dictation_enabled);
         assert_eq!(settings.dictation_model_id, "base");
         assert!(settings.dictation_preferred_language.is_none());

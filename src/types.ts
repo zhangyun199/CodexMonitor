@@ -97,6 +97,7 @@ export type AppSettings = {
   composerModelShortcut: string | null;
   composerAccessShortcut: string | null;
   composerReasoningShortcut: string | null;
+  composerPlanModeShortcut: string | null;
   newAgentShortcut: string | null;
   newWorktreeAgentShortcut: string | null;
   newCloneAgentShortcut: string | null;
@@ -138,6 +139,37 @@ export type AppSettings = {
   composerListContinuation: boolean;
   composerCodeBlockCopyUseModifier: boolean;
   workspaceGroups: WorkspaceGroup[];
+};
+
+export type MemoryStatus = {
+  enabled: boolean;
+  embeddings_enabled: boolean;
+  total: number;
+  pending: number;
+  ready: number;
+  error: number;
+};
+
+export type MemorySearchResult = {
+  id: string;
+  content: string;
+  memory_type: string;
+  tags: string[];
+  workspace_id?: string | null;
+  created_at: string;
+  distance?: number | null;
+  score?: number | null;
+  rank?: number | null;
+};
+
+export type MemoryEntry = {
+  id?: string | null;
+  content: string;
+  memory_type: string;
+  tags: string[];
+  workspace_id?: string | null;
+  embedding_status?: string | null;
+  created_at?: string | null;
 };
 
 export type CodexDoctorResult = {

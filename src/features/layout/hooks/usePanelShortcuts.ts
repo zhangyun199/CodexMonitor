@@ -4,15 +4,19 @@ import { matchesShortcut } from "../../../utils/shortcuts";
 type UsePanelShortcutsOptions = {
   toggleDebugPanelShortcut: string | null;
   toggleTerminalShortcut: string | null;
+  toggleMemoryPanelShortcut: string | null;
   onToggleDebug: () => void;
   onToggleTerminal: () => void;
+  onToggleMemoryPanel: () => void;
 };
 
 export function usePanelShortcuts({
   toggleDebugPanelShortcut,
   toggleTerminalShortcut,
+  toggleMemoryPanelShortcut,
   onToggleDebug,
   onToggleTerminal,
+  onToggleMemoryPanel,
 }: UsePanelShortcutsOptions) {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -35,9 +39,21 @@ export function usePanelShortcuts({
       if (matchesShortcut(event, toggleTerminalShortcut)) {
         event.preventDefault();
         onToggleTerminal();
+        return;
+      }
+      if (matchesShortcut(event, toggleMemoryPanelShortcut)) {
+        event.preventDefault();
+        onToggleMemoryPanel();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onToggleDebug, onToggleTerminal, toggleDebugPanelShortcut, toggleTerminalShortcut]);
+  }, [
+    onToggleDebug,
+    onToggleTerminal,
+    onToggleMemoryPanel,
+    toggleDebugPanelShortcut,
+    toggleTerminalShortcut,
+    toggleMemoryPanelShortcut,
+  ]);
 }

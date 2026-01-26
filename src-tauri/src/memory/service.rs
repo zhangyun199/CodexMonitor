@@ -76,10 +76,17 @@ impl MemoryService {
 
         // If embeddings available, use semantic search
         if let Some(ref embeddings) = self.embeddings {
-            let result = embeddings.generate(query, "query").await?;
-            self.supabase
-                .search_by_embedding(&result.vector, limit, Some(0.5))
-                .await
+            match embeddings.generate(query, "query").await {
+                Ok(result) => {
+                    self.supabase
+                        .search_by_embedding(&result.vector, limit, Some(0.5))
+                        .await
+                }
+                Err(err) => {
+                    eprintln!("Embeddings search failed, falling back to text: {err}");
+                    self.supabase.search_by_text(query, limit).await
+                }
+            }
         } else {
             // Fall back to text search
             self.supabase.search_by_text(query, limit).await

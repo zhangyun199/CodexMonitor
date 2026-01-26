@@ -182,7 +182,7 @@ Edit `~/.codex/config.toml` and add:
 
 ```toml
 [mcp_servers.codex_monitor_memory]
-command = "/Volumes/YouTube 4TB/CodexMonitor/target/release/codex_monitor_memory_mcp"
+command = "/Volumes/YouTube 4TB/CodexMonitor/src-tauri/target/release/codex_monitor_memory_mcp"
 args = []
 env = {
   SUPABASE_URL = "https://<project>.supabase.co",

@@ -21,6 +21,17 @@
   color: var(--text-subtle);
 }
 
+.right-panel-switch .panel-tab {
+  gap: 6px;
+  padding: 6px 10px;
+}
+
+.right-panel-switch .panel-tab-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .right-panel-content {
   flex: 1;
   min-height: 0;
@@ -61,6 +72,13 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.memory-panel-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .memory-panel-chip {
@@ -124,6 +142,23 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.memory-panel-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 6px;
+}
+
+.memory-panel-count {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-control);
 }
 
 .memory-panel-placeholder {

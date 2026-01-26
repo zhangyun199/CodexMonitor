@@ -103,6 +103,7 @@ export type AppSettings = {
   newCloneAgentShortcut: string | null;
   toggleProjectsSidebarShortcut: string | null;
   toggleGitSidebarShortcut: string | null;
+  toggleMemoryPanelShortcut: string | null;
   toggleDebugPanelShortcut: string | null;
   toggleTerminalShortcut: string | null;
   cycleAgentNextShortcut: string | null;

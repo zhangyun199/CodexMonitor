@@ -97,6 +97,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var newCloneAgentShortcut: String?
     public var toggleProjectsSidebarShortcut: String?
     public var toggleGitSidebarShortcut: String?
+    public var toggleMemoryPanelShortcut: String?
     public var toggleDebugPanelShortcut: String?
     public var toggleTerminalShortcut: String?
     public var cycleAgentNextShortcut: String?

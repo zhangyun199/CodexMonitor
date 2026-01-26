@@ -114,12 +114,21 @@ export function MemoryPanel({ workspaceId }: MemoryPanelProps) {
     return `${status.total} total • ${status.ready} ready • ${status.pending} pending`;
   }, [status]);
 
+  const trimmedQuery = query.trim();
+
   return (
     <div className="memory-panel">
       <div className="memory-panel-header">
         <div>
           <div className="memory-panel-title">Memory</div>
           <div className="memory-panel-subtitle">{statusSummary}</div>
+          {status?.enabled && (
+            <div className="memory-panel-status-row">
+              <span className="memory-panel-chip">Ready {status.ready}</span>
+              <span className="memory-panel-chip">Pending {status.pending}</span>
+              <span className="memory-panel-chip">Error {status.error}</span>
+            </div>
+          )}
         </div>
         <div className="memory-panel-actions">
           <span className={`memory-panel-chip ${enabled ? "is-on" : "is-off"}`}>
@@ -153,11 +162,29 @@ export function MemoryPanel({ workspaceId }: MemoryPanelProps) {
         <button type="button" className="ghost" onClick={() => void runSearch()}>
           Search
         </button>
+        {trimmedQuery && (
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => {
+              setQuery("");
+              void refreshAll();
+            }}
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {error && <div className="memory-panel-error">{error}</div>}
 
       <div className="memory-panel-results">
+        {trimmedQuery && (
+          <div className="memory-panel-results-header">
+            <span>Results for “{trimmedQuery}”</span>
+            <span className="memory-panel-count">{results.length}</span>
+          </div>
+        )}
         {loading ? (
           <div className="memory-panel-placeholder">Loading memories…</div>
         ) : results.length === 0 ? (

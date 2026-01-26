@@ -27,6 +27,7 @@ const defaultSettings: AppSettings = {
   newCloneAgentShortcut: "cmd+alt+n",
   toggleProjectsSidebarShortcut: "cmd+shift+p",
   toggleGitSidebarShortcut: "cmd+shift+g",
+  toggleMemoryPanelShortcut: "cmd+shift+m",
   toggleDebugPanelShortcut: "cmd+shift+d",
   toggleTerminalShortcut: "cmd+shift+t",
   cycleAgentNextShortcut: "cmd+ctrl+down",

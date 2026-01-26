@@ -11,6 +11,8 @@ export function useLayoutController({
   setDebugOpen,
   toggleDebugPanelShortcut,
   toggleTerminalShortcut,
+  toggleMemoryPanelShortcut,
+  onToggleMemoryPanel,
 }: {
   uiScale: number;
   activeWorkspaceId: string | null;
@@ -18,6 +20,8 @@ export function useLayoutController({
   setDebugOpen: (value: boolean | ((prev: boolean) => boolean)) => void;
   toggleDebugPanelShortcut: string | null;
   toggleTerminalShortcut: string | null;
+  toggleMemoryPanelShortcut: string | null;
+  onToggleMemoryPanel: () => void;
 }) {
   const {
     sidebarWidth,
@@ -60,8 +64,10 @@ export function useLayoutController({
   usePanelShortcuts({
     toggleDebugPanelShortcut,
     toggleTerminalShortcut,
+    toggleMemoryPanelShortcut,
     onToggleDebug: handleDebugClick,
     onToggleTerminal: handleToggleTerminal,
+    onToggleMemoryPanel,
   });
 
   return {

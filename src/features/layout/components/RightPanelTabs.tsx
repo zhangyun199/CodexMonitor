@@ -37,6 +37,7 @@ export function RightPanelTabs({ active, onSelect }: RightPanelTabsProps) {
             <span className="panel-tab-icon" aria-hidden>
               {tab.icon}
             </span>
+            <span className="panel-tab-label">{tab.label}</span>
           </button>
         );
       })}

@@ -20,3 +20,8 @@
 - 2026-01-26: Added iOS plan-mode toggle and collaboration mode wiring (list + send). 
 - 2026-01-26: Added memory RPC helpers in web app and updated shared types.
 - 2026-01-26: Ran cargo build and npm run build (warnings only).
+- 2026-01-26: Added memory panel polish (results header, status chips, clearer tabs styling).
+- 2026-01-26: Added memory panel shortcut (cmd+shift+m) and wiring + settings.
+- 2026-01-26: Updated MCP binary path in docs + local config to src-tauri/target/release.
+- 2026-01-26: Ran MCP memory tools end-to-end; search now falls back to text when embeddings fail.
+- 2026-01-26: Ran cargo build --release and npm run build (warnings only).

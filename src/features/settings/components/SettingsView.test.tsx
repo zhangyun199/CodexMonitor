@@ -32,6 +32,7 @@ const baseSettings: AppSettings = {
   newCloneAgentShortcut: null,
   toggleProjectsSidebarShortcut: null,
   toggleGitSidebarShortcut: null,
+  toggleMemoryPanelShortcut: null,
   toggleDebugPanelShortcut: null,
   toggleTerminalShortcut: null,
   cycleAgentNextShortcut: null,

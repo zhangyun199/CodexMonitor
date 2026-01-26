@@ -140,6 +140,7 @@ type ShortcutSettingKey =
   | "newCloneAgentShortcut"
   | "toggleProjectsSidebarShortcut"
   | "toggleGitSidebarShortcut"
+  | "toggleMemoryPanelShortcut"
   | "toggleDebugPanelShortcut"
   | "toggleTerminalShortcut"
   | "cycleAgentNextShortcut"
@@ -156,6 +157,7 @@ type ShortcutDraftKey =
   | "newCloneAgent"
   | "projectsSidebar"
   | "gitSidebar"
+  | "memoryPanel"
   | "debugPanel"
   | "terminal"
   | "cycleAgentNext"
@@ -173,6 +175,7 @@ const shortcutDraftKeyBySetting: Record<ShortcutSettingKey, ShortcutDraftKey> = 
   newCloneAgentShortcut: "newCloneAgent",
   toggleProjectsSidebarShortcut: "projectsSidebar",
   toggleGitSidebarShortcut: "gitSidebar",
+  toggleMemoryPanelShortcut: "memoryPanel",
   toggleDebugPanelShortcut: "debugPanel",
   toggleTerminalShortcut: "terminal",
   cycleAgentNextShortcut: "cycleAgentNext",
@@ -239,6 +242,7 @@ export function SettingsView({
     newCloneAgent: appSettings.newCloneAgentShortcut ?? "",
     projectsSidebar: appSettings.toggleProjectsSidebarShortcut ?? "",
     gitSidebar: appSettings.toggleGitSidebarShortcut ?? "",
+    memoryPanel: appSettings.toggleMemoryPanelShortcut ?? "",
     debugPanel: appSettings.toggleDebugPanelShortcut ?? "",
     terminal: appSettings.toggleTerminalShortcut ?? "",
     cycleAgentNext: appSettings.cycleAgentNextShortcut ?? "",
@@ -327,6 +331,7 @@ export function SettingsView({
       newCloneAgent: appSettings.newCloneAgentShortcut ?? "",
       projectsSidebar: appSettings.toggleProjectsSidebarShortcut ?? "",
       gitSidebar: appSettings.toggleGitSidebarShortcut ?? "",
+      memoryPanel: appSettings.toggleMemoryPanelShortcut ?? "",
       debugPanel: appSettings.toggleDebugPanelShortcut ?? "",
       terminal: appSettings.toggleTerminalShortcut ?? "",
       cycleAgentNext: appSettings.cycleAgentNextShortcut ?? "",
@@ -344,6 +349,7 @@ export function SettingsView({
     appSettings.newCloneAgentShortcut,
     appSettings.toggleProjectsSidebarShortcut,
     appSettings.toggleGitSidebarShortcut,
+    appSettings.toggleMemoryPanelShortcut,
     appSettings.toggleDebugPanelShortcut,
     appSettings.toggleTerminalShortcut,
     appSettings.cycleAgentNextShortcut,
@@ -1836,6 +1842,30 @@ export function SettingsView({
                   </div>
                   <div className="settings-help">
                     Default: {formatShortcut("cmd+shift+g")}
+                  </div>
+                </div>
+                <div className="settings-field">
+                  <div className="settings-field-label">Toggle memory panel</div>
+                  <div className="settings-field-row">
+                    <input
+                      className="settings-input settings-input--shortcut"
+                      value={formatShortcut(shortcutDrafts.memoryPanel)}
+                      onKeyDown={(event) =>
+                        handleShortcutKeyDown(event, "toggleMemoryPanelShortcut")
+                      }
+                      placeholder="Type shortcut"
+                      readOnly
+                    />
+                    <button
+                      type="button"
+                      className="ghost settings-button-compact"
+                      onClick={() => void updateShortcut("toggleMemoryPanelShortcut", null)}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="settings-help">
+                    Default: {formatShortcut("cmd+shift+m")}
                   </div>
                 </div>
                 <div className="settings-field">

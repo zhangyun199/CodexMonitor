@@ -223,6 +223,10 @@ function MainApp() {
     setDebugOpen,
     toggleDebugPanelShortcut: appSettings.toggleDebugPanelShortcut,
     toggleTerminalShortcut: appSettings.toggleTerminalShortcut,
+    toggleMemoryPanelShortcut: appSettings.toggleMemoryPanelShortcut,
+    onToggleMemoryPanel: () => {
+      setRightPanelMode((current) => (current === "memory" ? "git" : "memory"));
+    },
   });
   const sidebarToggleProps = {
     isCompact,
@@ -233,6 +237,12 @@ function MainApp() {
     onCollapseRightPanel: collapseRightPanel,
     onExpandRightPanel: expandRightPanel,
   };
+
+  useEffect(() => {
+    if (rightPanelMode === "memory" && rightPanelCollapsed) {
+      expandRightPanel();
+    }
+  }, [expandRightPanel, rightPanelCollapsed, rightPanelMode]);
   const {
     settingsOpen,
     settingsSection,

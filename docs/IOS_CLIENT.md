@@ -257,9 +257,92 @@ See `ios/CodexMonitorMobile/CodexMonitorMobile/Info.plist`:
 
 ## BrowserView (2026-01-26)
 
-- Auto-refresh timer (3s/5s/10s) pauses when app goes background.
+- **Path**: `ios/CodexMonitorMobile/CodexMonitorMobile/Views/BrowserView.swift`
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Session management | Create, list, close browser sessions |
+| Navigation | Enter URL, navigate to pages |
+| Screenshot | Display page screenshots |
+| Auto-refresh | Configurable interval (3s/5s/10s) |
+| Interactive controls | Click coordinates, type text |
+
+### Auto-refresh Pause Behavior
+
+Uses `scenePhase` environment variable to detect when the app is backgrounded:
+
+```swift
+@Environment(\.scenePhase) private var scenePhase
+
+.task(id: "\(selectedSession ?? "")-\(autoRefresh)-\(refreshInterval)-\(scenePhase)") {
+    guard autoRefresh, selectedSession != nil, scenePhase == .active else { return }
+    while !Task.isCancelled {
+        await refreshScreenshot()
+        try? await Task.sleep(nanoseconds: UInt64(refreshInterval) * 1_000_000_000)
+    }
+}
+```
+
+When `scenePhase` is not `.active`, the auto-refresh task exits early. The `task(id:)` modifier causes the task to restart when `scenePhase` changes back to active.
+
+---
 
 ## SkillsView (2026-01-26)
 
-- Reads enable/disable status via `skills_config_read`.
-- Toggling persists with `skills_config_write`.
+- **Path**: `ios/CodexMonitorMobile/CodexMonitorMobile/Views/SkillsView.swift`
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Skill listing | Shows all installed skills with name and description |
+| Enable/disable toggle | Toggle to enable or disable each skill |
+| Validation status | Shows issues (missing binaries, env vars, OS incompatibility) |
+| Git installation | Install skills from git repository URL |
+| Persistence | Config saved to `{CODEX_HOME}/skills/config.json` |
+
+### State Management
+
+```swift
+@State private var validations: [SkillValidationResult] = []
+@State private var skills: [SkillOption] = []
+@State private var enabledSkills: Set<String> = []
+@State private var installUrl: String = ""
+```
+
+### Configuration Persistence
+
+On toggle change, writes to config via `skillsConfigWrite`:
+
+```swift
+private func persistSkillConfig() async {
+    guard let workspaceId = store.activeWorkspaceId else { return }
+    let enabled = skills.filter { enabledSkills.contains($0.id) }
+    let disabled = skills.filter { !enabledSkills.contains($0.id) }
+    await store.skillsConfigWrite(workspaceId: workspaceId, enabled: enabled, disabled: disabled)
+}
+```
+
+### Skill Resolution Logic
+
+Skills enabled/disabled state is resolved from config using:
+1. If `config.enabled` is non-empty, use that list
+2. Else if `config.disabled` is non-empty, enable all except those
+3. Else enable all skills by default
+
+```swift
+private func resolveEnabledSkills(skills: [SkillOption], config: JSONValue) -> Set<String> {
+    let enabledEntries = config["enabled"]?.arrayValue ?? []
+    let disabledEntries = config["disabled"]?.arrayValue ?? []
+
+    // Build key sets from entries
+    let enabledKeys = Set(enabledEntries.compactMap { ... })
+    let disabledKeys = Set(disabledEntries.compactMap { ... })
+
+    if !enabledKeys.isEmpty { return enabledKeys }
+    if !disabledKeys.isEmpty { return Set(skills.map { $0.id }).subtracting(disabledKeys) }
+    return Set(skills.map { $0.id })
+}
+```

@@ -326,10 +326,75 @@ In remote mode, these are either:
 
 ## Browser Panel (2026-01-26)
 
-- Located in right panel tabs.
-- Supports auto-refresh (3s/5s/10s) which pauses when the app is backgrounded.
+- **Path**: `src/features/browser/components/BrowserPanel.tsx`
+- Located in right panel tabs
+- Supports auto-refresh (3s/5s/10s) which pauses when the app is backgrounded
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Session management | Create, list, close browser sessions |
+| Navigation | Enter URL, navigate, view current page |
+| Screenshot | Capture and display page screenshot |
+| Auto-refresh | Configurable interval (3s/5s/10s) with visibility-aware pausing |
+| Interactive elements | Click, type, press keyboard keys |
+
+### Auto-refresh Pause Behavior
+
+Uses `document.visibilitychange` event to detect when the app is backgrounded:
+
+```tsx
+useEffect(() => {
+  const handleVisibility = () => {
+    setIsVisible(document.visibilityState === "visible");
+  };
+  document.addEventListener("visibilitychange", handleVisibility);
+  return () => document.removeEventListener("visibilitychange", handleVisibility);
+}, []);
+```
+
+When `isVisible` is false, the auto-refresh timer is paused to conserve resources and prevent unnecessary browser operations.
+
+---
 
 ## Skills Panel (2026-01-26)
 
-- Reads enable/disable status from `skills_config_read`.
-- Toggling checkboxes writes back with `skills_config_write`.
+- **Path**: `src/features/skills/components/SkillsPanel.tsx`
+- Located in settings/config area of the app
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Skill listing | Shows all installed skills with name and description |
+| Enable/disable toggle | Checkbox to enable or disable each skill |
+| Validation status | Shows issues (missing binaries, env vars, OS incompatibility) |
+| Git installation | Install skills from git repository URL |
+| Persistence | Config saved to `{CODEX_HOME}/skills/config.json` |
+
+### State Management
+
+```tsx
+const [skills, setSkills] = useState<{ name: string; path: string; description?: string }[]>([]);
+const [enabledSkills, setEnabledSkills] = useState<Set<string>>(new Set());
+```
+
+### Configuration Persistence
+
+On toggle change, writes to config via `skills_config_write`:
+
+```tsx
+const persistConfig = async (nextEnabled: Set<string>) => {
+  const enabled = skills.filter(s => nextEnabled.has(`${s.name}|${s.path}`));
+  const disabled = skills.filter(s => !nextEnabled.has(`${s.name}|${s.path}`));
+  await skillsConfigWrite(workspaceId, { enabled, disabled });
+};
+```
+
+### Skill Resolution Logic
+
+Skills enabled/disabled state is resolved from config using:
+1. If `config.enabled` is non-empty, use that list
+2. Else if `config.disabled` is non-empty, enable all except those
+3. Else enable all skills by default

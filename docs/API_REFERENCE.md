@@ -4161,13 +4161,21 @@ Codex app-server response envelope for `browser/evaluate`.
 | Field | Type | Required | Description |
 |------|------|----------|-------------|
 | `workspaceId` | `string` | yes | Workspace id (must be connected). |
-| `skillName` | `string` | yes | Name of the skill to configure. |
-| `enabled` | `boolean` | yes | Whether the skill should be enabled. |
+| `config` | `object` | yes | Configuration object with `enabled` and `disabled` arrays. |
+
+The `config` object structure:
+
+```json
+{
+  "enabled": [{ "name": "skill-name", "path": "/path/to/skill" }],
+  "disabled": [{ "name": "other-skill", "path": "/path/to/other" }]
+}
+```
 
 
 **Response**
 
-Codex app-server response envelope for `skills/configWrite`.
+{ ok: true }
 
 
 **Example**
@@ -4178,8 +4186,10 @@ Codex app-server response envelope for `skills/configWrite`.
   "method": "skills_config_write",
   "params": {
     "workspaceId": "...",
-    "skillName": "format",
-    "enabled": true
+    "config": {
+      "enabled": [{ "name": "format", "path": "/path/to/format" }],
+      "disabled": []
+    }
   }
 }
 ```
@@ -4187,17 +4197,16 @@ Codex app-server response envelope for `skills/configWrite`.
 {
   "id": 111,
   "result": {
-    "id": 1,
-    "result": {
-      "ok": true
-    }
+    "ok": true
   }
 }
 ```
 
 **Notes**
 
-- Enables or disables a skill in the configuration.
+- Writes the skills configuration to `{CODEX_HOME}/skills/config.json`.
+- Config specifies which skills are enabled and which are disabled.
+- Skills not in either list default to enabled.
 
 
 
@@ -4212,12 +4221,11 @@ Codex app-server response envelope for `skills/configWrite`.
 | Field | Type | Required | Description |
 |------|------|----------|-------------|
 | `workspaceId` | `string` | yes | Workspace id (must be connected). |
-| `skillName` | `string` | yes | Name of the skill to validate. |
 
 
 **Response**
 
-Codex app-server response envelope for `skills/validate`.
+Array of `SkillValidationResult` objects.
 
 
 **Example**
@@ -4227,30 +4235,39 @@ Codex app-server response envelope for `skills/validate`.
   "id": 1,
   "method": "skills_validate",
   "params": {
-    "workspaceId": "...",
-    "skillName": "format"
+    "workspaceId": "..."
   }
 }
 ```
 ```json
 {
   "id": 112,
-  "result": {
-    "id": 1,
-    "result": {
-      "valid": true,
-      "requirements": [],
-      "errors": []
+  "result": [
+    {
+      "name": "format",
+      "path": "/path/to/format",
+      "description": "Code formatting skill",
+      "issues": []
+    },
+    {
+      "name": "browser-tool",
+      "path": "/path/to/browser-tool",
+      "description": "Browser automation",
+      "issues": ["missing binary: playwright", "missing env var: BROWSER_PATH"]
     }
-  }
+  ]
 }
 ```
 
 **Notes**
 
-- Checks whether a skill's requirements are met.
+- Validates all installed skills in the workspace.
 
-- Returns validation status and any missing requirements.
+- Each result includes the skill name, path, description, and array of issues.
+
+- Issues include: missing binaries, missing env vars, unsupported OS.
+
+- Empty `issues` array means the skill is valid and ready to use.
 
 
 
@@ -4264,14 +4281,14 @@ Codex app-server response envelope for `skills/validate`.
 
 | Field | Type | Required | Description |
 |------|------|----------|-------------|
-| `workspaceId` | `string` | yes | Workspace id (must be connected). |
-| `gitUrl` | `string` | yes | Git repository URL containing the skill. |
-| `branch` | `string` | no | Optional branch to install from (defaults to main/master). |
+| `sourceUrl` | `string` | yes | Git repository URL containing the skill. |
+| `target` | `string` | yes | Installation target: `"global"` or `"workspace"`. |
+| `workspaceId` | `string` | conditional | Required when `target` is `"workspace"`. |
 
 
 **Response**
 
-Codex app-server response envelope for `skills/installFromGit`.
+{ ok: true }
 
 
 **Example**
@@ -4281,8 +4298,9 @@ Codex app-server response envelope for `skills/installFromGit`.
   "id": 1,
   "method": "skills_install_from_git",
   "params": {
-    "workspaceId": "...",
-    "gitUrl": "https://github.com/example/my-skill.git"
+    "sourceUrl": "https://github.com/example/my-skill.git",
+    "target": "workspace",
+    "workspaceId": "..."
   }
 }
 ```
@@ -4290,20 +4308,20 @@ Codex app-server response envelope for `skills/installFromGit`.
 {
   "id": 113,
   "result": {
-    "id": 1,
-    "result": {
-      "ok": true,
-      "skillName": "my-skill"
-    }
+    "ok": true
   }
 }
 ```
 
 **Notes**
 
-- Installs a skill from a git repository.
+- Clones the git repository into the skills directory.
 
-- Clones the repository and registers the skill.
+- `"global"` target installs to `$CODEX_HOME/skills/`.
+
+- `"workspace"` target installs to `<workspace>/.codex/skills/`.
+
+- The repository should contain a `SKILL.md` file at its root.
 
 
 
@@ -4317,13 +4335,14 @@ Codex app-server response envelope for `skills/installFromGit`.
 
 | Field | Type | Required | Description |
 |------|------|----------|-------------|
-| `workspaceId` | `string` | yes | Workspace id (must be connected). |
-| `skillName` | `string` | yes | Name of the skill to uninstall. |
+| `name` | `string` | yes | Name of the skill (repository folder name). |
+| `target` | `string` | yes | Uninstall target: `"global"` or `"workspace"`. |
+| `workspaceId` | `string` | conditional | Required when `target` is `"workspace"`. |
 
 
 **Response**
 
-Codex app-server response envelope for `skills/uninstall`.
+{ ok: true }
 
 
 **Example**
@@ -4333,8 +4352,9 @@ Codex app-server response envelope for `skills/uninstall`.
   "id": 1,
   "method": "skills_uninstall",
   "params": {
-    "workspaceId": "...",
-    "skillName": "my-skill"
+    "name": "my-skill",
+    "target": "workspace",
+    "workspaceId": "..."
   }
 }
 ```
@@ -4342,20 +4362,73 @@ Codex app-server response envelope for `skills/uninstall`.
 {
   "id": 114,
   "result": {
-    "id": 1,
-    "result": {
-      "ok": true
-    }
+    "ok": true
   }
 }
 ```
 
 **Notes**
 
-- Removes an installed skill.
+- Removes an installed skill by deleting its directory.
+
+- `"global"` target removes from `$CODEX_HOME/skills/`.
+
+- `"workspace"` target removes from `<workspace>/.codex/skills/`.
 
 - Only works for user-installed skills, not built-in skills.
 
+
+
+### `skills_config_read`
+
+- **Direction:** client → daemon
+- **Auth required:** yes
+
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Workspace id (must be connected). |
+
+
+**Response**
+
+Skills configuration object.
+
+
+**Example**
+
+```json
+{
+  "id": 1,
+  "method": "skills_config_read",
+  "params": {
+    "workspaceId": "..."
+  }
+}
+```
+```json
+{
+  "id": 115,
+  "result": {
+    "enabled": [
+      { "name": "format", "path": "/path/to/format" }
+    ],
+    "disabled": [
+      { "name": "browser-tool", "path": "/path/to/browser-tool" }
+    ]
+  }
+}
+```
+
+**Notes**
+
+- Reads the skills configuration from `{CODEX_HOME}/skills/config.json`.
+
+- Returns empty arrays if no config file exists.
+
+- Used by UI to determine which skills are enabled/disabled.
 
 
 ---

@@ -292,6 +292,162 @@ This changes what Codex can execute without prompting and is security-sensitive.
 
 ---
 
+## Memory System
+
+### MemoryService
+
+- **Path**: `src-tauri/src/memory/service.rs`
+- Provides CRUD and semantic search against Supabase + pgvector
+- Uses MiniMax embeddings API for vector generation
+
+### Auto-Memory (Pre-compaction Flush)
+
+- **Path**: `src-tauri/src/memory/auto_flush.rs`
+
+The auto-memory system monitors token usage and triggers background summarization before the model's context window fills.
+
+#### AutoMemoryRuntime
+
+Maintains per-thread state:
+
+```rust
+struct ThreadAutoState {
+    last_flush_at: Option<Instant>,        // Rate limiting
+    last_seen_context_tokens: Option<u32>, // Previous token count
+    last_compaction_epoch: u64,            // Increments on compaction detection
+    last_flush_epoch: Option<u64>,         // Prevents duplicate flushes
+}
+```
+
+#### Flush Trigger Logic
+
+```rust
+fn should_flush(settings, context_tokens, model_context_window) -> bool {
+    let usable_window = model_context_window - reserve_tokens_floor;
+    context_tokens >= usable_window - soft_threshold_tokens
+}
+```
+
+Compaction detection: if `new_tokens + (new_tokens / 2) < previous_tokens`, a compaction occurred.
+
+#### Snapshot Builder
+
+When a flush triggers:
+1. Call `thread/resume` to fetch recent turns
+2. Extract user/assistant messages (optionally tool output)
+3. Collect `git status -sb` + `git diff --stat` if configured
+4. Build `MemoryFlushSnapshot` struct
+
+#### Background Summarizer
+
+Spawns an ephemeral Codex thread with a structured prompt:
+- Input: `MemoryFlushSnapshot` as JSON
+- Output: JSON with `{ no_reply, title, tags, daily_markdown, curated_markdown }`
+- Timeout: 60 seconds
+- Thread is archived after completion
+
+The summarizer uses a "commit message" pattern - extract durable facts, decisions, TODOs, and project state worth remembering.
+
+---
+
+## Browser Control System
+
+### BrowserService
+
+- **Path**: `src-tauri/src/browser/service.rs`
+- Lazy-spawns browser-worker on first request
+- Maintains persistent stdio connection
+- Request/response matching by JSON-RPC `id`
+
+```rust
+pub struct BrowserService {
+    worker: Arc<Mutex<Option<BrowserWorkerClient>>>,
+}
+```
+
+Environment variable:
+- `CODEX_MONITOR_BROWSER_WORKER` - path to worker script (default: `browser-worker/dist/index.js`)
+
+### Browser Worker (Node.js + Playwright)
+
+- **Path**: `browser-worker/src/index.ts`
+- Dependencies: `playwright` (Chromium)
+- Session management: `Map<sessionId, Session>`
+
+Supported methods:
+| Method | Description |
+|--------|-------------|
+| `browser.create` | Create new session with optional headless, viewport, userDataDir, startUrl |
+| `browser.list` | List active session IDs |
+| `browser.close` | Close session |
+| `browser.navigate` | Navigate to URL with waitUntil and timeout options |
+| `browser.screenshot` | Capture PNG screenshot (fullPage option) |
+| `browser.click` | Click by selector or x/y coordinates |
+| `browser.type` | Type into element (with clearFirst option) |
+| `browser.press` | Press keyboard key |
+| `browser.evaluate` | Execute JavaScript in page context |
+| `browser.snapshot` | Screenshot + DOM element list (first 50 interactive elements) |
+
+### Browser MCP Server
+
+- **Binary**: `src-tauri/src/bin/codex_monitor_browser_mcp.rs`
+- Exposes browser tools to Codex CLI via MCP protocol
+- Connects to daemon over TCP, proxies browser RPC calls
+
+---
+
+## Skills Management System
+
+### SKILL.md Parser
+
+- **Path**: `src-tauri/src/skills/skill_md.rs`
+- Parses YAML frontmatter + markdown body
+
+```rust
+pub struct SkillDescriptor {
+    pub name: String,
+    pub description: Option<String>,
+    pub path: String,
+    pub requirements: Requirements,
+}
+
+pub struct Requirements {
+    pub bins: Vec<String>,  // Required CLI binaries
+    pub env: Vec<String>,   // Required environment variables
+    pub os: Vec<String>,    // Supported operating systems
+}
+```
+
+#### Parsing Logic
+
+1. Split frontmatter from body (delimited by `---`)
+2. Parse YAML frontmatter for `name`, `description`, `requirements`
+3. Fallback name: parent directory name
+4. Fallback description: first non-empty line of body
+
+#### Validation
+
+The `validate_skill()` function checks:
+1. **OS compatibility**: current OS in `requirements.os` list
+2. **Binary availability**: all `requirements.bins` found via `which`
+3. **Environment variables**: all `requirements.env` are set
+
+Returns a list of issues (empty = valid).
+
+### Skills Configuration
+
+- **Config path**: `{CODEX_HOME}/skills/config.json`
+- Stores enabled/disabled skill entries
+
+```json
+{
+  "enabled": [{ "name": "skill-name", "path": "/path/to/skill" }],
+  "disabled": [{ "name": "other-skill", "path": "/path/to/other" }]
+}
+```
+
+---
+
 ## File inventory (Rust backend)
 
 Top-level Tauri crate (`src-tauri/src/*.rs`):
@@ -315,3 +471,22 @@ Top-level Tauri crate (`src-tauri/src/*.rs`):
 Backend folder (`src-tauri/src/backend/*.rs`):
 - `app_server.rs` — spawn/manage Codex app-server process
 - `events.rs` — event types and sink abstraction
+
+Memory folder (`src-tauri/src/memory/*.rs`):
+- `mod.rs` — module exports
+- `service.rs` — MemoryService (Supabase + embedding)
+- `embeddings.rs` — MiniMax embedding client
+- `auto_flush.rs` — AutoMemoryRuntime + snapshot/summarizer logic
+
+Browser folder (`src-tauri/src/browser/*.rs`):
+- `mod.rs` — module exports
+- `service.rs` — BrowserService (worker management)
+
+Skills folder (`src-tauri/src/skills/*.rs`):
+- `mod.rs` — module exports
+- `skill_md.rs` — SKILL.md parser + validator
+
+Binaries (`src-tauri/src/bin/*.rs`):
+- `codex_monitor_daemon.rs` — headless daemon server
+- `codex_monitor_memory_mcp.rs` — MCP server for memory tools
+- `codex_monitor_browser_mcp.rs` — MCP server for browser tools

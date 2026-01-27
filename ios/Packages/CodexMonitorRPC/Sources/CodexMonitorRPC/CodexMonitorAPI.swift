@@ -269,6 +269,13 @@ public struct CodexMonitorAPI: Sendable {
         )
     }
 
+    public func skillsConfigRead(workspaceId: String) async throws -> JSONValue {
+        return try await rpc.call(
+            method: "skills_config_read",
+            params: .object(["workspaceId": .string(workspaceId)])
+        )
+    }
+
     public func skillsValidate(workspaceId: String) async throws -> [SkillValidationResult] {
         return try await call("skills_validate", params: .object(["workspaceId": .string(workspaceId)]), as: [SkillValidationResult].self)
     }
@@ -408,10 +415,6 @@ public struct CodexMonitorAPI: Sendable {
 
     public func accountRateLimits(workspaceId: String) async throws -> [RateLimitSnapshot] {
         return try await call("account_rate_limits", params: .object(["workspaceId": .string(workspaceId)]), as: [RateLimitSnapshot].self)
-    }
-
-    public func skillsList(workspaceId: String) async throws -> [SkillOption] {
-        return try await call("skills_list", params: .object(["workspaceId": .string(workspaceId)]), as: [SkillOption].self)
     }
 
     public func getCommitMessagePrompt(workspaceId: String) async throws -> String {

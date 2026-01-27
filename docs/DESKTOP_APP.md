@@ -321,3 +321,15 @@ In remote mode, these are either:
 - **Terminal output can be large**  
   Both desktop and daemon stream terminal output as raw strings. Without trimming, memory can grow.
 
+
+---
+
+## Browser Panel (2026-01-26)
+
+- Located in right panel tabs.
+- Supports auto-refresh (3s/5s/10s) which pauses when the app is backgrounded.
+
+## Skills Panel (2026-01-26)
+
+- Reads enable/disable status from `skills_config_read`.
+- Toggling checkboxes writes back with `skills_config_write`.

@@ -1127,9 +1127,33 @@ impl DaemonState {
             _ => Map::new(),
         };
         payload.entry("cwd".to_string()).or_insert(json!(session.entry.path));
-        session
-            .send_request("skills/config/write", Value::Object(payload))
-            .await
+        let payload_value = Value::Object(payload.clone());
+        let result = session
+            .send_request("skills/config/write", payload_value)
+            .await?;
+
+        if let Ok(config_path) = self.skills_config_path(&workspace_id).await {
+            let config_value = result
+                .get("result")
+                .and_then(|v| v.get("config"))
+                .cloned()
+                .unwrap_or_else(|| {
+                    let mut clone = payload.clone();
+                    clone.remove("cwd");
+                    Value::Object(clone)
+                });
+            let _ = write_json_file(&config_path, &config_value);
+        }
+
+        Ok(result)
+    }
+
+    async fn skills_config_read(&self, workspace_id: String) -> Result<Value, String> {
+        let config_path = self.skills_config_path(&workspace_id).await?;
+        if let Ok(value) = read_json_file(&config_path) {
+            return Ok(value);
+        }
+        Ok(json!({ "enabled": [], "disabled": [] }))
     }
 
     async fn skills_validate(&self, workspace_id: String) -> Result<Value, String> {
@@ -1299,6 +1323,13 @@ impl DaemonState {
             "ok": true,
             "rulesPath": rules_path,
         }))
+    }
+
+    async fn skills_config_path(&self, workspace_id: &str) -> Result<PathBuf, String> {
+        let (entry, parent_path) = self.workspace_entry_with_parent_path(workspace_id).await?;
+        let codex_home = codex_home::resolve_workspace_codex_home(&entry, parent_path.as_deref())
+            .ok_or("Unable to resolve CODEX_HOME")?;
+        Ok(codex_home.join("skills").join("config.json"))
     }
 }
 
@@ -4183,6 +4214,41 @@ fn parse_optional_usize(value: &Value, key: &str) -> Option<usize> {
     }
 }
 
+fn read_json_file(path: &Path) -> Result<Value, String> {
+    let mut file = File::open(path).map_err(|err| err.to_string())?;
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)
+        .map_err(|err| err.to_string())?;
+    serde_json::from_str(&contents).map_err(|err| err.to_string())
+}
+
+fn write_json_file(path: &Path, value: &Value) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    let contents = serde_json::to_string_pretty(value).map_err(|err| err.to_string())?;
+    let mut file = File::create(path).map_err(|err| err.to_string())?;
+    file.write_all(contents.as_bytes())
+        .map_err(|err| err.to_string())
+}
+
+#[cfg(test)]
+mod daemon_tests {
+    use super::{read_json_file, write_json_file};
+    use serde_json::json;
+    use tempfile::tempdir;
+
+    #[test]
+    fn json_file_roundtrip() {
+        let dir = tempdir().expect("tempdir");
+        let path = dir.path().join("config.json");
+        let value = json!({ "enabled": [{ "name": "a", "path": "/a" }], "disabled": [] });
+        write_json_file(&path, &value).expect("write");
+        let loaded = read_json_file(&path).expect("read");
+        assert_eq!(loaded, value);
+    }
+}
+
 fn parse_optional_string_array(value: &Value, key: &str) -> Option<Vec<String>> {
     match value {
         Value::Object(map) => map
@@ -4548,6 +4614,10 @@ async fn handle_rpc_request(
         "skills_list" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
             state.skills_list(workspace_id).await
+        }
+        "skills_config_read" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            state.skills_config_read(workspace_id).await
         }
         "skills_config_write" => {
             let workspace_id = parse_string(&params, "workspaceId")?;

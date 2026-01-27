@@ -326,6 +326,10 @@ export async function skillsConfigWrite(
   return invoke("skills_config_write", { workspaceId, config });
 }
 
+export async function skillsConfigRead(workspaceId: string) {
+  return invoke("skills_config_read", { workspaceId });
+}
+
 export async function skillsValidate(workspaceId: string) {
   return invoke("skills_validate", { workspaceId });
 }

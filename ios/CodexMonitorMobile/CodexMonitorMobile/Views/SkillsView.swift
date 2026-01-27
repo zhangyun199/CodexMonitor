@@ -4,6 +4,8 @@ import CodexMonitorModels
 struct SkillsView: View {
     @EnvironmentObject private var store: CodexStore
     @State private var validations: [SkillValidationResult] = []
+    @State private var skills: [SkillOption] = []
+    @State private var enabledSkills: Set<String> = []
     @State private var installUrl: String = ""
 
     var body: some View {
@@ -51,6 +53,33 @@ struct SkillsView: View {
                             }
                         }
                     }
+
+                    GlassSectionHeader(title: "Enable / Disable", icon: "sparkles")
+                    if skills.isEmpty {
+                        Text("No skills loaded.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(skills) { skill in
+                            Toggle(isOn: Binding(
+                                get: { enabledSkills.contains(skill.id) },
+                                set: { value in
+                                    if value {
+                                        enabledSkills.insert(skill.id)
+                                    } else {
+                                        enabledSkills.remove(skill.id)
+                                    }
+                                    Task { await persistSkillConfig() }
+                                }
+                            )) {
+                                VStack(alignment: .leading) {
+                                    Text(skill.name).font(.headline)
+                                    if let desc = skill.description {
+                                        Text(desc).font(.caption).foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 .padding()
             }
@@ -62,5 +91,48 @@ struct SkillsView: View {
     private func refresh() async {
         guard let workspaceId = store.activeWorkspaceId else { return }
         validations = await store.skillsValidate(workspaceId: workspaceId)
+        skills = await store.skillsList(workspaceId: workspaceId)
+        if let config = await store.skillsConfigRead(workspaceId: workspaceId) {
+            enabledSkills = resolveEnabledSkills(skills: skills, config: config)
+        } else {
+            enabledSkills = Set(skills.map { $0.id })
+        }
+    }
+
+    private func persistSkillConfig() async {
+        guard let workspaceId = store.activeWorkspaceId else { return }
+        let enabled = skills.filter { enabledSkills.contains($0.id) }
+        let disabled = skills.filter { !enabledSkills.contains($0.id) }
+        await store.skillsConfigWrite(workspaceId: workspaceId, enabled: enabled, disabled: disabled)
+    }
+
+    private func resolveEnabledSkills(skills: [SkillOption], config: JSONValue) -> Set<String> {
+        let enabledEntries = config["enabled"]?.arrayValue ?? []
+        let disabledEntries = config["disabled"]?.arrayValue ?? []
+
+        let enabledKeys: Set<String> = Set(enabledEntries.compactMap { entry in
+            let name = entry["name"]?.asString() ?? ""
+            let path = entry["path"]?.asString() ?? ""
+            if name.isEmpty || path.isEmpty { return nil }
+            return "\(name)|\(path)"
+        })
+
+        let disabledKeys: Set<String> = Set(disabledEntries.compactMap { entry in
+            let name = entry["name"]?.asString() ?? ""
+            let path = entry["path"]?.asString() ?? ""
+            if name.isEmpty || path.isEmpty { return nil }
+            return "\(name)|\(path)"
+        })
+
+        if !enabledKeys.isEmpty {
+            return enabledKeys
+        }
+
+        if !disabledKeys.isEmpty {
+            let allKeys = Set(skills.map { $0.id })
+            return allKeys.subtracting(disabledKeys)
+        }
+
+        return Set(skills.map { $0.id })
     }
 }

@@ -255,6 +255,19 @@ public struct SkillValidationResult: Codable, Sendable, Identifiable {
     public let description: String?
 }
 
+public struct SkillOption: Codable, Sendable, Identifiable, Hashable {
+    public var id: String { "\(name)|\(path)" }
+    public let name: String
+    public let path: String
+    public let description: String?
+
+    public init(name: String, path: String, description: String? = nil) {
+        self.name = name
+        self.path = path
+        self.description = description
+    }
+}
+
 // MARK: - App Server Events
 
 public struct AppServerEvent: Codable, Sendable {
@@ -724,12 +737,6 @@ public struct CollaborationModeOption: Codable, Hashable, Sendable {
     public var reasoningEffort: String?
     public var developerInstructions: String?
     public var value: [String: JSONValue]
-}
-
-public struct SkillOption: Codable, Hashable, Sendable {
-    public var name: String
-    public var path: String
-    public var description: String?
 }
 
 public enum PromptScope: String, Codable, Sendable {

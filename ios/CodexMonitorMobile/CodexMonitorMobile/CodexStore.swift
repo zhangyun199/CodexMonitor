@@ -711,6 +711,46 @@ final class CodexStore: ObservableObject {
         }
     }
 
+    func skillsList(workspaceId: String) async -> [SkillOption] {
+        do {
+            let response = try await api.skillsList(workspaceId: workspaceId)
+            let skills = extractSkills(from: response)
+            return skills.map { item in
+                SkillOption(
+                    name: item["name"]?.asString() ?? "",
+                    path: item["path"]?.asString() ?? "",
+                    description: item["description"]?.asString()
+                )
+            }.filter { !$0.name.isEmpty }
+        } catch {
+            lastError = error.localizedDescription
+            return []
+        }
+    }
+
+    func skillsConfigWrite(workspaceId: String, enabled: [SkillOption], disabled: [SkillOption]) async {
+        let enabledPayload = enabled.map { JSONValue.object(["name": .string($0.name), "path": .string($0.path)]) }
+        let disabledPayload = disabled.map { JSONValue.object(["name": .string($0.name), "path": .string($0.path)]) }
+        let config = JSONValue.object([
+            "enabled": .array(enabledPayload),
+            "disabled": .array(disabledPayload),
+        ])
+        do {
+            _ = try await api.skillsConfigWrite(workspaceId: workspaceId, config: config)
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func skillsConfigRead(workspaceId: String) async -> JSONValue? {
+        do {
+            return try await api.skillsConfigRead(workspaceId: workspaceId)
+        } catch {
+            lastError = error.localizedDescription
+            return nil
+        }
+    }
+
     func skillsInstallFromGit(sourceUrl: String, target: String, workspaceId: String? = nil) async {
         do {
             _ = try await api.skillsInstallFromGit(sourceUrl: sourceUrl, target: target, workspaceId: workspaceId)
@@ -725,6 +765,16 @@ final class CodexStore: ObservableObject {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    private func extractSkills(from response: JSONValue) -> [JSONValue] {
+        if let skills = response["result"]?["skills"]?.arrayValue ?? response["skills"]?.arrayValue {
+            return skills
+        }
+        if let buckets = response["result"]?["data"]?.arrayValue ?? response["data"]?.arrayValue {
+            return buckets.flatMap { $0["skills"]?.arrayValue ?? [] }
+        }
+        return []
     }
 
     func openTerminal(workspaceId: String, terminalId: String, cols: Int, rows: Int) async {

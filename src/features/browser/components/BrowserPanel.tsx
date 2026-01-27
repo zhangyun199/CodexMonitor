@@ -17,6 +17,11 @@ export function BrowserPanel() {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [refreshInterval, setRefreshInterval] = useState(5);
+  const [isVisible, setIsVisible] = useState(
+    typeof document !== "undefined" ? document.visibilityState === "visible" : true,
+  );
   const imageRef = useRef<HTMLImageElement | null>(null);
 
   const refreshSessions = useCallback(async () => {
@@ -95,6 +100,26 @@ export function BrowserPanel() {
     void refreshSessions();
   }, [refreshSessions]);
 
+  useEffect(() => {
+    const handleVisibility = () => {
+      setIsVisible(document.visibilityState === "visible");
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!autoRefresh || !selectedSession || !isVisible) {
+      return;
+    }
+    const timer = setInterval(() => {
+      void refreshScreenshot();
+    }, refreshInterval * 1000);
+    return () => clearInterval(timer);
+  }, [autoRefresh, refreshInterval, refreshScreenshot, selectedSession, isVisible]);
+
   const sessionOptions = useMemo(
     () => sessions.map((session) => (
       <option key={session} value={session}>
@@ -155,6 +180,29 @@ export function BrowserPanel() {
           <button type="button" className="ghost" onClick={() => void refreshScreenshot()}>
             Refresh
           </button>
+        </div>
+      </div>
+
+      <div className="memory-panel-form">
+        <label className="memory-panel-label">Auto-refresh</label>
+        <div className="memory-panel-row">
+          <label className="memory-panel-checkbox">
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(event) => setAutoRefresh(event.target.checked)}
+            />
+            Enabled
+          </label>
+          <select
+            className="memory-panel-select"
+            value={refreshInterval}
+            onChange={(event) => setRefreshInterval(Number(event.target.value))}
+          >
+            <option value={3}>3s</option>
+            <option value={5}>5s</option>
+            <option value={10}>10s</option>
+          </select>
         </div>
       </div>
 

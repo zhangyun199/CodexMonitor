@@ -58,7 +58,14 @@ if (!("requestAnimationFrame" in globalThis)) {
   });
 }
 
-if (!("localStorage" in globalThis)) {
+const ensureLocalStorage = () => {
+  const existing = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+  if (existing && typeof existing.clear === "function") {
+    if ("window" in globalThis && globalThis.window) {
+      Object.defineProperty(globalThis.window, "localStorage", { value: existing });
+    }
+    return;
+  }
   const store = new Map<string, string>();
   const localStorage = {
     getItem: (key: string) => (store.has(key) ? store.get(key) ?? null : null),
@@ -77,4 +84,9 @@ if (!("localStorage" in globalThis)) {
     },
   };
   Object.defineProperty(globalThis, "localStorage", { value: localStorage });
-}
+  if ("window" in globalThis && globalThis.window) {
+    Object.defineProperty(globalThis.window, "localStorage", { value: localStorage });
+  }
+};
+
+ensureLocalStorage();

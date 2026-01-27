@@ -4519,3 +4519,17 @@ See worker protocol in `browser-worker/src/index.ts` for exact params.
 | `name` | `string` | yes | Repo folder name |
 | `target` | `string` | yes | `global` or `workspace` |
 | `workspaceId` | `string` | no | Required for `workspace` target |
+
+### `skills_config_read`
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `workspaceId` | `string` | yes | Connected workspace |
+
+**Response**
+
+```json
+{ "enabled": [{"name":"...","path":"..."}], "disabled": [] }
+```

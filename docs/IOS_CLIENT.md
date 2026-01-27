@@ -252,3 +252,14 @@ See `ios/CodexMonitorMobile/CodexMonitorMobile/Info.plist`:
 - `NSSpeechRecognitionUsageDescription` (dictation)
 - `NSPhotoLibraryUsageDescription` (image attachments)
 - `NSLocalNetworkUsageDescription` (connecting to a local daemon)
+
+---
+
+## BrowserView (2026-01-26)
+
+- Auto-refresh timer (3s/5s/10s) pauses when app goes background.
+
+## SkillsView (2026-01-26)
+
+- Reads enable/disable status via `skills_config_read`.
+- Toggling persists with `skills_config_write`.

@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Download from "lucide-react/dist/esm/icons/download";
 import RefreshCcw from "lucide-react/dist/esm/icons/refresh-ccw";
 import type { SkillValidationResult } from "../../../types";
-import { skillsInstallFromGit, skillsValidate } from "../../../services/tauri";
+import {
+  getSkillsList,
+  skillsConfigRead,
+  skillsConfigWrite,
+  skillsInstallFromGit,
+  skillsValidate,
+} from "../../../services/tauri";
+import { resolveEnabledSkills, type SkillsConfig } from "../utils";
 
 export type SkillsPanelProps = {
   workspaceId: string | null;
@@ -10,6 +17,10 @@ export type SkillsPanelProps = {
 
 export function SkillsPanel({ workspaceId }: SkillsPanelProps) {
   const [results, setResults] = useState<SkillValidationResult[]>([]);
+  const [skills, setSkills] = useState<
+    { name: string; path: string; description?: string }[]
+  >([]);
+  const [enabledSkills, setEnabledSkills] = useState<Set<string>>(new Set());
   const [installUrl, setInstallUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +32,23 @@ export function SkillsPanel({ workspaceId }: SkillsPanelProps) {
     try {
       const data = (await skillsValidate(workspaceId)) as SkillValidationResult[];
       setResults(data ?? []);
+      const response = await getSkillsList(workspaceId);
+      const rawBuckets = response?.result?.data ?? response?.data ?? [];
+      const rawSkills =
+        response?.result?.skills ??
+        response?.skills ??
+        (Array.isArray(rawBuckets)
+          ? rawBuckets.flatMap((bucket: any) => bucket?.skills ?? [])
+          : []);
+      const parsed = rawSkills.map((item: any) => ({
+        name: String(item.name ?? ""),
+        path: String(item.path ?? ""),
+        description: item.description ? String(item.description) : undefined,
+      }));
+      const normalized = parsed.filter((item: any) => item.name);
+      setSkills(normalized);
+      const config = (await skillsConfigRead(workspaceId)) as SkillsConfig | null;
+      setEnabledSkills(resolveEnabledSkills(normalized, config));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -46,6 +74,56 @@ export function SkillsPanel({ workspaceId }: SkillsPanelProps) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const persistConfig = useCallback(
+    async (nextEnabled: Set<string>) => {
+      if (!workspaceId) return;
+      const enabled = skills
+        .filter((skill) => nextEnabled.has(`${skill.name}|${skill.path}`))
+        .map((skill) => ({ name: skill.name, path: skill.path }));
+      const disabled = skills
+        .filter((skill) => !nextEnabled.has(`${skill.name}|${skill.path}`))
+        .map((skill) => ({ name: skill.name, path: skill.path }));
+      await skillsConfigWrite(workspaceId, {
+        enabled,
+        disabled,
+      });
+    },
+    [skills, workspaceId],
+  );
+
+  const skillRows = useMemo(
+    () =>
+      skills.map((skill) => {
+        const key = `${skill.name}|${skill.path}`;
+        const enabled = enabledSkills.has(key);
+        return (
+          <label key={key} className="memory-panel-row">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(event) => {
+                const next = new Set(enabledSkills);
+                if (event.target.checked) {
+                  next.add(key);
+                } else {
+                  next.delete(key);
+                }
+                setEnabledSkills(next);
+                void persistConfig(next);
+              }}
+            />
+            <div>
+              <div className="memory-panel-result-title">{skill.name}</div>
+              {skill.description && (
+                <div className="memory-panel-result-subtitle">{skill.description}</div>
+              )}
+            </div>
+          </label>
+        );
+      }),
+    [enabledSkills, persistConfig, skills],
+  );
 
   return (
     <div className="memory-panel">
@@ -103,6 +181,13 @@ export function SkillsPanel({ workspaceId }: SkillsPanelProps) {
             )}
           </div>
         ))}
+      </div>
+
+      <div className="memory-panel-results">
+        {skills.length === 0 && !loading && (
+          <div className="memory-panel-status">No skills loaded.</div>
+        )}
+        {skillRows}
       </div>
     </div>
   );

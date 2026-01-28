@@ -200,23 +200,78 @@ private struct MediaCardView: View {
     let item: MediaItem
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(gradient)
-                .frame(height: 180)
-                .opacity(item.status == .backlog ? 0.6 : 1)
+        VStack(alignment: .leading, spacing: 6) {
+            poster
+                .overlay(alignment: .topLeading) { statusBadge }
+                .overlay(alignment: .topTrailing) { ratingBadge }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .aspectRatio(2 / 3, contentMode: .fit)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .font(.caption)
-                    .bold()
-                    .lineLimit(2)
-                    .foregroundStyle(.white)
-                Text(item.rating != nil ? "⭐ \(item.rating!, specifier: "%.1f")" : "—")
+                    .fontWeight(.semibold)
+                    .lineLimit(1)
+                Text(item.mediaType.rawValue)
                     .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(.secondary)
             }
-            .padding(8)
+        }
+    }
+
+    private var poster: some View {
+        ZStack {
+            if let coverUrl = item.coverUrl, let url = URL(string: coverUrl) {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    fallback
+                }
+            } else {
+                fallback
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .clipped()
+    }
+
+    private var fallback: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(gradient)
+            Text(item.title)
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.white.opacity(0.9))
+                .padding(8)
+        }
+    }
+
+    private var statusBadge: some View {
+        Text(item.status == .completed ? "✓" : "◎")
+            .font(.caption2)
+            .fontWeight(.bold)
+            .padding(.vertical, 2)
+            .padding(.horizontal, 6)
+            .background(item.status == .completed ? Color.green.opacity(0.9) : Color.blue.opacity(0.8))
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .padding(6)
+    }
+
+    @ViewBuilder
+    private var ratingBadge: some View {
+        if let rating = item.rating {
+            Text(String(format: "%.1f", rating))
+                .font(.caption2)
+                .fontWeight(.bold)
+                .padding(.vertical, 2)
+                .padding(.horizontal, 6)
+                .background(Color.black.opacity(0.75))
+                .foregroundStyle(.yellow)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .padding(6)
         }
     }
 

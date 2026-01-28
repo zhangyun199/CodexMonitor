@@ -40,7 +40,16 @@ export function NutritionDashboard({
 
   const trendRows = useMemo(() => {
     if (!trend) return [];
-    return Object.entries(trend).sort(([a], [b]) => a.localeCompare(b));
+    const rows = Object.entries(trend).sort(([a], [b]) => a.localeCompare(b));
+    const maxValue = Math.max(
+      NUTRITION_GOALS.calories,
+      ...rows.map(([, value]) => value ?? 0),
+    );
+    return rows.map(([date, value]) => ({
+      date,
+      value,
+      percent: maxValue > 0 ? (value / maxValue) * 100 : 0,
+    }));
   }, [trend]);
 
   return (
@@ -122,11 +131,17 @@ export function NutritionDashboard({
           <section className="life-section">
             <div className="life-section-title">Weekly Trends</div>
             {trendRows.length ? (
-              <div className="life-trend-list">
-                {trendRows.map(([date, value]) => (
-                  <div key={date} className="life-trend-row">
-                    <span>{formatShortDate(date)}</span>
-                    <span>{value.toFixed(0)} cal</span>
+              <div className="life-bar-chart">
+                {trendRows.map((row) => (
+                  <div key={row.date} className="life-bar-row">
+                    <div className="life-bar-label">{formatShortDate(row.date)}</div>
+                    <div className="life-bar-track">
+                      <div
+                        className="life-bar-fill"
+                        style={{ width: `${row.percent}%` }}
+                      />
+                    </div>
+                    <div className="life-bar-value">{row.value.toFixed(0)} cal</div>
                   </div>
                 ))}
               </div>

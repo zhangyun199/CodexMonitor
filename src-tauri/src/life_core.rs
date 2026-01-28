@@ -283,6 +283,28 @@ struct MediaCoverEntry {
     fetched_at: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct MediaCoverOverride {
+    #[serde(rename = "coverUrl")]
+    cover_url: String,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(rename = "updatedAt", default)]
+    updated_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct MediaCoverOverrideItem {
+    #[serde(rename = "mediaId")]
+    media_id: String,
+    #[serde(rename = "coverUrl")]
+    cover_url: String,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(rename = "updatedAt", default)]
+    updated_at: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 struct DeliverySessionFrontmatter {
     id: Option<String>,
@@ -348,6 +370,8 @@ struct FoodNutrition {
     carbs: f64,
     fat: f64,
     fiber: f64,
+    #[allow(dead_code)]
+    // Reserved for future category rollups; currently not surfaced in dashboards.
     category: Option<String>,
 }
 
@@ -961,6 +985,7 @@ pub(crate) async fn build_media_library(
     }
 
     let mut records = load_media_items(&root);
+    let overrides = load_media_cover_overrides(&root);
     let cache = load_media_cover_cache(&root);
     let total_count = records.len() as u32;
     let mut completed_count = 0u32;
@@ -971,7 +996,9 @@ pub(crate) async fn build_media_library(
     let mut latest: Option<DateTime<Utc>> = None;
 
     for record in &mut records {
-        if record.item.cover_url.is_none() {
+        if let Some(entry) = overrides.get(&record.item.id) {
+            record.item.cover_url = Some(entry.cover_url.clone());
+        } else if record.item.cover_url.is_none() {
             if let Some(entry) = cache.get(&record.item.id) {
                 record.item.cover_url = Some(entry.cover_url.clone());
             }
@@ -1121,6 +1148,7 @@ pub async fn enrich_media_covers(
 
     let records = load_media_items(&root);
     let total = records.len() as u32;
+    let overrides = load_media_cover_overrides(&root);
     let mut cache = load_media_cover_cache(&root);
     let mut found = 0u32;
     let mut skipped = 0u32;
@@ -1141,6 +1169,10 @@ pub async fn enrich_media_covers(
     };
 
     for record in records {
+        if overrides.contains_key(&record.item.id) {
+            skipped += 1;
+            continue;
+        }
         if cache.contains_key(&record.item.id) || record.item.cover_url.is_some() {
             skipped += 1;
             continue;
@@ -1509,6 +1541,60 @@ fn load_media_items(root: &Path) -> Vec<MediaRecord> {
 
 fn media_cover_cache_path(root: &Path) -> PathBuf {
     root.join("Indexes").join("media.covers.v1.json")
+}
+
+fn media_cover_overrides_path(root: &Path) -> PathBuf {
+    root.join("Indexes").join("media.covers.overrides.json")
+}
+
+fn load_media_cover_overrides(root: &Path) -> HashMap<String, MediaCoverOverride> {
+    let path = media_cover_overrides_path(root);
+    let content = match std::fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(_) => return HashMap::new(),
+    };
+
+    if let Ok(map) = serde_json::from_str::<HashMap<String, MediaCoverOverride>>(&content) {
+        return map;
+    }
+
+    if let Ok(list) = serde_json::from_str::<Vec<MediaCoverOverrideItem>>(&content) {
+        let mut map = HashMap::new();
+        for item in list {
+            if item.media_id.trim().is_empty() || item.cover_url.trim().is_empty() {
+                continue;
+            }
+            map.insert(
+                item.media_id.clone(),
+                MediaCoverOverride {
+                    cover_url: item.cover_url,
+                    source: item.source,
+                    updated_at: item.updated_at,
+                },
+            );
+        }
+        return map;
+    }
+
+    if let Ok(simple) = serde_json::from_str::<HashMap<String, String>>(&content) {
+        let mut map = HashMap::new();
+        for (media_id, cover_url) in simple {
+            if media_id.trim().is_empty() || cover_url.trim().is_empty() {
+                continue;
+            }
+            map.insert(
+                media_id,
+                MediaCoverOverride {
+                    cover_url,
+                    source: Some("manual".to_string()),
+                    updated_at: None,
+                },
+            );
+        }
+        return map;
+    }
+
+    HashMap::new()
 }
 
 fn load_media_cover_cache(root: &Path) -> HashMap<String, MediaCoverEntry> {
@@ -2797,8 +2883,16 @@ fn split_frontmatter(content: &str) -> (Option<String>, String) {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_life_workspace_prompt, LIFE_PROMPT_FILES, LIFE_PROMPT_TAIL};
+    use super::{
+        build_life_workspace_prompt, load_bill_records, load_exercise_entries, load_meal_entries,
+        normalize_food_key, parse_exercise_entry, parse_meal_entry, FoodNutrition,
+        LIFE_PROMPT_FILES, LIFE_PROMPT_TAIL,
+    };
+    use chrono::NaiveDate;
+    use std::collections::HashMap;
+    use std::fs;
     use std::path::PathBuf;
+    use tempfile::tempdir;
 
     fn prompt_files_present() -> bool {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -2819,5 +2913,151 @@ mod tests {
         assert!(prompt.contains(LIFE_PROMPT_TAIL));
         let separator_count = prompt.matches("\n---\n").count();
         assert!(separator_count >= LIFE_PROMPT_FILES.len());
+    }
+
+    #[test]
+    fn parse_meal_entry_aggregates_known_foods() {
+        let mut map = HashMap::new();
+        map.insert(
+            normalize_food_key("Eggs"),
+            FoodNutrition {
+                name: "Eggs".to_string(),
+                calories: 70.0,
+                protein: 6.0,
+                carbs: 0.0,
+                fat: 5.0,
+                fiber: 0.0,
+                category: None,
+            },
+        );
+        map.insert(
+            normalize_food_key("Sardines"),
+            FoodNutrition {
+                name: "Sardines".to_string(),
+                calories: 208.0,
+                protein: 25.0,
+                carbs: 0.0,
+                fat: 11.0,
+                fiber: 0.0,
+                category: None,
+            },
+        );
+        let date = NaiveDate::from_ymd_opt(2026, 1, 28).unwrap();
+        let entry =
+            parse_meal_entry("12:30pm 🍽️ Lunch: eggs, sardines", date, &map).expect("meal entry");
+        assert_eq!(entry.meal_type, "lunch");
+        assert_eq!(entry.foods.len(), 2);
+        assert_eq!(entry.calories, 278.0);
+        assert!(entry.estimated_calories.is_some());
+    }
+
+    #[test]
+    fn parse_exercise_entry_extracts_miles() {
+        let date = NaiveDate::from_ymd_opt(2026, 1, 28).unwrap();
+        let entry =
+            parse_exercise_entry("7:30am 🚶 Morning walk - 2.1 miles", date).expect("entry");
+        assert_eq!(entry.entry_type, "walk");
+        assert_eq!(entry.miles, Some(2.1));
+    }
+
+    #[test]
+    fn load_bill_records_calculates_next_due_date() {
+        let dir = tempdir().expect("temp dir");
+        let file_path = dir.path().join("Rent.md");
+        fs::write(
+            &file_path,
+            "---\nname: \"Rent\"\namount: 1200\ndue_day: 1\nfrequency: \"monthly\"\ncategory: \"housing\"\nauto_pay: true\n---\n",
+        )
+        .expect("write bill");
+        let today = NaiveDate::from_ymd_opt(2026, 1, 28).unwrap();
+        let records = load_bill_records(dir.path(), today);
+        assert_eq!(records.len(), 1);
+        let bill = &records[0].bill;
+        assert_eq!(bill.next_due_date, "2026-02-01");
+        assert_eq!(bill.category, "housing");
+        assert!(bill.auto_pay);
+    }
+
+    #[test]
+    fn load_meal_entries_reads_stream_rows() {
+        let dir = tempdir().expect("temp dir");
+        let stream_dir = dir.path().join("Stream");
+        fs::create_dir_all(&stream_dir).expect("stream dir");
+        let stream_path = stream_dir.join("2026-01.md");
+        fs::write(
+            &stream_path,
+            "## Wed Jan 21\n| Plan | Actual | Delta |\n| -- | -- | -- |\n| -- | 12:34pm 🍽️ Lunch: [[Food/Chicken]] and [[Food/Rice]] | + |\n",
+        )
+        .expect("write stream");
+
+        let mut map = HashMap::new();
+        map.insert(
+            normalize_food_key("Chicken"),
+            FoodNutrition {
+                name: "Chicken".to_string(),
+                calories: 200.0,
+                protein: 35.0,
+                carbs: 0.0,
+                fat: 5.0,
+                fiber: 0.0,
+                category: None,
+            },
+        );
+        map.insert(
+            normalize_food_key("Rice"),
+            FoodNutrition {
+                name: "Rice".to_string(),
+                calories: 300.0,
+                protein: 6.0,
+                carbs: 60.0,
+                fat: 2.0,
+                fiber: 1.0,
+                category: None,
+            },
+        );
+
+        let meals = load_meal_entries(
+            dir.path(),
+            Some(NaiveDate::from_ymd_opt(2026, 1, 21).unwrap()),
+            Some(NaiveDate::from_ymd_opt(2026, 1, 21).unwrap()),
+            &map,
+        );
+        assert_eq!(meals.len(), 1);
+        let meal = &meals[0];
+        assert_eq!(meal.meal_type, "lunch");
+        assert_eq!(meal.timestamp, "2026-01-21T12:34:00");
+        assert_eq!(meal.estimated_calories, Some(500.0));
+        assert_eq!(
+            meal.foods,
+            vec![
+                "[[Food/Chicken]]".to_string(),
+                "[[Food/Rice]]".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn load_exercise_entries_reads_stream_rows() {
+        let dir = tempdir().expect("temp dir");
+        let stream_dir = dir.path().join("Stream");
+        fs::create_dir_all(&stream_dir).expect("stream dir");
+        let stream_path = stream_dir.join("2026-01.md");
+        fs::write(
+            &stream_path,
+            "## Wed Jan 21\n| Plan | Actual | Delta |\n| -- | -- | -- |\n| -- | 7:10am 🚶 Walked 2.5 mi 40 min | + |\n",
+        )
+        .expect("write stream");
+
+        let entries = load_exercise_entries(
+            dir.path(),
+            Some(NaiveDate::from_ymd_opt(2026, 1, 21).unwrap()),
+            Some(NaiveDate::from_ymd_opt(2026, 1, 21).unwrap()),
+        );
+        assert_eq!(entries.len(), 1);
+        let entry = &entries[0];
+        assert_eq!(entry.entry_type, "walk");
+        assert_eq!(entry.miles, Some(2.5));
+        assert_eq!(entry.duration, Some(40.0));
+        assert_eq!(entry.timestamp, "2026-01-21T07:10:00");
     }
 }

@@ -49,7 +49,7 @@ Obsidian (raw) → Daemon parses → Dashboard data
 | **Phase 2** | ✅ Complete | Media Bookshelf (React + Rust + iOS) - poster cards with covers, filters, grid/list view |
 | **Phase 2b** | ✅ Complete | YouTube Bookshelf (React + Rust + iOS) - tier cards (S/A/B/C), filters, no time range |
 | **Phase 3** | ✅ Complete | Nutrition, Exercise, Finance dashboards - stream parsing, weekly trends, streaks, bill due dates |
-| Phase 4 | 🔲 Pending | Polish (charts, better UI, auto-detect workspace purpose) |
+| **Phase 4** | ✅ Complete | UI Polish - clean poster cards (title below), scrolling fix, weekly bar charts, domain accent colors, manual cover overrides |
 
 **Debug logging**: Set `LIFE_DEBUG=1` to see Life workspace logging.
 

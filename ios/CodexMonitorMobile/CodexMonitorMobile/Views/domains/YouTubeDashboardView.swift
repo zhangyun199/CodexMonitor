@@ -199,22 +199,67 @@ private struct YouTubeCardView: View {
     let idea: YouTubeIdea
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: 10)
+        VStack(alignment: .leading, spacing: 6) {
+            RoundedRectangle(cornerRadius: 8)
                 .fill(gradient)
-                .frame(height: 180)
+                .overlay(alignment: .topLeading) { tierBadge }
+                .overlay(alignment: .topTrailing) { stageBadge }
+                .aspectRatio(2 / 3, contentMode: .fit)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(idea.title)
-                    .font(.caption)
-                    .bold()
-                    .lineLimit(2)
-                    .foregroundStyle(.white)
-                Text("\(idea.stage.rawValue) • Tier \(idea.tier.rawValue)")
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.8))
-            }
-            .padding(8)
+            Text(idea.title)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+        }
+    }
+
+    private var tierBadge: some View {
+        Text(idea.tier.rawValue)
+            .font(.caption2)
+            .fontWeight(.bold)
+            .padding(.vertical, 2)
+            .padding(.horizontal, 6)
+            .background(tierColor.opacity(0.9))
+            .foregroundStyle(tierTextColor)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .padding(6)
+    }
+
+    private var stageBadge: some View {
+        Text(stageLabel)
+            .font(.caption2)
+            .fontWeight(.bold)
+            .padding(.vertical, 2)
+            .padding(.horizontal, 6)
+            .background(Color.black.opacity(0.75))
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .padding(6)
+    }
+
+    private var stageLabel: String {
+        idea.stage.rawValue.capitalized
+    }
+
+    private var tierColor: Color {
+        switch idea.tier {
+        case .s:
+            return .yellow
+        case .a:
+            return .gray
+        case .b:
+            return .orange
+        case .c:
+            return .gray.opacity(0.7)
+        }
+    }
+
+    private var tierTextColor: Color {
+        switch idea.tier {
+        case .c:
+            return .white
+        default:
+            return .black
         }
     }
 

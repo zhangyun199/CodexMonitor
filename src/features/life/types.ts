@@ -228,6 +228,12 @@ export interface MediaCoverSummary {
   failed: number;
 }
 
+export interface CoverOverride {
+  mediaId: string;
+  coverUrl: string;
+  source: "manual";
+}
+
 // -----------------------------
 // YouTube
 // -----------------------------

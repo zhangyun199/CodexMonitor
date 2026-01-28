@@ -31,11 +31,17 @@ export function ExerciseDashboard({
   const entries = dashboard?.entries ?? [];
   const byType = dashboard?.byType ?? {};
 
-  const breakdown = useMemo(
-    () =>
-      Object.entries(byType).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0)),
-    [byType],
-  );
+  const breakdown = useMemo(() => {
+    const rows = Object.entries(byType).sort(
+      (a, b) => (b[1] ?? 0) - (a[1] ?? 0),
+    );
+    const maxValue = Math.max(1, ...rows.map(([, value]) => value ?? 0));
+    return rows.map(([type, count]) => ({
+      type,
+      count,
+      percent: maxValue > 0 ? (count / maxValue) * 100 : 0,
+    }));
+  }, [byType]);
 
   return (
     <div className="life-dashboard life-exercise-dashboard">
@@ -110,13 +116,19 @@ export function ExerciseDashboard({
           <section className="life-section">
             <div className="life-section-title">Activity Breakdown</div>
             {breakdown.length ? (
-              <div className="life-trend-list">
-                {breakdown.map(([type, count]) => (
-                  <div key={type} className="life-trend-row">
-                    <span>
-                      {TYPE_EMOJI[type as ExerciseEntry["type"]] ?? "✨"} {type}
-                    </span>
-                    <span>{count}</span>
+              <div className="life-bar-chart">
+                {breakdown.map((row) => (
+                  <div key={row.type} className="life-bar-row">
+                    <div className="life-bar-label">
+                      {TYPE_EMOJI[row.type as ExerciseEntry["type"]] ?? "✨"} {row.type}
+                    </div>
+                    <div className="life-bar-track">
+                      <div
+                        className="life-bar-fill"
+                        style={{ width: `${row.percent}%` }}
+                      />
+                    </div>
+                    <div className="life-bar-value">{row.count}</div>
                   </div>
                 ))}
               </div>

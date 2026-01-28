@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { getMediaDashboard } from "../../../services/tauri";
-import type { LifeTimeRange, MediaDashboard } from "../types";
+import { getYouTubeDashboard } from "../../../services/tauri";
+import type { LifeTimeRange, YouTubeDashboard } from "../types";
 
-export function useMediaDashboard(
+export function useYouTubeDashboard(
   workspaceId: string | null,
   range: LifeTimeRange,
 ) {
-  const [dashboard, setDashboard] = useState<MediaDashboard | null>(null);
+  const [dashboard, setDashboard] = useState<YouTubeDashboard | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -18,7 +18,7 @@ export function useMediaDashboard(
     setLoading(true);
     setError(null);
     try {
-      const data = await getMediaDashboard(workspaceId, range);
+      const data = await getYouTubeDashboard(workspaceId, range);
       setDashboard(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

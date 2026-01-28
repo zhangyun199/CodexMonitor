@@ -318,19 +318,17 @@ public struct DeliveryDashboard: Codable, Hashable, Sendable {
 }
 
 public enum MediaType: String, Codable, CaseIterable, Sendable {
-    case film
-    case tv
-    case game
-    case book
-    case anime
-    case other
+    case film = "Film"
+    case tv = "TV"
+    case anime = "Anime"
+    case game = "Game"
+    case book = "Book"
+    case youTube = "YouTube"
 }
 
 public enum MediaStatus: String, Codable, CaseIterable, Sendable {
-    case backlog
-    case inProgress = "in_progress"
-    case completed
-    case dropped
+    case completed = "Completed"
+    case backlog = "Backlog"
 }
 
 public struct MediaItem: Codable, Hashable, Sendable, Identifiable {
@@ -340,9 +338,9 @@ public struct MediaItem: Codable, Hashable, Sendable, Identifiable {
     public var status: MediaStatus
     public var rating: Double?
     public var coverUrl: String?
-    public var lastActivityAt: String?
+    public var createdAt: String
+    public var updatedAt: String
     public var completedAt: String?
-    public var tags: [String]?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -351,24 +349,53 @@ public struct MediaItem: Codable, Hashable, Sendable, Identifiable {
         case status
         case rating
         case coverUrl
-        case lastActivityAt
+        case createdAt
+        case updatedAt
         case completedAt
-        case tags
     }
 }
 
-public struct MediaStats: Codable, Hashable, Sendable {
-    public var backlogCount: Int
-    public var inProgressCount: Int
+public struct MediaLibrary: Codable, Hashable, Sendable {
+    public var meta: DashboardMeta
+    public var totalCount: Int
     public var completedCount: Int
-    public var avgRating: Double?
+    public var backlogCount: Int
+    public var avgRating: Double
+    public var items: [MediaItem]
 }
 
-public struct MediaDashboard: Codable, Hashable, Sendable {
+public enum PipelineStage: String, Codable, CaseIterable, Sendable {
+    case brainDump = "brain_dump"
+    case development
+    case outline
+    case evaluation
+    case script
+    case edit
+    case published
+}
+
+public enum IdeaTier: String, Codable, CaseIterable, Sendable {
+    case s = "S"
+    case a = "A"
+    case b = "B"
+    case c = "C"
+}
+
+public struct VideoIdea: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var title: String
+    public var tier: IdeaTier
+    public var stage: PipelineStage
+    public var thesis: String?
+    public var updatedAt: String
+    public var nextAction: String?
+}
+
+public struct YouTubeDashboard: Codable, Hashable, Sendable {
     public var meta: DashboardMeta
-    public var stats: MediaStats
-    public var recentlyActive: [MediaItem]
-    public var byType: [String: Int]
+    public var pipelineStats: [String: Int]
+    public var sTier: [VideoIdea]
+    public var inProgress: [VideoIdea]
 }
 
 public struct AutoMemorySettings: Codable, Hashable, Sendable {

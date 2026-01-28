@@ -68,7 +68,8 @@ final class CodexStore: ObservableObject {
     @Published var lifeActiveDomain: LifeDomain? = nil
     @Published var lifeTimeRange: LifeTimeRange = .today
     @Published var deliveryDashboard: DeliveryDashboard?
-    @Published var mediaDashboard: MediaDashboard?
+    @Published var mediaLibrary: MediaLibrary?
+    @Published var youtubeDashboard: YouTubeDashboard?
     @Published var dashboardLoading: Bool = false
     @Published var dashboardError: String? = nil
     @Published var debugEntries: [DebugEntry] = []
@@ -250,13 +251,26 @@ final class CodexStore: ObservableObject {
         dashboardLoading = false
     }
 
-    func fetchMediaDashboard(range: LifeTimeRange) async {
+    func fetchMediaLibrary() async {
         guard let workspaceId = activeWorkspaceId else { return }
         dashboardLoading = true
         dashboardError = nil
         do {
-            let dashboard = try await api.getMediaDashboard(workspaceId: workspaceId, range: range.rawValue)
-            mediaDashboard = dashboard
+            let library = try await api.getMediaDashboard(workspaceId: workspaceId)
+            mediaLibrary = library
+        } catch {
+            dashboardError = error.localizedDescription
+        }
+        dashboardLoading = false
+    }
+
+    func fetchYouTubeDashboard(range: LifeTimeRange) async {
+        guard let workspaceId = activeWorkspaceId else { return }
+        dashboardLoading = true
+        dashboardError = nil
+        do {
+            let dashboard = try await api.getYouTubeDashboard(workspaceId: workspaceId, range: range.rawValue)
+            youtubeDashboard = dashboard
         } catch {
             dashboardError = error.localizedDescription
         }

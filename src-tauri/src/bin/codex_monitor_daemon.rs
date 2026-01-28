@@ -1082,7 +1082,18 @@ impl DaemonState {
         Ok(json!({}))
     }
 
-    async fn get_media_dashboard(
+    async fn get_media_dashboard(&self, workspace_id: String) -> Result<Value, String> {
+        let workspaces = self.workspaces.lock().await;
+        let entry = workspaces
+            .get(&workspace_id)
+            .cloned()
+            .ok_or("workspace not found")?;
+        let dashboard =
+            life::build_media_library(&entry.path, entry.settings.obsidian_root.as_deref()).await?;
+        serde_json::to_value(dashboard).map_err(|err| err.to_string())
+    }
+
+    async fn get_youtube_dashboard(
         &self,
         workspace_id: String,
         range: String,
@@ -1092,36 +1103,13 @@ impl DaemonState {
             .get(&workspace_id)
             .cloned()
             .ok_or("workspace not found")?;
-        let supabase = {
-            let settings = self.app_settings.lock().await;
-            if settings.supabase_url.trim().is_empty()
-                || settings.supabase_anon_key.trim().is_empty()
-            {
-                None
-            } else {
-                Some((
-                    settings.supabase_url.clone(),
-                    settings.supabase_anon_key.clone(),
-                ))
-            }
-        };
-        let dashboard = life::build_media_dashboard(
+        let dashboard = life::build_youtube_dashboard(
             &entry.path,
             entry.settings.obsidian_root.as_deref(),
-            supabase.as_ref().map(|value| value.0.as_str()),
-            supabase.as_ref().map(|value| value.1.as_str()),
             &range,
         )
         .await?;
         serde_json::to_value(dashboard).map_err(|err| err.to_string())
-    }
-
-    async fn get_youtube_dashboard(
-        &self,
-        _workspace_id: String,
-        _range: String,
-    ) -> Result<Value, String> {
-        Ok(json!({}))
     }
 
     async fn get_finance_dashboard(
@@ -4850,8 +4838,7 @@ async fn handle_rpc_request(
         }
         "get_media_dashboard" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
-            let range = parse_string(&params, "range")?;
-            state.get_media_dashboard(workspace_id, range).await
+            state.get_media_dashboard(workspace_id).await
         }
         "get_youtube_dashboard" => {
             let workspace_id = parse_string(&params, "workspaceId")?;

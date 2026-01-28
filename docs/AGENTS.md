@@ -46,9 +46,10 @@ Obsidian (raw) → Daemon parses → Dashboard data
 |-------|--------|-------------|
 | **Phase 0** | ✅ Complete | `WorkspacePurpose` enum, `get_life_workspace_prompt`, thread-level injection, skip per-turn injection |
 | **Phase 1** | ✅ Complete | Delivery Dashboard (React + Rust + iOS) - parses Obsidian sessions, center panel swap |
-| **Phase 2** | ✅ Complete | Media Dashboard (React + Rust + iOS) - parses Obsidian entities, by-type breakdown, recently active |
-| Phase 3 | 🔲 Pending | Remaining domains (Nutrition, Exercise, Finance, YouTube) |
-| Phase 4 | 🔲 Pending | Polish (caching, skeletons, filters, auto-detect) |
+| **Phase 2** | ✅ Complete | Media Bookshelf (React + Rust + iOS) - poster cards with gradients, filters, grid/list view, no time range |
+| **Phase 2b** | ✅ Complete | YouTube Pipeline (React + Rust + iOS) - stage stats, S-tier list, in-progress list |
+| Phase 3 | 🔲 Pending | Remaining domains (Nutrition, Exercise, Finance) |
+| Phase 4 | 🔲 Pending | Polish (caching, skeletons, TMDB covers, auto-detect) |
 
 **Debug logging**: Set `LIFE_DEBUG=1` to see Life workspace logging.
 

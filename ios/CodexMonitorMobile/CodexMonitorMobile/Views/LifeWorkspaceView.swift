@@ -19,7 +19,9 @@ struct LifeWorkspaceView: View {
                         set: { store.lifeTimeRange = $0 }
                     ))
                 case .media:
-                    MediaDashboardView(timeRange: Binding(
+                    MediaDashboardView()
+                case .youtube:
+                    YouTubeDashboardView(timeRange: Binding(
                         get: { store.lifeTimeRange },
                         set: { store.lifeTimeRange = $0 }
                     ))

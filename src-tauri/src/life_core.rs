@@ -115,34 +115,51 @@ pub(crate) struct MediaItem {
     pub(crate) rating: Option<f64>,
     #[serde(rename = "coverUrl", skip_serializing_if = "Option::is_none")]
     pub(crate) cover_url: Option<String>,
-    #[serde(rename = "lastActivityAt", skip_serializing_if = "Option::is_none")]
-    pub(crate) last_activity_at: Option<String>,
+    #[serde(rename = "createdAt")]
+    pub(crate) created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub(crate) updated_at: String,
     #[serde(rename = "completedAt", skip_serializing_if = "Option::is_none")]
     pub(crate) completed_at: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) tags: Option<Vec<String>>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub(crate) struct MediaStats {
-    #[serde(rename = "backlogCount")]
-    pub(crate) backlog_count: u32,
-    #[serde(rename = "inProgressCount")]
-    pub(crate) in_progress_count: u32,
-    #[serde(rename = "completedCount")]
-    pub(crate) completed_count: u32,
-    #[serde(rename = "avgRating", skip_serializing_if = "Option::is_none")]
-    pub(crate) avg_rating: Option<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct MediaDashboard {
+pub(crate) struct MediaLibrary {
     pub(crate) meta: DashboardMeta,
-    pub(crate) stats: MediaStats,
-    #[serde(rename = "recentlyActive")]
-    pub(crate) recently_active: Vec<MediaItem>,
-    #[serde(rename = "byType")]
-    pub(crate) by_type: HashMap<String, u32>,
+    #[serde(rename = "totalCount")]
+    pub(crate) total_count: u32,
+    #[serde(rename = "completedCount")]
+    pub(crate) completed_count: u32,
+    #[serde(rename = "backlogCount")]
+    pub(crate) backlog_count: u32,
+    #[serde(rename = "avgRating")]
+    pub(crate) avg_rating: f64,
+    pub(crate) items: Vec<MediaItem>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct VideoIdea {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) tier: String,
+    pub(crate) stage: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) thesis: Option<String>,
+    #[serde(rename = "updatedAt")]
+    pub(crate) updated_at: String,
+    #[serde(rename = "nextAction", skip_serializing_if = "Option::is_none")]
+    pub(crate) next_action: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct YouTubeDashboard {
+    pub(crate) meta: DashboardMeta,
+    #[serde(rename = "pipelineStats")]
+    pub(crate) pipeline_stats: HashMap<String, u32>,
+    #[serde(rename = "sTier")]
+    pub(crate) s_tier: Vec<VideoIdea>,
+    #[serde(rename = "inProgress")]
+    pub(crate) in_progress: Vec<VideoIdea>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -211,21 +228,19 @@ struct MediaFrontmatter {
     media_type: Option<String>,
     status: Option<String>,
     rating: Option<f64>,
+    created_at: Option<String>,
     completed_at: Option<String>,
     updated_at: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct MediaAggregationRow {
-    period: Option<String>,
-    period_start: String,
-    period_end: String,
-    completed_count: Option<i64>,
-    in_progress_count: Option<i64>,
-    backlog_count: Option<i64>,
-    avg_rating: Option<f64>,
-    by_type: Option<HashMap<String, u32>>,
-    computed_at: Option<String>,
+struct YouTubeIdeaFrontmatter {
+    id: Option<String>,
+    title: Option<String>,
+    tier: Option<String>,
+    stage: Option<String>,
+    updated_at: Option<String>,
+    created_at: Option<String>,
 }
 
 pub(crate) fn is_life_workspace(settings: &WorkspaceSettings) -> bool {
@@ -459,13 +474,10 @@ pub(crate) async fn build_delivery_dashboard(
     })
 }
 
-pub(crate) async fn build_media_dashboard(
+pub(crate) async fn build_media_library(
     workspace_path: &str,
     obsidian_root: Option<&str>,
-    supabase_url: Option<&str>,
-    supabase_key: Option<&str>,
-    range: &str,
-) -> Result<MediaDashboard, String> {
+) -> Result<MediaLibrary, String> {
     let root = resolve_obsidian_root(workspace_path, obsidian_root);
     if !root.exists() {
         return Err(format!(
@@ -473,14 +485,6 @@ pub(crate) async fn build_media_dashboard(
             root.to_string_lossy()
         ));
     }
-    let today = Utc::now().date_naive();
-    let (period, start_date, end_date) = match range {
-        "today" => (None, Some(today), Some(today)),
-        "week" | "7d" => (Some("week"), Some(today - Duration::days(6)), Some(today)),
-        "month" | "30d" => (Some("month"), Some(today - Duration::days(29)), Some(today)),
-        "lifetime" => (Some("lifetime"), None, Some(today)),
-        _ => (None, None, Some(today)),
-    };
 
     let media_dir = root.join("Entities").join("Media");
     if !media_dir.exists() {
@@ -490,101 +494,131 @@ pub(crate) async fn build_media_dashboard(
         ));
     }
 
-    if let Some(period) = period {
-        if let (Some(url), Some(key)) = (supabase_url, supabase_key) {
-            if let Some(row) = fetch_media_aggregation(url, key, period).await? {
-                let stats = MediaStats {
-                    backlog_count: row.backlog_count.unwrap_or(0).max(0) as u32,
-                    in_progress_count: row.in_progress_count.unwrap_or(0).max(0) as u32,
-                    completed_count: row.completed_count.unwrap_or(0).max(0) as u32,
-                    avg_rating: row.avg_rating,
-                };
-                let meta = DashboardMeta {
-                    domain: "media".to_string(),
-                    range: range.to_string(),
-                    period_start: row.period_start,
-                    period_end: row.period_end,
-                    generated_at: row.computed_at.unwrap_or_else(|| Utc::now().to_rfc3339()),
-                    sources: vec!["supabase".to_string()],
-                    cache_hit: None,
-                };
-                return Ok(MediaDashboard {
-                    meta,
-                    stats,
-                    recently_active: Vec::new(),
-                    by_type: row.by_type.unwrap_or_default(),
-                });
-            }
-        }
-    }
-
-    let media = load_media_items(&root);
-    let filtered: Vec<_> = media
-        .into_iter()
-        .filter(|item| item_in_range(item, range, start_date, end_date))
-        .collect();
-
-    let mut stats = MediaStats::default();
+    let items = load_media_items(&root);
+    let total_count = items.len() as u32;
+    let mut completed_count = 0u32;
+    let mut backlog_count = 0u32;
     let mut rating_total = 0.0;
     let mut rating_count = 0u32;
-    let mut by_type: HashMap<String, u32> = HashMap::new();
+    let mut earliest: Option<DateTime<Utc>> = None;
+    let mut latest: Option<DateTime<Utc>> = None;
 
-    for item in &filtered {
-        *by_type.entry(item.media_type.clone()).or_insert(0) += 1;
+    for item in &items {
         match item.status.as_str() {
-            "completed" => {
-                stats.completed_count += 1;
-                if let Some(rating) = item.rating {
-                    rating_total += rating;
-                    rating_count += 1;
-                }
-            }
-            "in_progress" => stats.in_progress_count += 1,
-            "backlog" => stats.backlog_count += 1,
-            "dropped" => {}
+            "Completed" => completed_count += 1,
+            "Backlog" => backlog_count += 1,
             _ => {}
+        }
+        if let Some(rating) = item.rating {
+            rating_total += rating;
+            rating_count += 1;
+        }
+        if let Some(updated_at) = parse_datetime(&item.updated_at) {
+            earliest = match earliest {
+                Some(value) if value <= updated_at => Some(value),
+                _ => Some(updated_at),
+            };
+            latest = match latest {
+                Some(value) if value >= updated_at => Some(value),
+                _ => Some(updated_at),
+            };
         }
     }
 
-    if rating_count > 0 {
-        stats.avg_rating = Some(rating_total / rating_count as f64);
-    }
+    let avg_rating = if rating_count > 0 {
+        rating_total / rating_count as f64
+    } else {
+        0.0
+    };
 
-    let mut recent: Vec<_> = filtered
-        .iter()
-        .filter(|item| item.activity_at.is_some())
-        .cloned()
-        .collect();
-    recent.sort_by(|a, b| b.activity_at.cmp(&a.activity_at));
-    let recently_active = recent
-        .into_iter()
-        .take(8)
-        .map(|record| record.into_item())
-        .collect();
-
-    let period_start = start_date
-        .or_else(|| {
-            filtered
-                .iter()
-                .filter_map(|item| item.activity_at)
-                .map(|dt| dt.date_naive())
-                .min()
-        })
-        .unwrap_or(today)
-        .to_string();
-    let period_end = end_date
-        .or_else(|| {
-            filtered
-                .iter()
-                .filter_map(|item| item.activity_at)
-                .map(|dt| dt.date_naive())
-                .max()
-        })
-        .unwrap_or(today)
-        .to_string();
+    let period_start = earliest
+        .map(|dt| dt.date_naive().to_string())
+        .unwrap_or_else(|| Utc::now().date_naive().to_string());
+    let period_end = latest
+        .map(|dt| dt.date_naive().to_string())
+        .unwrap_or_else(|| Utc::now().date_naive().to_string());
 
     let meta = DashboardMeta {
         domain: "media".to_string(),
+        range: "all".to_string(),
+        period_start,
+        period_end,
+        generated_at: Utc::now().to_rfc3339(),
+        sources: vec!["obsidian".to_string()],
+        cache_hit: None,
+    };
+
+    Ok(MediaLibrary {
+        meta,
+        total_count,
+        completed_count,
+        backlog_count,
+        avg_rating,
+        items,
+    })
+}
+
+pub(crate) async fn build_youtube_dashboard(
+    workspace_path: &str,
+    obsidian_root: Option<&str>,
+    range: &str,
+) -> Result<YouTubeDashboard, String> {
+    let root = resolve_obsidian_root(workspace_path, obsidian_root);
+    if !root.exists() {
+        return Err(format!(
+            "Obsidian root not found: {}",
+            root.to_string_lossy()
+        ));
+    }
+
+    let ideas_dir = root.join("Entities").join("YouTube");
+    if !ideas_dir.exists() {
+        return Err(format!(
+            "YouTube ideas not found at {}",
+            ideas_dir.to_string_lossy()
+        ));
+    }
+
+    let ideas = load_youtube_ideas(&root);
+    let mut pipeline_stats: HashMap<String, u32> = HashMap::new();
+    let mut earliest: Option<DateTime<Utc>> = None;
+    let mut latest: Option<DateTime<Utc>> = None;
+
+    for idea in &ideas {
+        *pipeline_stats.entry(idea.stage.clone()).or_insert(0) += 1;
+        if let Some(updated_at) = idea.updated_at_dt {
+            earliest = match earliest {
+                Some(value) if value <= updated_at => Some(value),
+                _ => Some(updated_at),
+            };
+            latest = match latest {
+                Some(value) if value >= updated_at => Some(value),
+                _ => Some(updated_at),
+            };
+        }
+    }
+
+    for stage in [
+        "brain_dump",
+        "development",
+        "outline",
+        "evaluation",
+        "script",
+        "edit",
+        "published",
+    ] {
+        pipeline_stats.entry(stage.to_string()).or_insert(0);
+    }
+
+    let period_start = earliest
+        .map(|dt| dt.date_naive().to_string())
+        .unwrap_or_else(|| Utc::now().date_naive().to_string());
+    let period_end = latest
+        .map(|dt| dt.date_naive().to_string())
+        .unwrap_or_else(|| Utc::now().date_naive().to_string());
+
+    let meta = DashboardMeta {
+        domain: "youtube".to_string(),
         range: range.to_string(),
         period_start,
         period_end,
@@ -593,11 +627,29 @@ pub(crate) async fn build_media_dashboard(
         cache_hit: None,
     };
 
-    Ok(MediaDashboard {
+    let mut s_tier: Vec<VideoIdea> = ideas
+        .iter()
+        .filter(|idea| idea.tier == "S")
+        .cloned()
+        .map(|idea| idea.into_item())
+        .collect();
+    s_tier.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    s_tier.truncate(8);
+
+    let mut in_progress: Vec<VideoIdea> = ideas
+        .iter()
+        .filter(|idea| idea.stage != "published" && idea.stage != "brain_dump")
+        .cloned()
+        .map(|idea| idea.into_item())
+        .collect();
+    in_progress.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    in_progress.truncate(8);
+
+    Ok(YouTubeDashboard {
         meta,
-        stats,
-        recently_active,
-        by_type,
+        pipeline_stats,
+        s_tier,
+        in_progress,
     })
 }
 
@@ -634,36 +686,6 @@ async fn fetch_delivery_aggregation(
         return Err(format!("Supabase delivery_aggregations failed: {text}"));
     }
     let rows: Vec<DeliveryAggregationRow> = resp.json().await.map_err(|err| err.to_string())?;
-    Ok(rows.into_iter().next())
-}
-
-async fn fetch_media_aggregation(
-    supabase_url: &str,
-    supabase_key: &str,
-    period: &str,
-) -> Result<Option<MediaAggregationRow>, String> {
-    let endpoint = format!(
-        "{}/rest/v1/media_aggregations?period=eq.{}&order=period_start.desc&limit=1",
-        supabase_url.trim_end_matches('/'),
-        period
-    );
-    let mut headers = reqwest::header::HeaderMap::new();
-    headers.insert("apikey", supabase_key.parse().unwrap());
-    headers.insert(
-        "Authorization",
-        format!("Bearer {}", supabase_key).parse().unwrap(),
-    );
-    let resp = Client::new()
-        .get(&endpoint)
-        .headers(headers)
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
-    if !resp.status().is_success() {
-        let text = resp.text().await.unwrap_or_default();
-        return Err(format!("Supabase media_aggregations failed: {text}"));
-    }
-    let rows: Vec<MediaAggregationRow> = resp.json().await.map_err(|err| err.to_string())?;
     Ok(rows.into_iter().next())
 }
 
@@ -870,35 +892,7 @@ fn load_delivery_merchant_tiers(root: &Path) -> HashMap<String, String> {
         .collect()
 }
 
-#[derive(Debug, Clone)]
-struct MediaRecord {
-    id: String,
-    title: String,
-    media_type: String,
-    status: String,
-    rating: Option<f64>,
-    last_activity_at: Option<String>,
-    completed_at: Option<String>,
-    activity_at: Option<DateTime<Utc>>,
-}
-
-impl MediaRecord {
-    fn into_item(self) -> MediaItem {
-        MediaItem {
-            id: self.id,
-            title: self.title,
-            media_type: self.media_type,
-            status: self.status,
-            rating: self.rating,
-            cover_url: None,
-            last_activity_at: self.last_activity_at,
-            completed_at: self.completed_at,
-            tags: None,
-        }
-    }
-}
-
-fn load_media_items(root: &Path) -> Vec<MediaRecord> {
+fn load_media_items(root: &Path) -> Vec<MediaItem> {
     let dir = root.join("Entities").join("Media");
     let entries = match std::fs::read_dir(&dir) {
         Ok(entries) => entries,
@@ -934,42 +928,109 @@ fn load_media_items(root: &Path) -> Vec<MediaRecord> {
         let id = parsed.id.unwrap_or_else(|| fallback_title.clone());
         let media_type = normalize_media_type(parsed.media_type.as_deref());
         let status = normalize_media_status(parsed.status.as_deref());
-        let last_activity_at = parsed
+        let created_at = parsed
+            .created_at
+            .clone()
+            .or_else(|| parsed.updated_at.clone())
+            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        let updated_at = parsed
             .updated_at
             .clone()
-            .or_else(|| parsed.completed_at.clone());
-        let activity_at = last_activity_at.as_deref().and_then(parse_datetime);
-        items.push(MediaRecord {
+            .or_else(|| Some(created_at.clone()))
+            .unwrap_or_else(|| created_at.clone());
+        items.push(MediaItem {
             id,
             title,
             media_type,
             status,
             rating: parsed.rating,
-            last_activity_at,
+            cover_url: None,
+            created_at,
+            updated_at,
             completed_at: parsed.completed_at,
-            activity_at,
         });
     }
 
     items
 }
 
-fn item_in_range(
-    item: &MediaRecord,
-    range: &str,
-    start_date: Option<NaiveDate>,
-    end_date: Option<NaiveDate>,
-) -> bool {
-    if range == "lifetime" {
-        return true;
+#[derive(Debug, Clone)]
+struct YouTubeIdeaRecord {
+    id: String,
+    title: String,
+    tier: String,
+    stage: String,
+    updated_at: String,
+    updated_at_dt: Option<DateTime<Utc>>,
+}
+
+impl YouTubeIdeaRecord {
+    fn into_item(self) -> VideoIdea {
+        VideoIdea {
+            id: self.id,
+            title: self.title,
+            tier: self.tier,
+            stage: self.stage,
+            thesis: None,
+            updated_at: self.updated_at,
+            next_action: None,
+        }
     }
-    let Some(activity_at) = item.activity_at else {
-        return false;
+}
+
+fn load_youtube_ideas(root: &Path) -> Vec<YouTubeIdeaRecord> {
+    let dir = root.join("Entities").join("YouTube");
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(entries) => entries,
+        Err(_) => return Vec::new(),
     };
-    let date = activity_at.date_naive();
-    let after_start = start_date.map(|start| date >= start).unwrap_or(true);
-    let before_end = end_date.map(|end| date <= end).unwrap_or(true);
-    after_start && before_end
+
+    let mut ideas = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let content = match std::fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        let (frontmatter, _) = split_frontmatter(&content);
+        let Some(frontmatter) = frontmatter else {
+            continue;
+        };
+        let Ok(parsed) = serde_yaml::from_str::<YouTubeIdeaFrontmatter>(&frontmatter) else {
+            continue;
+        };
+        let fallback_title = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("idea")
+            .to_string();
+        let title = parsed
+            .title
+            .clone()
+            .unwrap_or_else(|| fallback_title.clone());
+        let id = parsed.id.unwrap_or_else(|| fallback_title.clone());
+        let tier = normalize_idea_tier(parsed.tier.as_deref());
+        let stage = normalize_pipeline_stage(parsed.stage.as_deref());
+        let updated_at = parsed
+            .updated_at
+            .clone()
+            .or_else(|| parsed.created_at.clone())
+            .unwrap_or_else(|| Utc::now().to_rfc3339());
+        let updated_at_dt = parse_datetime(&updated_at);
+        ideas.push(YouTubeIdeaRecord {
+            id,
+            title,
+            tier,
+            stage,
+            updated_at,
+            updated_at_dt,
+        });
+    }
+
+    ideas
 }
 
 fn build_timestamp(date: NaiveDate, time_value: &str) -> String {
@@ -1021,12 +1082,13 @@ fn normalize_optional_text(value: &str) -> Option<String> {
 fn normalize_media_type(value: Option<&str>) -> String {
     let trimmed = value.unwrap_or("").trim().to_lowercase();
     match trimmed.as_str() {
-        "film" | "movie" => "film",
-        "tv" | "series" => "tv",
-        "anime" => "anime",
-        "game" | "games" => "game",
-        "book" | "books" => "book",
-        _ => "other",
+        "film" | "movie" => "Film",
+        "tv" | "series" => "TV",
+        "anime" => "Anime",
+        "game" | "games" => "Game",
+        "book" | "books" => "Book",
+        "youtube" | "yt" => "YouTube",
+        _ => "Film",
     }
     .to_string()
 }
@@ -1034,11 +1096,34 @@ fn normalize_media_type(value: Option<&str>) -> String {
 fn normalize_media_status(value: Option<&str>) -> String {
     let trimmed = value.unwrap_or("").trim().to_lowercase();
     match trimmed.as_str() {
-        "completed" | "complete" => "completed",
-        "backlog" | "queue" | "queued" => "backlog",
-        "in progress" | "in_progress" | "progress" | "watching" | "playing" => "in_progress",
-        "dropped" | "abandoned" => "dropped",
-        _ => "backlog",
+        "completed" | "complete" => "Completed",
+        "backlog" | "queue" | "queued" => "Backlog",
+        _ => "Backlog",
+    }
+    .to_string()
+}
+
+fn normalize_idea_tier(value: Option<&str>) -> String {
+    match value.unwrap_or("C").trim().to_uppercase().as_str() {
+        "S" => "S",
+        "A" => "A",
+        "B" => "B",
+        _ => "C",
+    }
+    .to_string()
+}
+
+fn normalize_pipeline_stage(value: Option<&str>) -> String {
+    let trimmed = value.unwrap_or("").trim().to_lowercase();
+    match trimmed.as_str() {
+        "idea" | "brain_dump" => "brain_dump",
+        "notes" | "development" => "development",
+        "outline" | "outlining" => "outline",
+        "draft" | "evaluation" => "evaluation",
+        "script" | "scripting" => "script",
+        "ready" | "edit" | "editing" => "edit",
+        "published" => "published",
+        _ => "brain_dump",
     }
     .to_string()
 }

@@ -187,14 +187,24 @@ public struct CodexMonitorAPI: Sendable {
         )
     }
 
-    public func getMediaDashboard(workspaceId: String, range: String) async throws -> MediaDashboard {
+    public func getMediaDashboard(workspaceId: String) async throws -> MediaLibrary {
         return try await call(
             "get_media_dashboard",
             params: .object([
                 "workspaceId": .string(workspaceId),
+            ]),
+            as: MediaLibrary.self
+        )
+    }
+
+    public func getYouTubeDashboard(workspaceId: String, range: String) async throws -> YouTubeDashboard {
+        return try await call(
+            "get_youtube_dashboard",
+            params: .object([
+                "workspaceId": .string(workspaceId),
                 "range": .string(range),
             ]),
-            as: MediaDashboard.self
+            as: YouTubeDashboard.self
         )
     }
 

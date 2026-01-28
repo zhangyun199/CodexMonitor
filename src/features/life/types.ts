@@ -95,8 +95,10 @@ export interface DeliveryDashboard {
 // Media
 // -----------------------------
 
-export type MediaType = "film" | "tv" | "game" | "book" | "anime" | "other";
-export type MediaStatus = "backlog" | "in_progress" | "completed" | "dropped";
+export type MediaType = "Film" | "TV" | "Anime" | "Game" | "Book" | "YouTube";
+export type MediaStatus = "Completed" | "Backlog";
+export type MediaViewMode = "grid" | "list";
+export type MediaSortOption = "rating" | "title" | "updated" | "type";
 
 export interface MediaItem {
   id: string;
@@ -105,21 +107,56 @@ export interface MediaItem {
   status: MediaStatus;
   rating?: number;
   coverUrl?: string;
-  lastActivityAt?: string;
+  createdAt: string;
+  updatedAt: string;
   completedAt?: string;
-  tags?: string[];
 }
 
-export interface MediaStats {
-  backlogCount: number;
-  inProgressCount: number;
-  completedCount: number;
-  avgRating?: number;
-}
-
-export interface MediaDashboard {
+export interface MediaLibrary {
   meta: DashboardMeta;
-  stats: MediaStats;
-  recentlyActive: MediaItem[];
-  byType: Record<MediaType, number>;
+  totalCount: number;
+  completedCount: number;
+  backlogCount: number;
+  avgRating: number;
+  items: MediaItem[];
+}
+
+export interface MediaFilterState {
+  type: MediaType | "all";
+  status: MediaStatus | "all";
+  search: string;
+  sort: MediaSortOption;
+  viewMode: MediaViewMode;
+}
+
+// -----------------------------
+// YouTube
+// -----------------------------
+
+export type PipelineStage =
+  | "brain_dump"
+  | "development"
+  | "outline"
+  | "evaluation"
+  | "script"
+  | "edit"
+  | "published";
+
+export type IdeaTier = "S" | "A" | "B" | "C";
+
+export interface VideoIdea {
+  id: string;
+  title: string;
+  tier: IdeaTier;
+  stage: PipelineStage;
+  thesis?: string;
+  updatedAt: string;
+  nextAction?: string;
+}
+
+export interface YouTubeDashboard {
+  meta: DashboardMeta;
+  pipelineStats: Record<PipelineStage, number>;
+  sTier: VideoIdea[];
+  inProgress: VideoIdea[];
 }

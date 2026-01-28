@@ -18,6 +18,7 @@ mod event_sink;
 mod git;
 mod git_utils;
 mod life;
+mod life_core;
 mod local_usage;
 mod local_usage_core;
 mod memory;

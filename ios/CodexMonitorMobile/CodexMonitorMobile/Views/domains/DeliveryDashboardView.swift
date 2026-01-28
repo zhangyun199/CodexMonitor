@@ -14,6 +14,11 @@ struct DeliveryDashboardView: View {
                     StatCardView(title: "$/hr", value: number(store.deliveryDashboard?.stats.hourlyRate))
                 }
 
+                HStack(spacing: 12) {
+                    StatCardView(title: "AR", value: arLabel())
+                    StatCardView(title: "Whales", value: whalesLabel())
+                }
+
                 TimeRangePicker(selection: $timeRange)
 
                 if store.dashboardLoading {
@@ -84,5 +89,20 @@ struct DeliveryDashboardView: View {
     private func number(_ value: Double?) -> String {
         guard let value else { return "--" }
         return String(format: "$%.2f", value)
+    }
+
+    private func arLabel() -> String {
+        guard let start = store.deliveryDashboard?.stats.startingAr,
+              let end = store.deliveryDashboard?.stats.endingAr else {
+            return "--"
+        }
+        return "\(Int(start))% → \(Int(end))%"
+    }
+
+    private func whalesLabel() -> String {
+        if let whales = store.deliveryDashboard?.stats.whaleCatches {
+            return "\(whales)"
+        }
+        return "--"
     }
 }

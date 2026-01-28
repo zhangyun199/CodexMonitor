@@ -781,6 +781,13 @@ impl DaemonState {
         id: String,
         settings: WorkspaceSettings,
     ) -> Result<WorkspaceInfo, String> {
+        let mut settings = settings;
+        if matches!(settings.purpose, Some(types::WorkspacePurpose::Life))
+            && settings.obsidian_root.is_none()
+        {
+            settings.obsidian_root = life::default_obsidian_root();
+        }
+
         let (entry_snapshot, list) = {
             let mut workspaces = self.workspaces.lock().await;
             let entry_snapshot = match workspaces.get_mut(&id) {
@@ -1035,11 +1042,27 @@ impl DaemonState {
             .get(&workspace_id)
             .cloned()
             .ok_or("workspace not found")?;
+        let supabase = {
+            let settings = self.app_settings.lock().await;
+            if settings.supabase_url.trim().is_empty()
+                || settings.supabase_anon_key.trim().is_empty()
+            {
+                None
+            } else {
+                Some((
+                    settings.supabase_url.clone(),
+                    settings.supabase_anon_key.clone(),
+                ))
+            }
+        };
         let dashboard = life::build_delivery_dashboard(
             &entry.path,
             entry.settings.obsidian_root.as_deref(),
+            supabase.as_ref().map(|value| value.0.as_str()),
+            supabase.as_ref().map(|value| value.1.as_str()),
             &range,
-        )?;
+        )
+        .await?;
         serde_json::to_value(dashboard).map_err(|err| err.to_string())
     }
 

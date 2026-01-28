@@ -31,6 +31,12 @@ export function DeliveryDashboard({
   const ordersCount = stats ? String(stats.orderCount) : "--";
   const hourlyRate = stats ? `$${stats.hourlyRate.toFixed(2)}` : "--";
   const perMile = stats ? `$${stats.perMileRate.toFixed(2)}` : "--";
+  const arLabel =
+    stats?.startingAr !== undefined && stats?.endingAr !== undefined
+      ? `${stats.startingAr}% → ${stats.endingAr}%`
+      : "--";
+  const whales =
+    stats?.whaleCatches !== undefined ? String(stats.whaleCatches) : "--";
 
   return (
     <div className="life-dashboard life-delivery-dashboard">
@@ -66,6 +72,8 @@ export function DeliveryDashboard({
             <StatCard label="Orders" value={ordersCount} />
             <StatCard label="$/hr" value={hourlyRate} />
             <StatCard label="$/mi" value={perMile} />
+            <StatCard label="AR" value={arLabel} />
+            <StatCard label="Whales" value={whales} />
           </div>
 
           <section className="life-section">

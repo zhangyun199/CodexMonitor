@@ -282,6 +282,9 @@ public struct DeliveryStats: Codable, Hashable, Sendable {
     public var hourlyRate: Double
     public var perMileRate: Double
     public var avgOrderValue: Double?
+    public var startingAr: Double?
+    public var endingAr: Double?
+    public var whaleCatches: Int?
 }
 
 public struct DeliveryOrder: Codable, Hashable, Sendable, Identifiable {

@@ -15,6 +15,7 @@ use uuid::Uuid;
 use crate::codex::spawn_workspace_session;
 use crate::codex_home::resolve_workspace_codex_home;
 use crate::git_utils::resolve_git_root;
+use crate::life_core::default_obsidian_root;
 use crate::remote_backend;
 use crate::state::AppState;
 use crate::storage::write_workspaces;
@@ -189,6 +190,13 @@ fn apply_workspace_settings_update(
     id: &str,
     settings: WorkspaceSettings,
 ) -> Result<WorkspaceEntry, String> {
+    let mut settings = settings;
+    if matches!(settings.purpose, Some(crate::types::WorkspacePurpose::Life))
+        && settings.obsidian_root.is_none()
+    {
+        settings.obsidian_root = default_obsidian_root();
+    }
+
     match workspaces.get_mut(id) {
         Some(entry) => {
             entry.settings = settings.clone();

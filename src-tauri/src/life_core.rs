@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use chrono::{Duration, NaiveDate, NaiveTime, Utc};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 use crate::types::{WorkspacePurpose, WorkspaceSettings};
@@ -46,6 +47,12 @@ pub(crate) struct DeliveryStats {
     pub(crate) per_mile_rate: f64,
     #[serde(rename = "avgOrderValue", skip_serializing_if = "Option::is_none")]
     pub(crate) avg_order_value: Option<f64>,
+    #[serde(rename = "startingAr", skip_serializing_if = "Option::is_none")]
+    pub(crate) starting_ar: Option<f64>,
+    #[serde(rename = "endingAr", skip_serializing_if = "Option::is_none")]
+    pub(crate) ending_ar: Option<f64>,
+    #[serde(rename = "whaleCatches", skip_serializing_if = "Option::is_none")]
+    pub(crate) whale_catches: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -109,9 +116,15 @@ struct DeliverySessionFrontmatter {
     earnings: Option<f64>,
     #[serde(rename = "orders_count")]
     orders_count: Option<f64>,
+    #[serde(rename = "starting_ar")]
+    starting_ar: Option<f64>,
+    #[serde(rename = "ending_ar")]
+    ending_ar: Option<f64>,
+    #[serde(rename = "whale_catches")]
+    whale_catches: Option<f64>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct DeliverySessionRecord {
     id: String,
     date: NaiveDate,
@@ -119,7 +132,34 @@ struct DeliverySessionRecord {
     mileage: Option<f64>,
     earnings: f64,
     orders_count: u32,
+    starting_ar: Option<f64>,
+    ending_ar: Option<f64>,
+    whale_catches: u32,
     orders: Vec<DeliveryOrder>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeliveryAggregationRow {
+    period: Option<String>,
+    period_start: String,
+    period_end: String,
+    total_earnings: Option<f64>,
+    order_count: Option<i64>,
+    total_hours: Option<f64>,
+    total_miles: Option<f64>,
+    hourly_rate: Option<f64>,
+    per_mile_rate: Option<f64>,
+    computed_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeliveryMerchantIndex {
+    merchants: HashMap<String, DeliveryMerchantMeta>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeliveryMerchantMeta {
+    tier: Option<String>,
 }
 
 pub(crate) fn is_life_workspace(settings: &WorkspaceSettings) -> bool {
@@ -133,6 +173,21 @@ pub(crate) fn life_debug_enabled() -> bool {
             !trimmed.is_empty() && trimmed != "0"
         })
         .unwrap_or(false)
+}
+
+pub(crate) fn default_obsidian_root() -> Option<String> {
+    if let Ok(value) = std::env::var("OBSIDIAN_ROOT") {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() && Path::new(trimmed).exists() {
+            return Some(trimmed.to_string());
+        }
+    }
+    let fallback = "/Volumes/YouTube 4TB/Obsidian";
+    if Path::new(fallback).exists() {
+        Some(fallback.to_string())
+    } else {
+        None
+    }
 }
 
 fn resolve_prompt_root() -> Result<PathBuf, String> {
@@ -173,19 +228,70 @@ pub(crate) fn build_life_workspace_prompt() -> Result<String, String> {
     Ok(parts.join("\n---\n"))
 }
 
-pub(crate) fn build_delivery_dashboard(
+pub(crate) async fn build_delivery_dashboard(
     workspace_path: &str,
     obsidian_root: Option<&str>,
+    supabase_url: Option<&str>,
+    supabase_key: Option<&str>,
     range: &str,
 ) -> Result<DeliveryDashboard, String> {
     let root = resolve_obsidian_root(workspace_path, obsidian_root);
+    if !root.exists() {
+        return Err(format!(
+            "Obsidian root not found: {}",
+            root.to_string_lossy()
+        ));
+    }
     let today = Utc::now().date_naive();
-    let (start_date, end_date) = match range {
-        "today" => (Some(today), Some(today)),
-        "week" | "7d" => (Some(today - Duration::days(6)), Some(today)),
-        "month" | "30d" => (Some(today - Duration::days(29)), Some(today)),
-        _ => (None, Some(today)),
+    let (period, start_date, end_date) = match range {
+        "today" => (None, Some(today), Some(today)),
+        "week" | "7d" => (Some("week"), Some(today - Duration::days(6)), Some(today)),
+        "month" | "30d" => (Some("month"), Some(today - Duration::days(29)), Some(today)),
+        "lifetime" => (Some("lifetime"), None, Some(today)),
+        _ => (None, None, Some(today)),
     };
+
+    let sessions_dir = root.join("Entities").join("Delivery").join("Sessions");
+    if !sessions_dir.exists() {
+        return Err(format!(
+            "Delivery sessions not found at {}",
+            sessions_dir.to_string_lossy()
+        ));
+    }
+
+    if let Some(period) = period {
+        if let (Some(url), Some(key)) = (supabase_url, supabase_key) {
+            if let Some(row) = fetch_delivery_aggregation(url, key, period).await? {
+                let stats = DeliveryStats {
+                    total_earnings: row.total_earnings.unwrap_or(0.0),
+                    order_count: row.order_count.unwrap_or(0).max(0) as u32,
+                    active_hours: row.total_hours.unwrap_or(0.0),
+                    total_miles: row.total_miles,
+                    hourly_rate: row.hourly_rate.unwrap_or(0.0),
+                    per_mile_rate: row.per_mile_rate.unwrap_or(0.0),
+                    avg_order_value: None,
+                    starting_ar: None,
+                    ending_ar: None,
+                    whale_catches: None,
+                };
+                let meta = DashboardMeta {
+                    domain: "delivery".to_string(),
+                    range: range.to_string(),
+                    period_start: row.period_start,
+                    period_end: row.period_end,
+                    generated_at: row.computed_at.unwrap_or_else(|| Utc::now().to_rfc3339()),
+                    sources: vec!["supabase".to_string()],
+                    cache_hit: None,
+                };
+                return Ok(DeliveryDashboard {
+                    meta,
+                    stats,
+                    orders: Vec::new(),
+                    top_merchants: Vec::new(),
+                });
+            }
+        }
+    }
 
     let sessions = load_delivery_sessions(&root);
     let filtered: Vec<_> = sessions
@@ -204,6 +310,7 @@ pub(crate) fn build_delivery_dashboard(
     let mut total_miles = 0.0;
     let mut has_miles = false;
     let mut order_count = 0u32;
+    let mut whale_catches = 0u32;
     let mut orders = Vec::new();
 
     for session in &filtered {
@@ -215,6 +322,7 @@ pub(crate) fn build_delivery_dashboard(
             has_miles = true;
         }
         orders.extend(session.orders.clone());
+        whale_catches += session.whale_catches;
     }
 
     let hourly_rate = if total_hours > 0.0 {
@@ -233,6 +341,11 @@ pub(crate) fn build_delivery_dashboard(
         None
     };
 
+    let mut sorted = filtered.clone();
+    sorted.sort_by_key(|session| session.date);
+    let starting_ar = sorted.first().and_then(|session| session.starting_ar);
+    let ending_ar = sorted.last().and_then(|session| session.ending_ar);
+
     let stats = DeliveryStats {
         total_earnings,
         order_count,
@@ -241,9 +354,17 @@ pub(crate) fn build_delivery_dashboard(
         hourly_rate,
         per_mile_rate,
         avg_order_value,
+        starting_ar,
+        ending_ar,
+        whale_catches: if whale_catches > 0 {
+            Some(whale_catches)
+        } else {
+            None
+        },
     };
 
-    let top_merchants = build_top_merchants(&orders);
+    let merchant_tiers = load_delivery_merchant_tiers(&root);
+    let top_merchants = build_top_merchants(&orders, &merchant_tiers);
 
     let period_start = start_date
         .or_else(|| filtered.iter().map(|s| s.date).min())
@@ -276,6 +397,36 @@ fn resolve_obsidian_root(workspace_path: &str, obsidian_root: Option<&str>) -> P
     obsidian_root
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(workspace_path))
+}
+
+async fn fetch_delivery_aggregation(
+    supabase_url: &str,
+    supabase_key: &str,
+    period: &str,
+) -> Result<Option<DeliveryAggregationRow>, String> {
+    let endpoint = format!(
+        "{}/rest/v1/delivery_aggregations?period=eq.{}&order=period_start.desc&limit=1",
+        supabase_url.trim_end_matches('/'),
+        period
+    );
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("apikey", supabase_key.parse().unwrap());
+    headers.insert(
+        "Authorization",
+        format!("Bearer {}", supabase_key).parse().unwrap(),
+    );
+    let resp = Client::new()
+        .get(&endpoint)
+        .headers(headers)
+        .send()
+        .await
+        .map_err(|err| err.to_string())?;
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("Supabase delivery_aggregations failed: {text}"));
+    }
+    let rows: Vec<DeliveryAggregationRow> = resp.json().await.map_err(|err| err.to_string())?;
+    Ok(rows.into_iter().next())
 }
 
 fn load_delivery_sessions(root: &Path) -> Vec<DeliverySessionRecord> {
@@ -326,6 +477,12 @@ fn load_delivery_sessions(root: &Path) -> Vec<DeliverySessionRecord> {
             mileage: parsed.mileage,
             earnings: parsed.earnings.unwrap_or(0.0),
             orders_count,
+            starting_ar: parsed.starting_ar,
+            ending_ar: parsed.ending_ar,
+            whale_catches: parsed
+                .whale_catches
+                .map(|value| value.max(0.0) as u32)
+                .unwrap_or(0),
             orders,
         });
     }
@@ -396,7 +553,10 @@ fn parse_orders_table(body: &str, date: NaiveDate, session_id: &str) -> Vec<Deli
     orders
 }
 
-fn build_top_merchants(orders: &[DeliveryOrder]) -> Vec<MerchantStats> {
+fn build_top_merchants(
+    orders: &[DeliveryOrder],
+    tier_map: &HashMap<String, String>,
+) -> Vec<MerchantStats> {
     let mut map: HashMap<String, (u32, f64, f64, u32)> = HashMap::new();
     for order in orders {
         if order.payout <= 0.0 {
@@ -430,6 +590,10 @@ fn build_top_merchants(orders: &[DeliveryOrder]) -> Vec<MerchantStats> {
                         None
                     }
                 });
+                let tier = tier_map
+                    .get(&merchant_name.to_lowercase())
+                    .cloned()
+                    .or_else(|| tier_map.get(&merchant_name).cloned());
                 MerchantStats {
                     merchant_name,
                     order_count: count,
@@ -437,7 +601,7 @@ fn build_top_merchants(orders: &[DeliveryOrder]) -> Vec<MerchantStats> {
                     avg_payout,
                     avg_miles,
                     avg_per_mile,
-                    tier: None,
+                    tier,
                 }
             },
         )
@@ -450,6 +614,22 @@ fn build_top_merchants(orders: &[DeliveryOrder]) -> Vec<MerchantStats> {
     });
     merchants.truncate(8);
     merchants
+}
+
+fn load_delivery_merchant_tiers(root: &Path) -> HashMap<String, String> {
+    let path = root.join("Indexes").join("delivery.merchants.v1.json");
+    let content = match std::fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(_) => return HashMap::new(),
+    };
+    let Ok(parsed) = serde_json::from_str::<DeliveryMerchantIndex>(&content) else {
+        return HashMap::new();
+    };
+    parsed
+        .merchants
+        .into_iter()
+        .filter_map(|(name, meta)| meta.tier.map(|tier| (name.to_lowercase(), tier)))
+        .collect()
 }
 
 fn build_timestamp(date: NaiveDate, time_value: &str) -> String {

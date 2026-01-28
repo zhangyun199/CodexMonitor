@@ -1,16 +1,12 @@
 use serde_json::{json, Value};
 use tauri::{AppHandle, State};
 
-use crate::remote_backend;
-use crate::state::AppState;
-
-#[path = "life_core.rs"]
-mod core;
-
-pub(crate) use core::{
+pub(crate) use crate::life_core::{
     build_delivery_dashboard, build_life_workspace_prompt, is_life_workspace, life_debug_enabled,
     DeliveryDashboard,
 };
+use crate::remote_backend;
+use crate::state::AppState;
 
 #[tauri::command]
 pub(crate) async fn get_life_workspace_prompt(
@@ -45,7 +41,26 @@ pub(crate) async fn get_delivery_dashboard(
     }
     let workspaces = state.workspaces.lock().await;
     let entry = workspaces.get(&workspace_id).ok_or("workspace not found")?;
-    build_delivery_dashboard(&entry.path, entry.settings.obsidian_root.as_deref(), &range)
+    let supabase = {
+        let settings = state.app_settings.lock().await;
+        if settings.supabase_url.trim().is_empty() || settings.supabase_anon_key.trim().is_empty() {
+            None
+        } else {
+            Some((
+                settings.supabase_url.clone(),
+                settings.supabase_anon_key.clone(),
+            ))
+        }
+    };
+
+    build_delivery_dashboard(
+        &entry.path,
+        entry.settings.obsidian_root.as_deref(),
+        supabase.as_ref().map(|value| value.0.as_str()),
+        supabase.as_ref().map(|value| value.1.as_str()),
+        &range,
+    )
+    .await
 }
 
 #[tauri::command]

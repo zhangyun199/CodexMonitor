@@ -56,6 +56,9 @@ export interface DeliveryStats {
   hourlyRate: number;
   perMileRate: number;
   avgOrderValue?: number;
+  startingAr?: number;
+  endingAr?: number;
+  whaleCatches?: number;
 }
 
 export interface DeliveryOrder {

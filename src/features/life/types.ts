@@ -92,6 +92,98 @@ export interface DeliveryDashboard {
 }
 
 // -----------------------------
+// Nutrition
+// -----------------------------
+
+export interface NutritionStats {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber?: number;
+  mealCount: number;
+}
+
+export interface MealEntry {
+  id: string;
+  timestamp: string;
+  mealType: "breakfast" | "lunch" | "dinner" | "snack";
+  description: string;
+  foods: string[];
+  estimatedCalories?: number;
+}
+
+export interface NutritionDashboard {
+  meta: DashboardMeta;
+  stats: NutritionStats;
+  meals: MealEntry[];
+  weeklyTrend?: Record<string, number>;
+}
+
+export const NUTRITION_GOALS = {
+  calories: 2000,
+  protein: 180,
+  carbs: 150,
+  fat: 80,
+};
+
+// -----------------------------
+// Exercise
+// -----------------------------
+
+export interface ExerciseStats {
+  workoutCount: number;
+  walkingMiles: number;
+  activeDays: number;
+  currentStreak: number;
+}
+
+export interface ExerciseEntry {
+  id: string;
+  timestamp: string;
+  type: "walk" | "strength" | "cardio" | "other";
+  description: string;
+  miles?: number;
+  duration?: number;
+}
+
+export interface ExerciseDashboard {
+  meta: DashboardMeta;
+  stats: ExerciseStats;
+  entries: ExerciseEntry[];
+  byType: Record<string, number>;
+}
+
+// -----------------------------
+// Finance
+// -----------------------------
+
+export interface Bill {
+  id: string;
+  name: string;
+  amount: number;
+  dueDay: number;
+  frequency: "monthly" | "weekly" | "annual";
+  category: string;
+  autoPay: boolean;
+  nextDueDate: string;
+}
+
+export interface FinanceStats {
+  monthlyTotal: number;
+  dueSoonCount: number;
+  autoPayCount: number;
+}
+
+export interface FinanceDashboard {
+  meta: DashboardMeta;
+  stats: FinanceStats;
+  bills: Bill[];
+  byCategory: Record<string, number>;
+  statusMessage?: string;
+}
+
+// -----------------------------
 // Media
 // -----------------------------
 

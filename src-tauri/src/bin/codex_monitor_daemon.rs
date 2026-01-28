@@ -1068,18 +1068,40 @@ impl DaemonState {
 
     async fn get_nutrition_dashboard(
         &self,
-        _workspace_id: String,
-        _range: String,
+        workspace_id: String,
+        range: String,
     ) -> Result<Value, String> {
-        Ok(json!({}))
+        let workspaces = self.workspaces.lock().await;
+        let entry = workspaces
+            .get(&workspace_id)
+            .cloned()
+            .ok_or("workspace not found")?;
+        let dashboard = life::build_nutrition_dashboard(
+            &entry.path,
+            entry.settings.obsidian_root.as_deref(),
+            &range,
+        )
+        .await?;
+        serde_json::to_value(dashboard).map_err(|err| err.to_string())
     }
 
     async fn get_exercise_dashboard(
         &self,
-        _workspace_id: String,
-        _range: String,
+        workspace_id: String,
+        range: String,
     ) -> Result<Value, String> {
-        Ok(json!({}))
+        let workspaces = self.workspaces.lock().await;
+        let entry = workspaces
+            .get(&workspace_id)
+            .cloned()
+            .ok_or("workspace not found")?;
+        let dashboard = life::build_exercise_dashboard(
+            &entry.path,
+            entry.settings.obsidian_root.as_deref(),
+            &range,
+        )
+        .await?;
+        serde_json::to_value(dashboard).map_err(|err| err.to_string())
     }
 
     async fn get_media_dashboard(&self, workspace_id: String) -> Result<Value, String> {
@@ -1129,10 +1151,21 @@ impl DaemonState {
 
     async fn get_finance_dashboard(
         &self,
-        _workspace_id: String,
-        _range: String,
+        workspace_id: String,
+        range: String,
     ) -> Result<Value, String> {
-        Ok(json!({}))
+        let workspaces = self.workspaces.lock().await;
+        let entry = workspaces
+            .get(&workspace_id)
+            .cloned()
+            .ok_or("workspace not found")?;
+        let dashboard = life::build_finance_dashboard(
+            &entry.path,
+            entry.settings.obsidian_root.as_deref(),
+            &range,
+        )
+        .await?;
+        serde_json::to_value(dashboard).map_err(|err| err.to_string())
     }
 
     async fn start_thread(&self, workspace_id: String) -> Result<Value, String> {

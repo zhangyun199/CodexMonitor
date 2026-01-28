@@ -18,10 +18,25 @@ struct LifeWorkspaceView: View {
                         get: { store.lifeTimeRange },
                         set: { store.lifeTimeRange = $0 }
                     ))
+                case .nutrition:
+                    NutritionDashboardView(timeRange: Binding(
+                        get: { store.lifeTimeRange },
+                        set: { store.lifeTimeRange = $0 }
+                    ))
+                case .exercise:
+                    ExerciseDashboardView(timeRange: Binding(
+                        get: { store.lifeTimeRange },
+                        set: { store.lifeTimeRange = $0 }
+                    ))
                 case .media:
                     MediaDashboardView()
                 case .youtube:
                     YouTubeDashboardView()
+                case .finance:
+                    FinanceDashboardView(timeRange: Binding(
+                        get: { store.lifeTimeRange },
+                        set: { store.lifeTimeRange = $0 }
+                    ))
                 default:
                     Text("Dashboard coming soon.")
                         .foregroundStyle(.secondary)

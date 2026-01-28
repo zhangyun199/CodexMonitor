@@ -15,9 +15,12 @@ import type {
   Domain,
   DomainTrendSnapshot,
   DeliveryDashboard,
+  ExerciseDashboard,
+  FinanceDashboard,
   MediaLibrary,
   MediaCoverSummary,
   LifeTimeRange,
+  NutritionDashboard,
   YouTubeLibrary,
 } from "../types";
 import type {
@@ -91,6 +94,20 @@ export async function getDeliveryDashboard(
   return invoke<DeliveryDashboard>("get_delivery_dashboard", { workspaceId, range });
 }
 
+export async function getNutritionDashboard(
+  workspaceId: string,
+  range: LifeTimeRange,
+): Promise<NutritionDashboard> {
+  return invoke<NutritionDashboard>("get_nutrition_dashboard", { workspaceId, range });
+}
+
+export async function getExerciseDashboard(
+  workspaceId: string,
+  range: LifeTimeRange,
+): Promise<ExerciseDashboard> {
+  return invoke<ExerciseDashboard>("get_exercise_dashboard", { workspaceId, range });
+}
+
 export async function getMediaDashboard(
   workspaceId: string,
 ): Promise<MediaLibrary> {
@@ -101,6 +118,13 @@ export async function getYouTubeDashboard(
   workspaceId: string,
 ): Promise<YouTubeLibrary> {
   return invoke<YouTubeLibrary>("get_youtube_dashboard", { workspaceId });
+}
+
+export async function getFinanceDashboard(
+  workspaceId: string,
+  range: LifeTimeRange,
+): Promise<FinanceDashboard> {
+  return invoke<FinanceDashboard>("get_finance_dashboard", { workspaceId, range });
 }
 
 export async function enrichMediaCovers(

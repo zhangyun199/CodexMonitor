@@ -77,6 +77,14 @@ export function MediaDashboard({ workspaceId }: MediaDashboardProps) {
           <button
             type="button"
             className="ghost life-refresh-button"
+            onClick={() => void handleEnrich()}
+            disabled={loading}
+          >
+            Retry Missing
+          </button>
+          <button
+            type="button"
+            className="ghost life-refresh-button"
             onClick={() => void refresh()}
             disabled={loading}
           >

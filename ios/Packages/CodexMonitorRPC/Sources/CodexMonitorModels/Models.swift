@@ -320,6 +320,79 @@ public struct DeliveryDashboard: Codable, Hashable, Sendable {
     public var topMerchants: [MerchantStats]
 }
 
+public struct NutritionStats: Codable, Hashable, Sendable {
+    public var calories: Double
+    public var protein: Double
+    public var carbs: Double
+    public var fat: Double
+    public var fiber: Double?
+    public var mealCount: Int
+}
+
+public struct MealEntry: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var timestamp: String
+    public var mealType: String
+    public var description: String
+    public var foods: [String]
+    public var estimatedCalories: Double?
+}
+
+public struct NutritionDashboard: Codable, Hashable, Sendable {
+    public var meta: DashboardMeta
+    public var stats: NutritionStats
+    public var meals: [MealEntry]
+    public var weeklyTrend: [String: Double]?
+}
+
+public struct ExerciseStats: Codable, Hashable, Sendable {
+    public var workoutCount: Int
+    public var walkingMiles: Double
+    public var activeDays: Int
+    public var currentStreak: Int
+}
+
+public struct ExerciseEntry: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var timestamp: String
+    public var type: String
+    public var description: String
+    public var miles: Double?
+    public var duration: Double?
+}
+
+public struct ExerciseDashboard: Codable, Hashable, Sendable {
+    public var meta: DashboardMeta
+    public var stats: ExerciseStats
+    public var entries: [ExerciseEntry]
+    public var byType: [String: Int]
+}
+
+public struct Bill: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var name: String
+    public var amount: Double
+    public var dueDay: Int
+    public var frequency: String
+    public var category: String
+    public var autoPay: Bool
+    public var nextDueDate: String
+}
+
+public struct FinanceStats: Codable, Hashable, Sendable {
+    public var monthlyTotal: Double
+    public var dueSoonCount: Int
+    public var autoPayCount: Int
+}
+
+public struct FinanceDashboard: Codable, Hashable, Sendable {
+    public var meta: DashboardMeta
+    public var stats: FinanceStats
+    public var bills: [Bill]
+    public var byCategory: [String: Double]
+    public var statusMessage: String?
+}
+
 public enum MediaType: String, Codable, CaseIterable, Sendable {
     case film = "Film"
     case tv = "TV"

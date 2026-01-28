@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Duration, NaiveDate, NaiveTime, TimeZone, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, TimeZone, Utc};
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 
@@ -1147,7 +1147,15 @@ pub async fn enrich_media_covers(
         }
         let maybe_cover = match record.item.media_type.as_str() {
             "Film" => fetch_tmdb_cover(&record.item.title, "movie", tmdb_api_key).await?,
-            "TV" | "Anime" => fetch_tmdb_cover(&record.item.title, "tv", tmdb_api_key).await?,
+            "TV" => fetch_tmdb_cover(&record.item.title, "tv", tmdb_api_key).await?,
+            "Anime" => {
+                let cover = fetch_tmdb_cover(&record.item.title, "tv", tmdb_api_key).await?;
+                if cover.is_some() {
+                    cover
+                } else {
+                    fetch_tmdb_cover(&record.item.title, "movie", tmdb_api_key).await?
+                }
+            }
             "Book" => fetch_open_library_cover(&record.item.title).await?,
             "Game" => fetch_igdb_cover(&record.item.title, igdb_client_id, &igdb_token).await?,
             "YouTube" => fetch_youtube_cover(record.youtube_id.as_deref(), record.url.as_deref()),
@@ -1438,6 +1446,13 @@ fn load_media_items(root: &Path) -> Vec<MediaRecord> {
         if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
             continue;
         }
+        let stem = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("");
+        if stem.starts_with('_') {
+            continue;
+        }
         let content = match std::fs::read_to_string(&path) {
             Ok(content) => content,
             Err(_) => continue,
@@ -1449,11 +1464,11 @@ fn load_media_items(root: &Path) -> Vec<MediaRecord> {
         let Ok(parsed) = serde_yaml::from_str::<MediaFrontmatter>(&frontmatter) else {
             continue;
         };
-        let fallback_title = path
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .unwrap_or("untitled")
-            .to_string();
+        let fallback_title = if stem.is_empty() {
+            "untitled".to_string()
+        } else {
+            stem.to_string()
+        };
         let title = parsed
             .title
             .clone()
@@ -1605,6 +1620,768 @@ fn load_youtube_ideas(root: &Path) -> Vec<YouTubeIdeaRecord> {
     ideas
 }
 
+fn load_food_library(root: &Path) -> HashMap<String, FoodNutrition> {
+    let dir = root.join("Entities").join("Food");
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(entries) => entries,
+        Err(_) => return HashMap::new(),
+    };
+
+    let mut foods = HashMap::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let content = match std::fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        let fallback_name = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .unwrap_or("food")
+            .to_string();
+
+        let (frontmatter, body) = split_frontmatter(&content);
+        let nutrition = if let Some(frontmatter) = frontmatter {
+            if let Ok(parsed) = serde_yaml::from_str::<FoodFrontmatter>(&frontmatter) {
+                if parsed.calories.is_some()
+                    || parsed.protein.is_some()
+                    || parsed.carbs.is_some()
+                    || parsed.fat.is_some()
+                {
+                    Some(FoodNutrition {
+                        name: parsed.name.clone().unwrap_or_else(|| fallback_name.clone()),
+                        calories: parsed.calories.unwrap_or(0.0),
+                        protein: parsed.protein.unwrap_or(0.0),
+                        carbs: parsed.carbs.unwrap_or(0.0),
+                        fat: parsed.fat.unwrap_or(0.0),
+                        fiber: parsed.fiber.unwrap_or(0.0),
+                        category: parsed.category,
+                    })
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+        .or_else(|| parse_food_table(&body, &fallback_name));
+
+        if let Some(nutrition) = nutrition {
+            let key = normalize_food_key(&nutrition.name);
+            foods.insert(key, nutrition.clone());
+            let stem_key = normalize_food_key(&fallback_name);
+            foods.insert(stem_key, nutrition);
+        }
+    }
+
+    foods
+}
+
+fn parse_food_table(content: &str, fallback_name: &str) -> Option<FoodNutrition> {
+    let mut calories = None;
+    let mut protein = None;
+    let mut carbs = None;
+    let mut fat = None;
+    let mut fiber = None;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with('|') {
+            continue;
+        }
+        let cells: Vec<&str> = trimmed
+            .trim_matches('|')
+            .split('|')
+            .map(|cell| cell.trim())
+            .collect();
+        if cells.len() < 2 {
+            continue;
+        }
+        match cells[0].to_lowercase().as_str() {
+            "calories" => calories = parse_f64(cells[1]),
+            "protein" => protein = parse_f64(cells[1]),
+            "carbs" | "carbohydrates" => carbs = parse_f64(cells[1]),
+            "fat" => fat = parse_f64(cells[1]),
+            "fiber" => fiber = parse_f64(cells[1]),
+            _ => {}
+        }
+    }
+
+    if calories.is_none() && protein.is_none() && carbs.is_none() && fat.is_none() {
+        return None;
+    }
+
+    Some(FoodNutrition {
+        name: fallback_name.to_string(),
+        calories: calories.unwrap_or(0.0),
+        protein: protein.unwrap_or(0.0),
+        carbs: carbs.unwrap_or(0.0),
+        fat: fat.unwrap_or(0.0),
+        fiber: fiber.unwrap_or(0.0),
+        category: None,
+    })
+}
+
+fn load_meal_entries(
+    root: &Path,
+    start_date: Option<NaiveDate>,
+    end_date: Option<NaiveDate>,
+    food_map: &HashMap<String, FoodNutrition>,
+) -> Vec<MealParseRecord> {
+    let mut meals = Vec::new();
+    let files = list_stream_files(root);
+
+    for file in files {
+        let year = match stream_year_from_path(&file) {
+            Some(value) => value,
+            None => continue,
+        };
+        let content = match std::fs::read_to_string(&file) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        let mut current_date: Option<NaiveDate> = None;
+        for line in content.lines() {
+            if let Some(date) = parse_stream_date_heading(line, year) {
+                current_date = Some(date);
+                continue;
+            }
+            let Some(date) = current_date else {
+                continue;
+            };
+            if !date_in_range(date, start_date, end_date) {
+                continue;
+            }
+            let line_text = extract_stream_line_text(line);
+            if let Some(meal) = parse_meal_entry(&line_text, date, food_map) {
+                meals.push(meal);
+            }
+        }
+    }
+
+    meals.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    meals
+}
+
+fn load_exercise_entries(
+    root: &Path,
+    start_date: Option<NaiveDate>,
+    end_date: Option<NaiveDate>,
+) -> Vec<ExerciseParseRecord> {
+    let mut entries = Vec::new();
+    let files = list_stream_files(root);
+
+    for file in files {
+        let year = match stream_year_from_path(&file) {
+            Some(value) => value,
+            None => continue,
+        };
+        let content = match std::fs::read_to_string(&file) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        let mut current_date: Option<NaiveDate> = None;
+        for line in content.lines() {
+            if let Some(date) = parse_stream_date_heading(line, year) {
+                current_date = Some(date);
+                continue;
+            }
+            let Some(date) = current_date else {
+                continue;
+            };
+            if !date_in_range(date, start_date, end_date) {
+                continue;
+            }
+            let line_text = extract_stream_line_text(line);
+            if let Some(entry) = parse_exercise_entry(&line_text, date) {
+                entries.push(entry);
+            }
+        }
+    }
+
+    entries.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+    entries
+}
+
+fn load_activity_dates(root: &Path) -> HashSet<NaiveDate> {
+    let mut dates = HashSet::new();
+    let files = list_stream_files(root);
+
+    for file in files {
+        let year = match stream_year_from_path(&file) {
+            Some(value) => value,
+            None => continue,
+        };
+        let content = match std::fs::read_to_string(&file) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        let mut current_date: Option<NaiveDate> = None;
+        for line in content.lines() {
+            if let Some(date) = parse_stream_date_heading(line, year) {
+                current_date = Some(date);
+                continue;
+            }
+            let Some(date) = current_date else {
+                continue;
+            };
+            let line_text = extract_stream_line_text(line);
+            if parse_exercise_entry(&line_text, date).is_some() {
+                dates.insert(date);
+            }
+        }
+    }
+
+    dates
+}
+
+fn build_weekly_calorie_trend(
+    meals: &[MealParseRecord],
+    end_date: NaiveDate,
+) -> Option<HashMap<String, f64>> {
+    if meals.is_empty() {
+        return None;
+    }
+    let start_date = end_date - Duration::days(6);
+    let mut totals: HashMap<NaiveDate, f64> = HashMap::new();
+    for meal in meals {
+        if meal.date < start_date || meal.date > end_date {
+            continue;
+        }
+        let entry = totals.entry(meal.date).or_insert(0.0);
+        *entry += meal.calories;
+    }
+    let mut trend = HashMap::new();
+    let mut cursor = start_date;
+    while cursor <= end_date {
+        let value = totals.get(&cursor).copied().unwrap_or(0.0);
+        trend.insert(cursor.to_string(), value);
+        cursor += Duration::days(1);
+    }
+    Some(trend)
+}
+
+fn compute_activity_streak(today: NaiveDate, dates: &HashSet<NaiveDate>) -> u32 {
+    let mut streak = 0u32;
+    let mut cursor = today;
+    loop {
+        if dates.contains(&cursor) {
+            streak += 1;
+            cursor -= Duration::days(1);
+        } else {
+            break;
+        }
+    }
+    streak
+}
+
+fn load_bill_records(bills_dir: &Path, today: NaiveDate) -> Vec<BillRecord> {
+    let entries = match std::fs::read_dir(bills_dir) {
+        Ok(entries) => entries,
+        Err(_) => return Vec::new(),
+    };
+
+    let mut records = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let content = match std::fs::read_to_string(&path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+        let (frontmatter, _) = split_frontmatter(&content);
+        let Some(frontmatter) = frontmatter else {
+            continue;
+        };
+        let Ok(parsed) = serde_yaml::from_str::<BillFrontmatter>(&frontmatter) else {
+            continue;
+        };
+
+        let name = parsed.name.clone().unwrap_or_else(|| {
+            path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("Bill")
+                .to_string()
+        });
+        let Some(amount) = parsed.amount else {
+            continue;
+        };
+        let Some(due_day) = parsed.due_day else {
+            continue;
+        };
+        let frequency = normalize_frequency(parsed.frequency.as_deref());
+        let category = parsed
+            .category
+            .unwrap_or_else(|| "uncategorized".to_string());
+        let auto_pay = parsed.auto_pay.unwrap_or(false);
+        let due_date = compute_next_due_date(today, due_day, &frequency);
+        let bill = Bill {
+            id: path
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .unwrap_or(&name)
+                .to_string(),
+            name,
+            amount,
+            due_day,
+            frequency: frequency.clone(),
+            category,
+            auto_pay,
+            next_due_date: due_date.to_string(),
+        };
+        let monthly_equivalent = monthly_equivalent_amount(amount, &frequency);
+        records.push(BillRecord {
+            bill,
+            monthly_equivalent,
+            due_date,
+        });
+    }
+
+    records
+}
+
+fn list_stream_files(root: &Path) -> Vec<PathBuf> {
+    let dir = root.join("Stream");
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(entries) => entries,
+        Err(_) => return Vec::new(),
+    };
+    let mut files: Vec<PathBuf> = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("md"))
+        .collect();
+    files.sort();
+    files
+}
+
+fn stream_year_from_path(path: &Path) -> Option<i32> {
+    let stem = path.file_stem()?.to_str()?;
+    let mut parts = stem.split('-');
+    let year = parts.next()?.parse::<i32>().ok()?;
+    Some(year)
+}
+
+fn parse_stream_date_heading(line: &str, year: i32) -> Option<NaiveDate> {
+    let trimmed = line.trim();
+    if !trimmed.starts_with("## ") {
+        return None;
+    }
+    let parts: Vec<&str> = trimmed
+        .trim_start_matches("## ")
+        .split_whitespace()
+        .collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    let month = match parts[1].to_lowercase().as_str() {
+        "jan" => 1,
+        "feb" => 2,
+        "mar" => 3,
+        "apr" => 4,
+        "may" => 5,
+        "jun" => 6,
+        "jul" => 7,
+        "aug" => 8,
+        "sep" | "sept" => 9,
+        "oct" => 10,
+        "nov" => 11,
+        "dec" => 12,
+        _ => return None,
+    };
+    let day_raw = parts[2].trim_matches(|c: char| !c.is_ascii_digit());
+    let day = day_raw.parse::<u32>().ok()?;
+    NaiveDate::from_ymd_opt(year, month, day)
+}
+
+fn extract_stream_line_text(line: &str) -> String {
+    let trimmed = line.trim();
+    if trimmed.starts_with('|') {
+        let cells: Vec<&str> = trimmed.split('|').map(|cell| cell.trim()).collect();
+        if cells.len() >= 3 {
+            return cells[2].to_string();
+        }
+    }
+    trimmed.to_string()
+}
+
+fn date_in_range(
+    date: NaiveDate,
+    start_date: Option<NaiveDate>,
+    end_date: Option<NaiveDate>,
+) -> bool {
+    let after_start = start_date.map(|start| date >= start).unwrap_or(true);
+    let before_end = end_date.map(|end| date <= end).unwrap_or(true);
+    after_start && before_end
+}
+
+fn parse_meal_entry(
+    content: &str,
+    date: NaiveDate,
+    food_map: &HashMap<String, FoodNutrition>,
+) -> Option<MealParseRecord> {
+    let emoji = "🍽️";
+    let idx = content.find(emoji)?;
+    let (prefix, suffix) = content.split_at(idx);
+    let suffix = suffix.trim_start_matches(emoji);
+    let time = extract_time_from_text(prefix).or_else(|| extract_time_from_text(suffix));
+    let description = clean_stream_description(suffix);
+    if description.is_empty() {
+        return None;
+    }
+    let meal_type = detect_meal_type(&description);
+    let foods = extract_food_links(&description, food_map);
+
+    let (calories, protein, carbs, fat, fiber) = foods
+        .iter()
+        .filter_map(|link| food_name_from_link(link))
+        .filter_map(|name| food_map.get(&normalize_food_key(name)))
+        .fold((0.0, 0.0, 0.0, 0.0, 0.0), |mut acc, food| {
+            acc.0 += food.calories;
+            acc.1 += food.protein;
+            acc.2 += food.carbs;
+            acc.3 += food.fat;
+            acc.4 += food.fiber;
+            acc
+        });
+
+    let estimated_calories = if calories > 0.0 { Some(calories) } else { None };
+    Some(MealParseRecord {
+        date,
+        timestamp: format_timestamp(date, time),
+        description,
+        meal_type,
+        foods,
+        estimated_calories,
+        calories,
+        protein,
+        carbs,
+        fat,
+        fiber,
+    })
+}
+
+fn parse_exercise_entry(content: &str, date: NaiveDate) -> Option<ExerciseParseRecord> {
+    let emoji = if content.contains('🚶') {
+        "🚶"
+    } else if content.contains("🏋️") {
+        "🏋️"
+    } else if content.contains('🏃') {
+        "🏃"
+    } else if content.contains('🚴') {
+        "🚴"
+    } else {
+        return None;
+    };
+    let idx = content.find(emoji)?;
+    let (prefix, suffix) = content.split_at(idx);
+    let suffix = suffix.trim_start_matches(emoji);
+    let time = extract_time_from_text(prefix).or_else(|| extract_time_from_text(suffix));
+    let mut description = clean_stream_description(suffix);
+    if description.is_empty() {
+        description = content.to_string();
+    }
+    let mut entry_type = if emoji == "🚶" {
+        "walk".to_string()
+    } else if emoji == "🏃" || emoji == "🚴" {
+        "cardio".to_string()
+    } else {
+        "strength".to_string()
+    };
+    if entry_type == "strength" {
+        let lower = description.to_lowercase();
+        if lower.contains("run") || lower.contains("cardio") {
+            entry_type = "cardio".to_string();
+        }
+    }
+
+    let miles = extract_miles(&description);
+    let duration = extract_duration_minutes(&description);
+
+    Some(ExerciseParseRecord {
+        date,
+        timestamp: format_timestamp(date, time),
+        description,
+        entry_type,
+        miles,
+        duration,
+    })
+}
+
+fn extract_food_links(description: &str, food_map: &HashMap<String, FoodNutrition>) -> Vec<String> {
+    let mut links = Vec::new();
+    let mut search_start = 0;
+    while let Some(start) = description[search_start..].find("[[Food/") {
+        let link_start = search_start + start;
+        let after = link_start + "[[Food/".len();
+        if let Some(end) = description[after..].find("]]") {
+            let name = &description[after..after + end];
+            links.push(format!("[[Food/{}]]", name.trim()));
+            search_start = after + end + 2;
+        } else {
+            break;
+        }
+    }
+    if !links.is_empty() {
+        return links;
+    }
+
+    let mut raw = description;
+    if let Some(idx) = description.find(':') {
+        raw = &description[(idx + 1)..];
+    }
+    let raw = raw.replace(" and ", ",");
+    for token in raw.split(',') {
+        let cleaned = token.trim();
+        if cleaned.is_empty() {
+            continue;
+        }
+        let key = normalize_food_key(cleaned);
+        if let Some(food) = food_map.get(&key) {
+            links.push(format!("[[Food/{}]]", food.name));
+        }
+    }
+    links
+}
+
+fn food_name_from_link(link: &str) -> Option<&str> {
+    if let Some(stripped) = link.strip_prefix("[[Food/") {
+        return stripped.strip_suffix("]]");
+    }
+    None
+}
+
+fn detect_meal_type(description: &str) -> String {
+    let lower = description.to_lowercase();
+    if lower.contains("breakfast") {
+        "breakfast"
+    } else if lower.contains("lunch") {
+        "lunch"
+    } else if lower.contains("dinner") {
+        "dinner"
+    } else if lower.contains("snack") {
+        "snack"
+    } else {
+        "snack"
+    }
+    .to_string()
+}
+
+fn clean_stream_description(text: &str) -> String {
+    let mut cleaned = text.split('📝').next().unwrap_or(text).trim().to_string();
+    cleaned = cleaned.trim_matches('|').trim().to_string();
+    cleaned = cleaned
+        .trim_start_matches(|c: char| c == '-' || c == '—' || c == '–' || c == ':')
+        .trim()
+        .to_string();
+    cleaned
+}
+
+fn normalize_food_key(value: &str) -> String {
+    value
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect::<String>()
+}
+
+fn extract_time_from_text(text: &str) -> Option<NaiveTime> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i].is_ascii_digit() {
+            let start = i;
+            while i < chars.len() && chars[i].is_ascii_digit() {
+                i += 1;
+            }
+            if i < chars.len() && chars[i] == ':' {
+                let hour_str: String = chars[start..i].iter().collect();
+                i += 1;
+                let minute_start = i;
+                while i < chars.len() && chars[i].is_ascii_digit() {
+                    i += 1;
+                }
+                let minute_str: String = chars[minute_start..i].iter().collect();
+                if minute_str.len() != 2 {
+                    continue;
+                }
+                let mut hour: u32 = hour_str.parse().ok()?;
+                let minute: u32 = minute_str.parse().ok()?;
+
+                let mut suffix = None;
+                let mut j = i;
+                while j < chars.len() && chars[j].is_whitespace() {
+                    j += 1;
+                }
+                if j + 1 < chars.len() {
+                    let candidate: String = vec![chars[j], chars[j + 1]]
+                        .into_iter()
+                        .collect::<String>()
+                        .to_lowercase();
+                    if candidate == "am" || candidate == "pm" {
+                        suffix = Some(candidate);
+                    }
+                }
+
+                if let Some(meridian) = suffix {
+                    if meridian == "pm" && hour < 12 {
+                        hour += 12;
+                    }
+                    if meridian == "am" && hour == 12 {
+                        hour = 0;
+                    }
+                }
+                return NaiveTime::from_hms_opt(hour, minute, 0);
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
+fn format_timestamp(date: NaiveDate, time: Option<NaiveTime>) -> String {
+    if let Some(time) = time {
+        return date.and_time(time).format("%Y-%m-%dT%H:%M:%S").to_string();
+    }
+    date.to_string()
+}
+
+fn extract_miles(description: &str) -> Option<f64> {
+    let tokens: Vec<&str> = description.split_whitespace().collect();
+    for (idx, token) in tokens.iter().enumerate() {
+        let lower = token.to_lowercase();
+        if lower.contains("mi") {
+            if let Some(value) = parse_f64(token) {
+                return Some(value);
+            }
+        }
+        if idx + 1 < tokens.len() {
+            let next = tokens[idx + 1].to_lowercase();
+            if next.starts_with("mi") || next.starts_with("mile") {
+                if let Some(value) = parse_f64(token) {
+                    return Some(value);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn extract_duration_minutes(description: &str) -> Option<f64> {
+    let tokens: Vec<&str> = description.split_whitespace().collect();
+    for (idx, token) in tokens.iter().enumerate() {
+        let lower = token.to_lowercase();
+        if lower.contains("min") {
+            if let Some(value) = parse_f64(token) {
+                return Some(value);
+            }
+        }
+        if idx + 1 < tokens.len() {
+            let next = tokens[idx + 1].to_lowercase();
+            if next.starts_with("min") {
+                if let Some(value) = parse_f64(token) {
+                    return Some(value);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn normalize_frequency(value: Option<&str>) -> String {
+    match value.unwrap_or("monthly").trim().to_lowercase().as_str() {
+        "weekly" => "weekly".to_string(),
+        "annual" | "yearly" => "annual".to_string(),
+        _ => "monthly".to_string(),
+    }
+}
+
+fn monthly_equivalent_amount(amount: f64, frequency: &str) -> f64 {
+    match frequency {
+        "weekly" => amount * 4.0,
+        "annual" => amount / 12.0,
+        _ => amount,
+    }
+}
+
+fn compute_next_due_date(today: NaiveDate, due_day: u32, frequency: &str) -> NaiveDate {
+    match frequency {
+        "weekly" => next_weekday_date(today, due_day),
+        "annual" => {
+            let mut year = today.year();
+            let month = today.month();
+            let mut date = safe_date(year, month, due_day);
+            if date < today {
+                year += 1;
+                date = safe_date(year, month, due_day);
+            }
+            date
+        }
+        _ => {
+            let mut year = today.year();
+            let mut month = today.month();
+            let mut date = safe_date(year, month, due_day);
+            if date < today {
+                if month == 12 {
+                    year += 1;
+                    month = 1;
+                } else {
+                    month += 1;
+                }
+                date = safe_date(year, month, due_day);
+            }
+            date
+        }
+    }
+}
+
+fn safe_date(year: i32, month: u32, due_day: u32) -> NaiveDate {
+    let last_day = last_day_of_month(year, month);
+    let day = due_day.min(last_day);
+    NaiveDate::from_ymd_opt(year, month, day)
+        .unwrap_or_else(|| NaiveDate::from_ymd_opt(year, month, last_day).unwrap())
+}
+
+fn last_day_of_month(year: i32, month: u32) -> u32 {
+    let (next_year, next_month) = if month == 12 {
+        (year + 1, 1)
+    } else {
+        (year, month + 1)
+    };
+    let first_next = NaiveDate::from_ymd_opt(next_year, next_month, 1)
+        .unwrap_or_else(|| NaiveDate::from_ymd_opt(year, month, 28).unwrap());
+    (first_next - Duration::days(1)).day()
+}
+
+fn next_weekday_date(today: NaiveDate, due_day: u32) -> NaiveDate {
+    use chrono::Weekday;
+    let target = match due_day {
+        1 => Weekday::Mon,
+        2 => Weekday::Tue,
+        3 => Weekday::Wed,
+        4 => Weekday::Thu,
+        5 => Weekday::Fri,
+        6 => Weekday::Sat,
+        7 => Weekday::Sun,
+        _ => return today + Duration::days(7),
+    };
+    let mut date = today;
+    for _ in 0..7 {
+        if date.weekday() == target {
+            break;
+        }
+        date += Duration::days(1);
+    }
+    date
+}
+
 fn build_timestamp(date: NaiveDate, time_value: &str) -> String {
     if let Ok(time) = NaiveTime::parse_from_str(time_value, "%H:%M") {
         let dt = date.and_time(time);
@@ -1700,6 +2477,123 @@ fn normalize_youtube_stage(value: Option<&str>) -> String {
     .to_string()
 }
 
+fn title_variants(title: &str) -> Vec<String> {
+    let mut variants = Vec::new();
+    let base = collapse_whitespace(title);
+    push_variant(&mut variants, base.clone());
+
+    let no_parens = strip_parenthetical(&base);
+    push_variant(&mut variants, no_parens.clone());
+
+    let no_season = strip_season_suffix(&base);
+    push_variant(&mut variants, no_season.clone());
+
+    let no_parens_no_season = strip_season_suffix(&no_parens);
+    push_variant(&mut variants, no_parens_no_season.clone());
+
+    let no_colon = base.replace(':', "");
+    push_variant(&mut variants, no_colon);
+    let no_colon_space = base.replace(':', " ");
+    push_variant(&mut variants, no_colon_space);
+    let no_parens_colon = no_parens.replace(':', " ");
+    push_variant(&mut variants, no_parens_colon);
+
+    let no_trailing_series = strip_trailing_series_number(&no_parens_no_season);
+    push_variant(&mut variants, no_trailing_series);
+
+    variants
+}
+
+fn game_title_variants(title: &str) -> Vec<String> {
+    let mut variants = title_variants(title);
+    let trimmed = title.trim();
+    let upper = trimmed.to_uppercase();
+    if upper.starts_with("MGS ") {
+        let rest = trimmed[3..].trim();
+        push_variant(&mut variants, format!("Metal Gear Solid {}", rest.trim()));
+    }
+    variants
+}
+
+fn push_variant(variants: &mut Vec<String>, value: String) {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return;
+    }
+    if variants
+        .iter()
+        .any(|existing| existing.eq_ignore_ascii_case(trimmed))
+    {
+        return;
+    }
+    variants.push(trimmed.to_string());
+}
+
+fn collapse_whitespace(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn strip_parenthetical(value: &str) -> String {
+    let mut result = String::new();
+    let mut depth = 0u32;
+    for ch in value.chars() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                if depth > 0 {
+                    depth -= 1;
+                }
+            }
+            _ => {
+                if depth == 0 {
+                    result.push(ch);
+                }
+            }
+        }
+    }
+    collapse_whitespace(&result)
+}
+
+fn strip_season_suffix(value: &str) -> String {
+    let trimmed = value.trim();
+    let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+    if tokens.len() < 2 {
+        return trimmed.to_string();
+    }
+    let last = tokens.last().unwrap().to_lowercase();
+    let second_last = tokens[tokens.len() - 2].to_lowercase();
+    let is_season_token =
+        last.starts_with('s') && last.chars().skip(1).all(|c| c.is_ascii_digit() || c == '-');
+    if is_season_token {
+        return tokens[..tokens.len() - 1].join(" ");
+    }
+    if second_last == "season" && last.chars().all(|c| c.is_ascii_digit() || c == '-') {
+        return tokens[..tokens.len() - 2].join(" ");
+    }
+    trimmed.to_string()
+}
+
+fn strip_trailing_series_number(value: &str) -> String {
+    let trimmed = value.trim();
+    let tokens: Vec<&str> = trimmed.split_whitespace().collect();
+    if tokens.len() < 2 {
+        return trimmed.to_string();
+    }
+    let last = tokens.last().unwrap();
+    if last.chars().all(|c| c.is_ascii_digit()) || is_roman_numeral(last) {
+        return tokens[..tokens.len() - 1].join(" ");
+    }
+    trimmed.to_string()
+}
+
+fn is_roman_numeral(token: &str) -> bool {
+    let upper = token.to_uppercase();
+    !upper.is_empty()
+        && upper
+            .chars()
+            .all(|c| matches!(c, 'I' | 'V' | 'X' | 'L' | 'C' | 'D' | 'M'))
+}
+
 async fn fetch_tmdb_cover(
     title: &str,
     media_type: &str,
@@ -1712,51 +2606,56 @@ async fn fetch_tmdb_cover(
         return Ok(None);
     }
     let base = format!("https://api.themoviedb.org/3/search/{media_type}");
-    let mut url = Url::parse(&base).map_err(|err| err.to_string())?;
-    url.query_pairs_mut()
-        .append_pair("api_key", api_key)
-        .append_pair("query", title)
-        .append_pair("include_adult", "false");
-    let resp = Client::new()
-        .get(url)
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
-    if !resp.status().is_success() {
-        return Ok(None);
-    }
-    let payload: TmdbSearchResponse = resp.json().await.map_err(|err| err.to_string())?;
-    if let Some(result) = payload
-        .results
-        .into_iter()
-        .find(|result| result.poster_path.is_some())
-    {
-        let poster_path = result.poster_path.unwrap();
-        let cover_url = format!("https://image.tmdb.org/t/p/w500{poster_path}");
-        return Ok(Some((cover_url, "tmdb".to_string())));
+    for variant in title_variants(title) {
+        let mut url = Url::parse(&base).map_err(|err| err.to_string())?;
+        url.query_pairs_mut()
+            .append_pair("api_key", api_key)
+            .append_pair("query", &variant)
+            .append_pair("include_adult", "false");
+        let resp = Client::new()
+            .get(url)
+            .send()
+            .await
+            .map_err(|err| err.to_string())?;
+        if !resp.status().is_success() {
+            continue;
+        }
+        let payload: TmdbSearchResponse = resp.json().await.map_err(|err| err.to_string())?;
+        if let Some(result) = payload
+            .results
+            .into_iter()
+            .find(|result| result.poster_path.is_some())
+        {
+            let poster_path = result.poster_path.unwrap();
+            let cover_url = format!("https://image.tmdb.org/t/p/w500{poster_path}");
+            return Ok(Some((cover_url, "tmdb".to_string())));
+        }
     }
     Ok(None)
 }
 
 async fn fetch_open_library_cover(title: &str) -> Result<Option<(String, String)>, String> {
-    let mut url =
-        Url::parse("https://openlibrary.org/search.json").map_err(|err| err.to_string())?;
-    url.query_pairs_mut()
-        .append_pair("title", title)
-        .append_pair("limit", "1");
-    let resp = Client::new()
-        .get(url)
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
-    if !resp.status().is_success() {
-        return Ok(None);
-    }
-    let payload: OpenLibrarySearchResponse = resp.json().await.map_err(|err| err.to_string())?;
-    if let Some(doc) = payload.docs.into_iter().find(|doc| doc.cover_i.is_some()) {
-        let cover_id = doc.cover_i.unwrap();
-        let cover_url = format!("https://covers.openlibrary.org/b/id/{cover_id}-M.jpg");
-        return Ok(Some((cover_url, "openlibrary".to_string())));
+    for variant in title_variants(title) {
+        let mut url =
+            Url::parse("https://openlibrary.org/search.json").map_err(|err| err.to_string())?;
+        url.query_pairs_mut()
+            .append_pair("title", &variant)
+            .append_pair("limit", "1");
+        let resp = Client::new()
+            .get(url)
+            .send()
+            .await
+            .map_err(|err| err.to_string())?;
+        if !resp.status().is_success() {
+            continue;
+        }
+        let payload: OpenLibrarySearchResponse =
+            resp.json().await.map_err(|err| err.to_string())?;
+        if let Some(doc) = payload.docs.into_iter().find(|doc| doc.cover_i.is_some()) {
+            let cover_id = doc.cover_i.unwrap();
+            let cover_url = format!("https://covers.openlibrary.org/b/id/{cover_id}-M.jpg");
+            return Ok(Some((cover_url, "openlibrary".to_string())));
+        }
     }
     Ok(None)
 }
@@ -1789,29 +2688,31 @@ async fn fetch_igdb_cover(
     if client_id.trim().is_empty() || access_token.trim().is_empty() {
         return Ok(None);
     }
-    let body = format!(
-        "search \"{}\"; fields cover.image_id; limit 1;",
-        title.replace('\"', "")
-    );
-    let resp = Client::new()
-        .post("https://api.igdb.com/v4/games")
-        .header("Client-ID", client_id)
-        .header("Authorization", format!("Bearer {access_token}"))
-        .body(body)
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
-    if !resp.status().is_success() {
-        return Ok(None);
-    }
-    let results: Vec<IgdbGameResult> = resp.json().await.map_err(|err| err.to_string())?;
-    if let Some(result) = results.into_iter().find(|item| item.cover.is_some()) {
-        let cover = result.cover.unwrap();
-        let cover_url = format!(
-            "https://images.igdb.com/igdb/image/upload/t_cover_big/{}.jpg",
-            cover.image_id
+    for variant in game_title_variants(title) {
+        let body = format!(
+            "search \"{}\"; fields cover.image_id; limit 1;",
+            variant.replace('\"', "")
         );
-        return Ok(Some((cover_url, "igdb".to_string())));
+        let resp = Client::new()
+            .post("https://api.igdb.com/v4/games")
+            .header("Client-ID", client_id)
+            .header("Authorization", format!("Bearer {access_token}"))
+            .body(body)
+            .send()
+            .await
+            .map_err(|err| err.to_string())?;
+        if !resp.status().is_success() {
+            continue;
+        }
+        let results: Vec<IgdbGameResult> = resp.json().await.map_err(|err| err.to_string())?;
+        if let Some(result) = results.into_iter().find(|item| item.cover.is_some()) {
+            let cover = result.cover.unwrap();
+            let cover_url = format!(
+                "https://images.igdb.com/igdb/image/upload/t_cover_big/{}.jpg",
+                cover.image_id
+            );
+            return Ok(Some((cover_url, "igdb".to_string())));
+        }
     }
     Ok(None)
 }

@@ -187,6 +187,28 @@ public struct CodexMonitorAPI: Sendable {
         )
     }
 
+    public func getNutritionDashboard(workspaceId: String, range: String) async throws -> NutritionDashboard {
+        return try await call(
+            "get_nutrition_dashboard",
+            params: .object([
+                "workspaceId": .string(workspaceId),
+                "range": .string(range),
+            ]),
+            as: NutritionDashboard.self
+        )
+    }
+
+    public func getExerciseDashboard(workspaceId: String, range: String) async throws -> ExerciseDashboard {
+        return try await call(
+            "get_exercise_dashboard",
+            params: .object([
+                "workspaceId": .string(workspaceId),
+                "range": .string(range),
+            ]),
+            as: ExerciseDashboard.self
+        )
+    }
+
     public func getMediaDashboard(workspaceId: String) async throws -> MediaLibrary {
         return try await call(
             "get_media_dashboard",
@@ -204,6 +226,17 @@ public struct CodexMonitorAPI: Sendable {
                 "workspaceId": .string(workspaceId),
             ]),
             as: YouTubeLibrary.self
+        )
+    }
+
+    public func getFinanceDashboard(workspaceId: String, range: String) async throws -> FinanceDashboard {
+        return try await call(
+            "get_finance_dashboard",
+            params: .object([
+                "workspaceId": .string(workspaceId),
+                "range": .string(range),
+            ]),
+            as: FinanceDashboard.self
         )
     }
 

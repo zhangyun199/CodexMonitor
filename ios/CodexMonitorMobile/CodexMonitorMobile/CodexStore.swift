@@ -68,8 +68,11 @@ final class CodexStore: ObservableObject {
     @Published var lifeActiveDomain: LifeDomain? = nil
     @Published var lifeTimeRange: LifeTimeRange = .today
     @Published var deliveryDashboard: DeliveryDashboard?
+    @Published var nutritionDashboard: NutritionDashboard?
+    @Published var exerciseDashboard: ExerciseDashboard?
     @Published var mediaLibrary: MediaLibrary?
     @Published var youtubeLibrary: YouTubeLibrary?
+    @Published var financeDashboard: FinanceDashboard?
     @Published var dashboardLoading: Bool = false
     @Published var dashboardError: String? = nil
     @Published var debugEntries: [DebugEntry] = []
@@ -251,6 +254,32 @@ final class CodexStore: ObservableObject {
         dashboardLoading = false
     }
 
+    func fetchNutritionDashboard(range: LifeTimeRange) async {
+        guard let workspaceId = activeWorkspaceId else { return }
+        dashboardLoading = true
+        dashboardError = nil
+        do {
+            let dashboard = try await api.getNutritionDashboard(workspaceId: workspaceId, range: range.rawValue)
+            nutritionDashboard = dashboard
+        } catch {
+            dashboardError = error.localizedDescription
+        }
+        dashboardLoading = false
+    }
+
+    func fetchExerciseDashboard(range: LifeTimeRange) async {
+        guard let workspaceId = activeWorkspaceId else { return }
+        dashboardLoading = true
+        dashboardError = nil
+        do {
+            let dashboard = try await api.getExerciseDashboard(workspaceId: workspaceId, range: range.rawValue)
+            exerciseDashboard = dashboard
+        } catch {
+            dashboardError = error.localizedDescription
+        }
+        dashboardLoading = false
+    }
+
     func fetchMediaLibrary() async {
         guard let workspaceId = activeWorkspaceId else { return }
         dashboardLoading = true
@@ -271,6 +300,19 @@ final class CodexStore: ObservableObject {
         do {
             let library = try await api.getYouTubeDashboard(workspaceId: workspaceId)
             youtubeLibrary = library
+        } catch {
+            dashboardError = error.localizedDescription
+        }
+        dashboardLoading = false
+    }
+
+    func fetchFinanceDashboard(range: LifeTimeRange) async {
+        guard let workspaceId = activeWorkspaceId else { return }
+        dashboardLoading = true
+        dashboardError = nil
+        do {
+            let dashboard = try await api.getFinanceDashboard(workspaceId: workspaceId, range: range.rawValue)
+            financeDashboard = dashboard
         } catch {
             dashboardError = error.localizedDescription
         }

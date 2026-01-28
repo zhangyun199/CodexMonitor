@@ -1,11 +1,12 @@
-use serde_json::{json, Value};
+use serde_json::json;
 use tauri::{AppHandle, State};
 
 pub(crate) use crate::life_core::{
-    build_delivery_dashboard, build_life_workspace_prompt, build_media_library,
-    build_youtube_library, enrich_media_covers as enrich_media_covers_inner,
-    is_life_workspace, life_debug_enabled, DeliveryDashboard, MediaCoverSummary, MediaLibrary,
-    YouTubeLibrary,
+    build_delivery_dashboard, build_exercise_dashboard, build_finance_dashboard,
+    build_life_workspace_prompt, build_media_library, build_nutrition_dashboard,
+    build_youtube_library, enrich_media_covers as enrich_media_covers_inner, is_life_workspace,
+    life_debug_enabled, DeliveryDashboard, ExerciseDashboard, FinanceDashboard, MediaCoverSummary,
+    MediaLibrary, NutritionDashboard, YouTubeLibrary,
 };
 use crate::remote_backend;
 use crate::state::AppState;
@@ -71,17 +72,21 @@ pub(crate) async fn get_nutrition_dashboard(
     range: String,
     state: State<'_, AppState>,
     app: AppHandle,
-) -> Result<Value, String> {
+) -> Result<NutritionDashboard, String> {
     if remote_backend::is_remote_mode(&*state).await {
-        return remote_backend::call_remote(
+        let response = remote_backend::call_remote(
             &*state,
             app,
             "get_nutrition_dashboard",
             json!({ "workspaceId": workspace_id, "range": range }),
         )
-        .await;
+        .await?;
+        return serde_json::from_value(response).map_err(|err| err.to_string());
     }
-    Ok(json!({}))
+    let workspaces = state.workspaces.lock().await;
+    let entry = workspaces.get(&workspace_id).ok_or("workspace not found")?;
+
+    build_nutrition_dashboard(&entry.path, entry.settings.obsidian_root.as_deref(), &range).await
 }
 
 #[tauri::command]
@@ -90,17 +95,21 @@ pub(crate) async fn get_exercise_dashboard(
     range: String,
     state: State<'_, AppState>,
     app: AppHandle,
-) -> Result<Value, String> {
+) -> Result<ExerciseDashboard, String> {
     if remote_backend::is_remote_mode(&*state).await {
-        return remote_backend::call_remote(
+        let response = remote_backend::call_remote(
             &*state,
             app,
             "get_exercise_dashboard",
             json!({ "workspaceId": workspace_id, "range": range }),
         )
-        .await;
+        .await?;
+        return serde_json::from_value(response).map_err(|err| err.to_string());
     }
-    Ok(json!({}))
+    let workspaces = state.workspaces.lock().await;
+    let entry = workspaces.get(&workspace_id).ok_or("workspace not found")?;
+
+    build_exercise_dashboard(&entry.path, entry.settings.obsidian_root.as_deref(), &range).await
 }
 
 #[tauri::command]
@@ -194,15 +203,19 @@ pub(crate) async fn get_finance_dashboard(
     range: String,
     state: State<'_, AppState>,
     app: AppHandle,
-) -> Result<Value, String> {
+) -> Result<FinanceDashboard, String> {
     if remote_backend::is_remote_mode(&*state).await {
-        return remote_backend::call_remote(
+        let response = remote_backend::call_remote(
             &*state,
             app,
             "get_finance_dashboard",
             json!({ "workspaceId": workspace_id, "range": range }),
         )
-        .await;
+        .await?;
+        return serde_json::from_value(response).map_err(|err| err.to_string());
     }
-    Ok(json!({}))
+    let workspaces = state.workspaces.lock().await;
+    let entry = workspaces.get(&workspace_id).ok_or("workspace not found")?;
+
+    build_finance_dashboard(&entry.path, entry.settings.obsidian_root.as_deref(), &range).await
 }

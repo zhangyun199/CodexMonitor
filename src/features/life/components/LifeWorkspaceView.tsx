@@ -1,7 +1,10 @@
 import type { ReactNode } from "react";
 import type { LifeDomain, LifeTimeRange } from "../types";
 import { DeliveryDashboard } from "./domains/DeliveryDashboard";
+import { ExerciseDashboard } from "./domains/ExerciseDashboard";
+import { FinanceDashboard } from "./domains/FinanceDashboard";
 import { MediaDashboard } from "./domains/MediaDashboard";
+import { NutritionDashboard } from "./domains/NutritionDashboard";
 import { YouTubeDashboard } from "./domains/YouTubeDashboard";
 
 type LifeWorkspaceViewProps = {
@@ -38,10 +41,28 @@ export function LifeWorkspaceView({
           range={timeRange}
           onRangeChange={onTimeRangeChange}
         />
+      ) : activeDomain === "nutrition" ? (
+        <NutritionDashboard
+          workspaceId={workspaceId}
+          range={timeRange}
+          onRangeChange={onTimeRangeChange}
+        />
+      ) : activeDomain === "exercise" ? (
+        <ExerciseDashboard
+          workspaceId={workspaceId}
+          range={timeRange}
+          onRangeChange={onTimeRangeChange}
+        />
       ) : activeDomain === "media" ? (
         <MediaDashboard workspaceId={workspaceId} />
       ) : activeDomain === "youtube" ? (
         <YouTubeDashboard workspaceId={workspaceId} />
+      ) : activeDomain === "finance" ? (
+        <FinanceDashboard
+          workspaceId={workspaceId}
+          range={timeRange}
+          onRangeChange={onTimeRangeChange}
+        />
       ) : (
         <div className="life-dashboard-status">Dashboard coming soon.</div>
       )}

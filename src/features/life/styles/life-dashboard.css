@@ -198,6 +198,51 @@
   color: #fca5a5;
 }
 
+.life-status-warning {
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fcd34d;
+  white-space: pre-wrap;
+}
+
+.life-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.life-list-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.life-list-title {
+  font-weight: 600;
+}
+
+.life-list-meta {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.life-trend-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.life-trend-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.85rem;
+}
+
 .media-filter-bar {
   display: flex;
   flex-direction: column;

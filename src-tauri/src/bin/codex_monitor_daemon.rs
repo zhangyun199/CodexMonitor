@@ -1093,23 +1093,38 @@ impl DaemonState {
         serde_json::to_value(dashboard).map_err(|err| err.to_string())
     }
 
-    async fn get_youtube_dashboard(
-        &self,
-        workspace_id: String,
-        range: String,
-    ) -> Result<Value, String> {
+    async fn get_youtube_dashboard(&self, workspace_id: String) -> Result<Value, String> {
         let workspaces = self.workspaces.lock().await;
         let entry = workspaces
             .get(&workspace_id)
             .cloned()
             .ok_or("workspace not found")?;
-        let dashboard = life::build_youtube_dashboard(
+        let dashboard =
+            life::build_youtube_library(&entry.path, entry.settings.obsidian_root.as_deref())
+                .await?;
+        serde_json::to_value(dashboard).map_err(|err| err.to_string())
+    }
+
+    async fn enrich_media_covers(&self, workspace_id: String) -> Result<Value, String> {
+        let workspaces = self.workspaces.lock().await;
+        let entry = workspaces
+            .get(&workspace_id)
+            .cloned()
+            .ok_or("workspace not found")?;
+        let settings = self.app_settings.lock().await;
+        let tmdb_key = resolve_api_key(settings.tmdb_api_key.as_str(), "TMDB_API_KEY");
+        let igdb_client_id = resolve_api_key(settings.igdb_client_id.as_str(), "IGDB_CLIENT_ID");
+        let igdb_client_secret =
+            resolve_api_key(settings.igdb_client_secret.as_str(), "IGDB_CLIENT_SECRET");
+        let summary = life::enrich_media_covers(
             &entry.path,
             entry.settings.obsidian_root.as_deref(),
-            &range,
+            tmdb_key.as_deref(),
+            igdb_client_id.as_deref(),
+            igdb_client_secret.as_deref(),
         )
         .await?;
-        serde_json::to_value(dashboard).map_err(|err| err.to_string())
+        serde_json::to_value(summary).map_err(|err| err.to_string())
     }
 
     async fn get_finance_dashboard(
@@ -4402,6 +4417,13 @@ fn parse_string(value: &Value, key: &str) -> Result<String, String> {
     }
 }
 
+fn resolve_api_key(value: &str, env_key: &str) -> Option<String> {
+    if !value.trim().is_empty() {
+        return Some(value.to_string());
+    }
+    std::env::var(env_key).ok().filter(|v| !v.trim().is_empty())
+}
+
 fn parse_optional_string(value: &Value, key: &str) -> Option<String> {
     match value {
         Value::Object(map) => map
@@ -4842,8 +4864,11 @@ async fn handle_rpc_request(
         }
         "get_youtube_dashboard" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
-            let range = parse_string(&params, "range")?;
-            state.get_youtube_dashboard(workspace_id, range).await
+            state.get_youtube_dashboard(workspace_id).await
+        }
+        "enrich_media_covers" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            state.enrich_media_covers(workspace_id).await
         }
         "get_finance_dashboard" => {
             let workspace_id = parse_string(&params, "workspaceId")?;

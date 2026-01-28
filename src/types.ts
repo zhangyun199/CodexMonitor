@@ -143,6 +143,9 @@ export type AppSettings = {
   supabase_url?: string;
   supabase_anon_key?: string;
   minimax_api_key?: string;
+  tmdb_api_key?: string;
+  igdb_client_id?: string;
+  igdb_client_secret?: string;
   memory_embedding_enabled?: boolean;
   autoMemory: AutoMemorySettings;
   composerEditorPreset: ComposerEditorPreset;

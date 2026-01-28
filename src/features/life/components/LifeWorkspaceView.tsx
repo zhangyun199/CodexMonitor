@@ -41,11 +41,7 @@ export function LifeWorkspaceView({
       ) : activeDomain === "media" ? (
         <MediaDashboard workspaceId={workspaceId} />
       ) : activeDomain === "youtube" ? (
-        <YouTubeDashboard
-          workspaceId={workspaceId}
-          range={timeRange}
-          onRangeChange={onTimeRangeChange}
-        />
+        <YouTubeDashboard workspaceId={workspaceId} />
       ) : (
         <div className="life-dashboard-status">Dashboard coming soon.</div>
       )}

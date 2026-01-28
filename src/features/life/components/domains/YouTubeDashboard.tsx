@@ -1,59 +1,58 @@
-import type { LifeTimeRange, PipelineStage } from "../../types";
-import { useYouTubeDashboard } from "../../hooks/useYouTubeDashboard";
-import { StatCard } from "../shared/StatCard";
-import { TimeRangeSelector } from "../shared/TimeRangeSelector";
+import { useMemo } from "react";
+import type { YouTubeFilterState, YouTubeIdea, YouTubeTier } from "../../types";
+import { useYouTubeLibrary } from "../../hooks/useYouTubeLibrary";
+import { YouTubeFilterBar } from "./YouTubeFilterBar";
+import { YouTubeSection } from "./YouTubeSection";
 
-const STAGE_LABELS: Record<PipelineStage, string> = {
-  brain_dump: "Brain Dump",
-  development: "Development",
-  outline: "Outline",
-  evaluation: "Evaluation",
-  script: "Script",
-  edit: "Edit",
-  published: "Published",
+const TIERS: YouTubeTier[] = ["S", "A", "B", "C"];
+const TIER_LABELS: Record<YouTubeTier, string> = {
+  S: "⭐ S-Tier",
+  A: "🥈 A-Tier",
+  B: "🥉 B-Tier",
+  C: "🪨 C-Tier",
 };
-
-const STAGE_ORDER: PipelineStage[] = [
-  "brain_dump",
-  "development",
-  "outline",
-  "evaluation",
-  "script",
-  "edit",
-  "published",
-];
 
 type YouTubeDashboardProps = {
   workspaceId: string | null;
-  range: LifeTimeRange;
-  onRangeChange: (range: LifeTimeRange) => void;
 };
 
-export function YouTubeDashboard({
-  workspaceId,
-  range,
-  onRangeChange,
-}: YouTubeDashboardProps) {
-  const { dashboard, loading, error, refresh } = useYouTubeDashboard(
-    workspaceId,
-    range,
-  );
+export function YouTubeDashboard({ workspaceId }: YouTubeDashboardProps) {
+  const { library, summary, filters, updateFilters, loading, error, refresh } =
+    useYouTubeLibrary(workspaceId);
 
-  const stats = dashboard?.pipelineStats ?? ({} as Record<PipelineStage, number>);
+  const filteredIdeas = useMemo(() => {
+    if (!library) return [];
+    return applyFilters(library.items, filters);
+  }, [library, filters]);
+
+  const grouped = useMemo(() => {
+    const groups = new Map<YouTubeTier, YouTubeIdea[]>();
+    for (const tier of TIERS) {
+      groups.set(tier, []);
+    }
+    for (const idea of filteredIdeas) {
+      const list = groups.get(idea.tier) ?? [];
+      list.push(idea);
+      groups.set(idea.tier, list);
+    }
+    for (const [key, list] of groups) {
+      groups.set(key, sortIdeas(list, filters.sort));
+    }
+    return groups;
+  }, [filteredIdeas, filters.sort]);
+
+  const headerLine = summary
+    ? `${summary.totalCount} ideas • ${summary.inProgressCount} in progress • ${summary.publishedCount} published`
+    : "--";
 
   return (
     <div className="life-dashboard life-youtube-dashboard">
       <div className="life-dashboard-header">
         <div>
-          <div className="life-dashboard-title">🎥 YouTube Pipeline</div>
-          <div className="life-dashboard-subtitle">
-            {dashboard?.meta
-              ? `${dashboard.meta.periodStart} → ${dashboard.meta.periodEnd}`
-              : ""}
-          </div>
+          <div className="life-dashboard-title">🎥 YouTube Ideas</div>
+          <div className="life-dashboard-subtitle">{headerLine}</div>
         </div>
         <div className="life-dashboard-actions">
-          <TimeRangeSelector value={range} onChange={onRangeChange} />
           <button
             type="button"
             className="ghost life-refresh-button"
@@ -65,60 +64,65 @@ export function YouTubeDashboard({
         </div>
       </div>
 
+      <YouTubeFilterBar filters={filters} onChange={updateFilters} />
+
       {error && <div className="life-dashboard-error">{error}</div>}
-      {loading && !dashboard && (
-        <div className="life-dashboard-status">Loading YouTube data…</div>
+      {loading && !library && (
+        <div className="life-dashboard-status">Loading YouTube ideas…</div>
       )}
 
-      {dashboard ? (
-        <>
-          <div className="life-stat-grid">
-            {STAGE_ORDER.map((stage) => (
-              <StatCard
-                key={stage}
-                label={STAGE_LABELS[stage]}
-                value={String(stats[stage] ?? 0)}
+      {library ? (
+        <div className="youtube-sections">
+          {TIERS.map((tier) => {
+            const ideas = grouped.get(tier) ?? [];
+            if (ideas.length === 0) return null;
+            return (
+              <YouTubeSection
+                key={tier}
+                title={TIER_LABELS[tier]}
+                count={ideas.length}
+                ideas={ideas}
+                viewMode={filters.viewMode}
               />
-            ))}
-          </div>
-
-          <section className="life-section">
-            <div className="life-section-title">S-Tier Ideas</div>
-            {dashboard.sTier.length ? (
-              <div className="life-media-list">
-                {dashboard.sTier.map((idea) => (
-                  <div key={idea.id} className="life-media-card">
-                    <div className="life-media-title">{idea.title}</div>
-                    <div className="life-media-meta">
-                      {idea.stage.replace("_", " ")} • Tier {idea.tier}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="life-dashboard-status">No S-tier ideas yet.</div>
-            )}
-          </section>
-
-          <section className="life-section">
-            <div className="life-section-title">In Progress</div>
-            {dashboard.inProgress.length ? (
-              <div className="life-media-list">
-                {dashboard.inProgress.map((idea) => (
-                  <div key={idea.id} className="life-media-card">
-                    <div className="life-media-title">{idea.title}</div>
-                    <div className="life-media-meta">
-                      {idea.stage.replace("_", " ")} • Tier {idea.tier}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="life-dashboard-status">No ideas in progress.</div>
-            )}
-          </section>
-        </>
+            );
+          })}
+        </div>
       ) : null}
     </div>
   );
+}
+
+function applyFilters(ideas: YouTubeIdea[], filters: YouTubeFilterState) {
+  return ideas.filter((idea) => {
+    if (filters.tier !== "all" && idea.tier !== filters.tier) {
+      return false;
+    }
+    if (filters.stage !== "all" && idea.stage !== filters.stage) {
+      return false;
+    }
+    if (filters.search.trim()) {
+      const query = filters.search.toLowerCase();
+      if (!idea.title.toLowerCase().includes(query)) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+function sortIdeas(ideas: YouTubeIdea[], sort: YouTubeFilterState["sort"]) {
+  const list = [...ideas];
+  switch (sort) {
+    case "title":
+      return list.sort((a, b) => a.title.localeCompare(b.title));
+    case "stage":
+      return list.sort((a, b) => a.stage.localeCompare(b.stage));
+    case "updated":
+      return list.sort(
+        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
+    case "tier":
+    default:
+      return list.sort((a, b) => a.tier.localeCompare(b.tier));
+  }
 }

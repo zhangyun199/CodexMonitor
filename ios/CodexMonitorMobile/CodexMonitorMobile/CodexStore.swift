@@ -69,7 +69,7 @@ final class CodexStore: ObservableObject {
     @Published var lifeTimeRange: LifeTimeRange = .today
     @Published var deliveryDashboard: DeliveryDashboard?
     @Published var mediaLibrary: MediaLibrary?
-    @Published var youtubeDashboard: YouTubeDashboard?
+    @Published var youtubeLibrary: YouTubeLibrary?
     @Published var dashboardLoading: Bool = false
     @Published var dashboardError: String? = nil
     @Published var debugEntries: [DebugEntry] = []
@@ -264,13 +264,13 @@ final class CodexStore: ObservableObject {
         dashboardLoading = false
     }
 
-    func fetchYouTubeDashboard(range: LifeTimeRange) async {
+    func fetchYouTubeLibrary() async {
         guard let workspaceId = activeWorkspaceId else { return }
         dashboardLoading = true
         dashboardError = nil
         do {
-            let dashboard = try await api.getYouTubeDashboard(workspaceId: workspaceId, range: range.rawValue)
-            youtubeDashboard = dashboard
+            let library = try await api.getYouTubeDashboard(workspaceId: workspaceId)
+            youtubeLibrary = library
         } catch {
             dashboardError = error.localizedDescription
         }

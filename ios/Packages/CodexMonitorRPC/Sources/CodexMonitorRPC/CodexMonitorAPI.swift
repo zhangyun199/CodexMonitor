@@ -197,14 +197,13 @@ public struct CodexMonitorAPI: Sendable {
         )
     }
 
-    public func getYouTubeDashboard(workspaceId: String, range: String) async throws -> YouTubeDashboard {
+    public func getYouTubeDashboard(workspaceId: String) async throws -> YouTubeLibrary {
         return try await call(
             "get_youtube_dashboard",
             params: .object([
                 "workspaceId": .string(workspaceId),
-                "range": .string(range),
             ]),
-            as: YouTubeDashboard.self
+            as: YouTubeLibrary.self
         )
     }
 

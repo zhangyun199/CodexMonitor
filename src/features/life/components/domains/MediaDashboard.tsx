@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { MediaFilterState, MediaItem, MediaType } from "../../types";
 import { useMediaLibrary } from "../../hooks/useMediaLibrary";
+import { enrichMediaCovers } from "../../../../services/tauri";
 import { MediaFilterBar } from "./MediaFilterBar";
 import { MediaSection } from "./MediaSection";
 
@@ -68,6 +69,14 @@ export function MediaDashboard({ workspaceId }: MediaDashboardProps) {
           <button
             type="button"
             className="ghost life-refresh-button"
+            onClick={() => void handleEnrich()}
+            disabled={loading}
+          >
+            Fetch Covers
+          </button>
+          <button
+            type="button"
+            className="ghost life-refresh-button"
             onClick={() => void refresh()}
             disabled={loading}
           >
@@ -102,6 +111,16 @@ export function MediaDashboard({ workspaceId }: MediaDashboardProps) {
       ) : null}
     </div>
   );
+
+  async function handleEnrich() {
+    if (!workspaceId) return;
+    try {
+      await enrichMediaCovers(workspaceId);
+      await refresh();
+    } catch (err) {
+      console.error(err);
+    }
+  }
 }
 
 function applyFilters(items: MediaItem[], filters: MediaFilterState) {

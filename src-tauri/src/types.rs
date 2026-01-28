@@ -471,6 +471,12 @@ pub(crate) struct AppSettings {
     pub(crate) supabase_anon_key: String,
     #[serde(default)]
     pub(crate) minimax_api_key: String,
+    #[serde(default)]
+    pub(crate) tmdb_api_key: String,
+    #[serde(default)]
+    pub(crate) igdb_client_id: String,
+    #[serde(default)]
+    pub(crate) igdb_client_secret: String,
     #[serde(default = "default_memory_embedding_enabled")]
     pub(crate) memory_embedding_enabled: bool,
     #[serde(default, rename = "autoMemory")]
@@ -796,6 +802,9 @@ impl Default for AppSettings {
             supabase_url: String::new(),
             supabase_anon_key: String::new(),
             minimax_api_key: String::new(),
+            tmdb_api_key: String::new(),
+            igdb_client_id: String::new(),
+            igdb_client_secret: String::new(),
             memory_embedding_enabled: default_memory_embedding_enabled(),
             auto_memory: default_auto_memory_settings(),
             composer_editor_preset: default_composer_editor_preset(),

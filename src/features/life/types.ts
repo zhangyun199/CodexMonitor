@@ -129,34 +129,49 @@ export interface MediaFilterState {
   viewMode: MediaViewMode;
 }
 
+export interface MediaCoverSummary {
+  total: number;
+  found: number;
+  skipped: number;
+  failed: number;
+}
+
 // -----------------------------
 // YouTube
 // -----------------------------
 
-export type PipelineStage =
-  | "brain_dump"
-  | "development"
+export type YouTubeTier = "S" | "A" | "B" | "C";
+export type YouTubeStage =
+  | "idea"
+  | "notes"
   | "outline"
-  | "evaluation"
+  | "draft"
   | "script"
-  | "edit"
+  | "ready"
   | "published";
 
-export type IdeaTier = "S" | "A" | "B" | "C";
-
-export interface VideoIdea {
+export interface YouTubeIdea {
   id: string;
   title: string;
-  tier: IdeaTier;
-  stage: PipelineStage;
-  thesis?: string;
+  slug?: string;
+  tier: YouTubeTier;
+  stage: YouTubeStage;
+  createdAt: string;
   updatedAt: string;
-  nextAction?: string;
 }
 
-export interface YouTubeDashboard {
+export interface YouTubeLibrary {
   meta: DashboardMeta;
-  pipelineStats: Record<PipelineStage, number>;
-  sTier: VideoIdea[];
-  inProgress: VideoIdea[];
+  totalCount: number;
+  inProgressCount: number;
+  publishedCount: number;
+  items: YouTubeIdea[];
+}
+
+export interface YouTubeFilterState {
+  tier: YouTubeTier | "all";
+  stage: YouTubeStage | "all";
+  search: string;
+  sort: "tier" | "stage" | "title" | "updated";
+  viewMode: "grid" | "list";
 }

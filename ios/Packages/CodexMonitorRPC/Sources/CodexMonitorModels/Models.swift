@@ -149,6 +149,9 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var supabase_url: String?
     public var supabase_anon_key: String?
     public var minimax_api_key: String?
+    public var tmdb_api_key: String?
+    public var igdb_client_id: String?
+    public var igdb_client_secret: String?
     public var memory_embedding_enabled: Bool?
     public var autoMemory: AutoMemorySettings
     public var composerEditorPreset: ComposerEditorPreset
@@ -364,38 +367,39 @@ public struct MediaLibrary: Codable, Hashable, Sendable {
     public var items: [MediaItem]
 }
 
-public enum PipelineStage: String, Codable, CaseIterable, Sendable {
-    case brainDump = "brain_dump"
-    case development
-    case outline
-    case evaluation
-    case script
-    case edit
-    case published
-}
-
-public enum IdeaTier: String, Codable, CaseIterable, Sendable {
+public enum YouTubeTier: String, Codable, CaseIterable, Sendable {
     case s = "S"
     case a = "A"
     case b = "B"
     case c = "C"
 }
 
-public struct VideoIdea: Codable, Hashable, Sendable, Identifiable {
-    public var id: String
-    public var title: String
-    public var tier: IdeaTier
-    public var stage: PipelineStage
-    public var thesis: String?
-    public var updatedAt: String
-    public var nextAction: String?
+public enum YouTubeStage: String, Codable, CaseIterable, Sendable {
+    case idea
+    case notes
+    case outline
+    case draft
+    case script
+    case ready
+    case published
 }
 
-public struct YouTubeDashboard: Codable, Hashable, Sendable {
+public struct YouTubeIdea: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var title: String
+    public var slug: String?
+    public var tier: YouTubeTier
+    public var stage: YouTubeStage
+    public var createdAt: String
+    public var updatedAt: String
+}
+
+public struct YouTubeLibrary: Codable, Hashable, Sendable {
     public var meta: DashboardMeta
-    public var pipelineStats: [String: Int]
-    public var sTier: [VideoIdea]
-    public var inProgress: [VideoIdea]
+    public var totalCount: Int
+    public var inProgressCount: Int
+    public var publishedCount: Int
+    public var items: [YouTubeIdea]
 }
 
 public struct AutoMemorySettings: Codable, Hashable, Sendable {

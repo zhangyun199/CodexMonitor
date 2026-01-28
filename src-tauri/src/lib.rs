@@ -18,7 +18,7 @@ mod event_sink;
 mod git;
 mod git_utils;
 mod life;
-mod life_core;
+pub mod life_core;
 mod local_usage;
 mod local_usage_core;
 mod memory;
@@ -146,6 +146,7 @@ pub fn run() {
             life::get_exercise_dashboard,
             life::get_media_dashboard,
             life::get_youtube_dashboard,
+            life::enrich_media_covers,
             life::get_finance_dashboard,
             prompts::prompts_global_dir,
             memory_commands::memory_status,

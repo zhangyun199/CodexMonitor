@@ -3,20 +3,20 @@ import CodexMonitorModels
 
 struct YouTubeDashboardView: View {
     @EnvironmentObject private var store: CodexStore
-    @Binding var timeRange: LifeTimeRange
 
-    private let stages: [PipelineStage] = [.brainDump, .development, .outline, .evaluation, .script, .edit, .published]
+    @State private var selectedTier: YouTubeTier? = nil
+    @State private var selectedStage: YouTubeStage? = nil
+    @State private var searchText: String = ""
+    @State private var sortOption: YouTubeSortOption = .tier
+    @State private var viewMode: YouTubeViewMode = .grid
+
+    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                HStack {
-                    Text("🎥 YouTube Pipeline")
-                        .font(.headline)
-                    Spacer()
-                }
-
-                TimeRangePicker(selection: $timeRange)
+                header
+                filterBar
 
                 if store.dashboardLoading {
                     ProgressView("Loading…")
@@ -28,64 +28,206 @@ struct YouTubeDashboardView: View {
                         .font(.caption)
                 }
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    ForEach(stages, id: \.self) { stage in
-                        StatCardView(title: stageLabel(stage), value: "\(store.youtubeDashboard?.pipelineStats[stage.rawValue] ?? 0)")
+                ForEach(YouTubeTier.allCases, id: \.self) { tier in
+                    let ideas = groupedIdeas[tier] ?? []
+                    if !ideas.isEmpty {
+                        YouTubeSectionView(tier: tier, ideas: ideas, viewMode: viewMode)
                     }
-                }
-
-                if let sTier = store.youtubeDashboard?.sTier, !sTier.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("S-Tier Ideas")
-                            .font(.headline)
-                        ForEach(sTier) { idea in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(idea.title)
-                                    .font(.subheadline)
-                                Text("\(stageLabel(idea.stage)) • Tier \(idea.tier.rawValue)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Divider()
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                if let inProgress = store.youtubeDashboard?.inProgress, !inProgress.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("In Progress")
-                            .font(.headline)
-                        ForEach(inProgress) { idea in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(idea.title)
-                                    .font(.subheadline)
-                                Text("\(stageLabel(idea.stage)) • Tier \(idea.tier.rawValue)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Divider()
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding()
         }
-        .task(id: timeRange) {
-            await store.fetchYouTubeDashboard(range: timeRange)
+        .task {
+            await store.fetchYouTubeLibrary()
         }
     }
 
-    private func stageLabel(_ stage: PipelineStage) -> String {
-        switch stage {
-        case .brainDump: return "Brain Dump"
-        case .development: return "Development"
-        case .outline: return "Outline"
-        case .evaluation: return "Evaluation"
-        case .script: return "Script"
-        case .edit: return "Edit"
-        case .published: return "Published"
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("🎥 YouTube Ideas")
+                .font(.headline)
+            if let library = store.youtubeLibrary {
+                Text("\(library.totalCount) ideas • \(library.inProgressCount) in progress • \(library.publishedCount) published")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var filterBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("Tier", selection: $selectedTier) {
+                Text("All").tag(YouTubeTier?.none)
+                ForEach(YouTubeTier.allCases, id: \.self) { tier in
+                    Text(tier.rawValue).tag(Optional(tier))
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Picker("Stage", selection: $selectedStage) {
+                Text("All").tag(YouTubeStage?.none)
+                ForEach(YouTubeStage.allCases, id: \.self) { stage in
+                    Text(stage.rawValue).tag(Optional(stage))
+                }
+            }
+            .pickerStyle(.segmented)
+
+            HStack {
+                Picker("Sort", selection: $sortOption) {
+                    ForEach(YouTubeSortOption.allCases, id: \.self) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Picker("View", selection: $viewMode) {
+                    ForEach(YouTubeViewMode.allCases, id: \.self) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            TextField("Search ideas…", text: $searchText)
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private var filteredIdeas: [YouTubeIdea] {
+        guard let ideas = store.youtubeLibrary?.items else { return [] }
+        return ideas.filter { idea in
+            if let selectedTier, idea.tier != selectedTier { return false }
+            if let selectedStage, idea.stage != selectedStage { return false }
+            if !searchText.isEmpty && !idea.title.localizedCaseInsensitiveContains(searchText) {
+                return false
+            }
+            return true
+        }
+    }
+
+    private var groupedIdeas: [YouTubeTier: [YouTubeIdea]] {
+        var groups: [YouTubeTier: [YouTubeIdea]] = [:]
+        for idea in filteredIdeas.sorted(by: sortComparator) {
+            groups[idea.tier, default: []].append(idea)
+        }
+        return groups
+    }
+
+    private func sortComparator(_ lhs: YouTubeIdea, _ rhs: YouTubeIdea) -> Bool {
+        switch sortOption {
+        case .title:
+            return lhs.title < rhs.title
+        case .stage:
+            return lhs.stage.rawValue < rhs.stage.rawValue
+        case .updated:
+            return lhs.updatedAt > rhs.updatedAt
+        case .tier:
+            return lhs.tier.rawValue < rhs.tier.rawValue
+        }
+    }
+}
+
+private enum YouTubeSortOption: String, CaseIterable {
+    case tier
+    case stage
+    case title
+    case updated
+
+    var label: String {
+        switch self {
+        case .tier: return "Tier"
+        case .stage: return "Stage"
+        case .title: return "Title"
+        case .updated: return "Updated"
+        }
+    }
+}
+
+private enum YouTubeViewMode: String, CaseIterable {
+    case grid
+    case list
+
+    var label: String {
+        switch self {
+        case .grid: return "Grid"
+        case .list: return "List"
+        }
+    }
+}
+
+private struct YouTubeSectionView: View {
+    let tier: YouTubeTier
+    let ideas: [YouTubeIdea]
+    let viewMode: YouTubeViewMode
+
+    private let gridColumns = [GridItem(.flexible()), GridItem(.flexible())]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("\(label) (\(ideas.count))")
+                .font(.headline)
+
+            if viewMode == .grid {
+                LazyVGrid(columns: gridColumns, spacing: 12) {
+                    ForEach(ideas) { idea in
+                        YouTubeCardView(idea: idea)
+                    }
+                }
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(ideas) { idea in
+                        YouTubeCardView(idea: idea)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var label: String {
+        switch tier {
+        case .s: return "⭐ S-Tier"
+        case .a: return "🥈 A-Tier"
+        case .b: return "🥉 B-Tier"
+        case .c: return "🪨 C-Tier"
+        }
+    }
+}
+
+private struct YouTubeCardView: View {
+    let idea: YouTubeIdea
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(gradient)
+                .frame(height: 180)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(idea.title)
+                    .font(.caption)
+                    .bold()
+                    .lineLimit(2)
+                    .foregroundStyle(.white)
+                Text("\(idea.stage.rawValue) • Tier \(idea.tier.rawValue)")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.8))
+            }
+            .padding(8)
+        }
+    }
+
+    private var gradient: LinearGradient {
+        switch idea.tier {
+        case .s:
+            return LinearGradient(colors: [.yellow, .orange], startPoint: .top, endPoint: .bottom)
+        case .a:
+            return LinearGradient(colors: [.gray, .gray.opacity(0.7)], startPoint: .top, endPoint: .bottom)
+        case .b:
+            return LinearGradient(colors: [.orange, .brown], startPoint: .top, endPoint: .bottom)
+        case .c:
+            return LinearGradient(colors: [.gray.opacity(0.7), .gray], startPoint: .top, endPoint: .bottom)
         }
     }
 }

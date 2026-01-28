@@ -19,8 +19,13 @@ export function MediaCard({ item, viewMode }: MediaCardProps) {
     <div
       className={`media-card ${TYPE_CLASS[item.type]} ${
         item.status === "Backlog" ? "backlog" : ""
-      } ${viewMode === "list" ? "is-list" : ""}`}
+      } ${viewMode === "list" ? "is-list" : ""} ${
+        item.coverUrl ? "has-cover" : ""
+      }`}
     >
+      {item.coverUrl ? (
+        <img className="cover" src={item.coverUrl} alt={item.title} />
+      ) : null}
       <div className="media-card-overlay">
         <div className="media-card-title">{item.title}</div>
         <div className="media-card-rating">

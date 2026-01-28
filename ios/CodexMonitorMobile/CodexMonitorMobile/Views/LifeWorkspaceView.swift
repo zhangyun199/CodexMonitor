@@ -21,10 +21,7 @@ struct LifeWorkspaceView: View {
                 case .media:
                     MediaDashboardView()
                 case .youtube:
-                    YouTubeDashboardView(timeRange: Binding(
-                        get: { store.lifeTimeRange },
-                        set: { store.lifeTimeRange = $0 }
-                    ))
+                    YouTubeDashboardView()
                 default:
                     Text("Dashboard coming soon.")
                         .foregroundStyle(.secondary)

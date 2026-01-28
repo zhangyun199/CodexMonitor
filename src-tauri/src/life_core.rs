@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, TimeZone, Utc};
-use reqwest::Client;
+use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 
 use crate::types::{WorkspacePurpose, WorkspaceSettings};
@@ -104,6 +104,109 @@ pub(crate) struct DeliveryDashboard {
     pub(crate) top_merchants: Vec<MerchantStats>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub(crate) struct NutritionStats {
+    pub(crate) calories: f64,
+    pub(crate) protein: f64,
+    pub(crate) carbs: f64,
+    pub(crate) fat: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) fiber: Option<f64>,
+    #[serde(rename = "mealCount")]
+    pub(crate) meal_count: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct MealEntry {
+    pub(crate) id: String,
+    pub(crate) timestamp: String,
+    #[serde(rename = "mealType")]
+    pub(crate) meal_type: String,
+    pub(crate) description: String,
+    pub(crate) foods: Vec<String>,
+    #[serde(rename = "estimatedCalories", skip_serializing_if = "Option::is_none")]
+    pub(crate) estimated_calories: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct NutritionDashboard {
+    pub(crate) meta: DashboardMeta,
+    pub(crate) stats: NutritionStats,
+    pub(crate) meals: Vec<MealEntry>,
+    #[serde(rename = "weeklyTrend", skip_serializing_if = "Option::is_none")]
+    pub(crate) weekly_trend: Option<HashMap<String, f64>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub(crate) struct ExerciseStats {
+    #[serde(rename = "workoutCount")]
+    pub(crate) workout_count: u32,
+    #[serde(rename = "walkingMiles")]
+    pub(crate) walking_miles: f64,
+    #[serde(rename = "activeDays")]
+    pub(crate) active_days: u32,
+    #[serde(rename = "currentStreak")]
+    pub(crate) current_streak: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct ExerciseEntry {
+    pub(crate) id: String,
+    pub(crate) timestamp: String,
+    #[serde(rename = "type")]
+    pub(crate) entry_type: String,
+    pub(crate) description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) miles: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) duration: Option<f64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct ExerciseDashboard {
+    pub(crate) meta: DashboardMeta,
+    pub(crate) stats: ExerciseStats,
+    pub(crate) entries: Vec<ExerciseEntry>,
+    #[serde(rename = "byType")]
+    pub(crate) by_type: HashMap<String, u32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct Bill {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) amount: f64,
+    #[serde(rename = "dueDay")]
+    pub(crate) due_day: u32,
+    pub(crate) frequency: String,
+    pub(crate) category: String,
+    #[serde(rename = "autoPay")]
+    pub(crate) auto_pay: bool,
+    #[serde(rename = "nextDueDate")]
+    pub(crate) next_due_date: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub(crate) struct FinanceStats {
+    #[serde(rename = "monthlyTotal")]
+    pub(crate) monthly_total: f64,
+    #[serde(rename = "dueSoonCount")]
+    pub(crate) due_soon_count: u32,
+    #[serde(rename = "autoPayCount")]
+    pub(crate) auto_pay_count: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct FinanceDashboard {
+    pub(crate) meta: DashboardMeta,
+    pub(crate) stats: FinanceStats,
+    pub(crate) bills: Vec<Bill>,
+    #[serde(rename = "byCategory")]
+    pub(crate) by_category: HashMap<String, f64>,
+    #[serde(rename = "statusMessage", skip_serializing_if = "Option::is_none")]
+    pub(crate) status_message: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct MediaItem {
     pub(crate) id: String,
@@ -138,28 +241,46 @@ pub(crate) struct MediaLibrary {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct VideoIdea {
+pub(crate) struct YouTubeIdea {
     pub(crate) id: String,
     pub(crate) title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) slug: Option<String>,
     pub(crate) tier: String,
     pub(crate) stage: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) thesis: Option<String>,
+    #[serde(rename = "createdAt")]
+    pub(crate) created_at: String,
     #[serde(rename = "updatedAt")]
     pub(crate) updated_at: String,
-    #[serde(rename = "nextAction", skip_serializing_if = "Option::is_none")]
-    pub(crate) next_action: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct YouTubeDashboard {
+pub(crate) struct YouTubeLibrary {
     pub(crate) meta: DashboardMeta,
-    #[serde(rename = "pipelineStats")]
-    pub(crate) pipeline_stats: HashMap<String, u32>,
-    #[serde(rename = "sTier")]
-    pub(crate) s_tier: Vec<VideoIdea>,
-    #[serde(rename = "inProgress")]
-    pub(crate) in_progress: Vec<VideoIdea>,
+    #[serde(rename = "totalCount")]
+    pub(crate) total_count: u32,
+    #[serde(rename = "inProgressCount")]
+    pub(crate) in_progress_count: u32,
+    #[serde(rename = "publishedCount")]
+    pub(crate) published_count: u32,
+    pub(crate) items: Vec<YouTubeIdea>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MediaCoverSummary {
+    pub total: u32,
+    pub found: u32,
+    pub skipped: u32,
+    pub failed: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct MediaCoverEntry {
+    #[serde(rename = "coverUrl")]
+    cover_url: String,
+    source: String,
+    #[serde(rename = "fetchedAt")]
+    fetched_at: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -182,6 +303,29 @@ struct DeliverySessionFrontmatter {
     whale_catches: Option<f64>,
 }
 
+#[derive(Debug, Deserialize)]
+struct FoodFrontmatter {
+    name: Option<String>,
+    calories: Option<f64>,
+    protein: Option<f64>,
+    carbs: Option<f64>,
+    fat: Option<f64>,
+    fiber: Option<f64>,
+    category: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BillFrontmatter {
+    name: Option<String>,
+    amount: Option<f64>,
+    #[serde(rename = "due_day")]
+    due_day: Option<u32>,
+    frequency: Option<String>,
+    category: Option<String>,
+    #[serde(rename = "auto_pay")]
+    auto_pay: Option<bool>,
+}
+
 #[derive(Debug, Clone)]
 struct DeliverySessionRecord {
     id: String,
@@ -194,6 +338,49 @@ struct DeliverySessionRecord {
     ending_ar: Option<f64>,
     whale_catches: u32,
     orders: Vec<DeliveryOrder>,
+}
+
+#[derive(Debug, Clone)]
+struct FoodNutrition {
+    name: String,
+    calories: f64,
+    protein: f64,
+    carbs: f64,
+    fat: f64,
+    fiber: f64,
+    category: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct MealParseRecord {
+    date: NaiveDate,
+    timestamp: String,
+    description: String,
+    meal_type: String,
+    foods: Vec<String>,
+    estimated_calories: Option<f64>,
+    calories: f64,
+    protein: f64,
+    carbs: f64,
+    fat: f64,
+    fiber: f64,
+}
+
+#[derive(Debug, Clone)]
+struct ExerciseParseRecord {
+    date: NaiveDate,
+    timestamp: String,
+    description: String,
+    entry_type: String,
+    miles: Option<f64>,
+    duration: Option<f64>,
+}
+
+#[derive(Debug, Clone)]
+struct BillRecord {
+    bill: Bill,
+    monthly_equivalent: f64,
+    due_date: NaiveDate,
 }
 
 #[derive(Debug, Deserialize)]
@@ -231,16 +418,55 @@ struct MediaFrontmatter {
     created_at: Option<String>,
     completed_at: Option<String>,
     updated_at: Option<String>,
+    cover_url: Option<String>,
+    url: Option<String>,
+    youtube_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct YouTubeIdeaFrontmatter {
     id: Option<String>,
     title: Option<String>,
+    slug: Option<String>,
     tier: Option<String>,
     stage: Option<String>,
     updated_at: Option<String>,
     created_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TmdbSearchResponse {
+    results: Vec<TmdbResult>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TmdbResult {
+    poster_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenLibrarySearchResponse {
+    docs: Vec<OpenLibraryDoc>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OpenLibraryDoc {
+    cover_i: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct IgdbTokenResponse {
+    access_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct IgdbGameResult {
+    cover: Option<IgdbCover>,
+}
+
+#[derive(Debug, Deserialize)]
+struct IgdbCover {
+    image_id: String,
 }
 
 pub(crate) fn is_life_workspace(settings: &WorkspaceSettings) -> bool {
@@ -474,6 +700,246 @@ pub(crate) async fn build_delivery_dashboard(
     })
 }
 
+pub(crate) async fn build_nutrition_dashboard(
+    workspace_path: &str,
+    obsidian_root: Option<&str>,
+    range: &str,
+) -> Result<NutritionDashboard, String> {
+    let root = resolve_obsidian_root(workspace_path, obsidian_root);
+    if !root.exists() {
+        return Err(format!(
+            "Obsidian root not found: {}",
+            root.to_string_lossy()
+        ));
+    }
+    let today = Utc::now().date_naive();
+    let (start_date, end_date) = match range {
+        "today" => (Some(today), Some(today)),
+        "week" | "7d" => (Some(today - Duration::days(6)), Some(today)),
+        "month" | "30d" => (Some(today - Duration::days(29)), Some(today)),
+        "lifetime" => (None, Some(today)),
+        _ => (None, Some(today)),
+    };
+
+    let food_map = load_food_library(&root);
+    let meals = load_meal_entries(&root, start_date, end_date, &food_map);
+
+    let mut stats = NutritionStats::default();
+    let mut fiber_total = 0.0;
+    let mut has_fiber = false;
+    for meal in &meals {
+        stats.calories += meal.calories;
+        stats.protein += meal.protein;
+        stats.carbs += meal.carbs;
+        stats.fat += meal.fat;
+        if meal.fiber > 0.0 {
+            fiber_total += meal.fiber;
+            has_fiber = true;
+        }
+    }
+    stats.meal_count = meals.len() as u32;
+    if has_fiber {
+        stats.fiber = Some(fiber_total);
+    }
+
+    let period_start = start_date
+        .or_else(|| meals.iter().map(|meal| meal.date).min())
+        .unwrap_or(today)
+        .to_string();
+    let period_end = end_date
+        .or_else(|| meals.iter().map(|meal| meal.date).max())
+        .unwrap_or(today)
+        .to_string();
+
+    let weekly_trend = build_weekly_calorie_trend(&meals, end_date.unwrap_or(today));
+
+    let meta = DashboardMeta {
+        domain: "nutrition".to_string(),
+        range: range.to_string(),
+        period_start,
+        period_end,
+        generated_at: Utc::now().to_rfc3339(),
+        sources: vec!["obsidian".to_string()],
+        cache_hit: None,
+    };
+
+    let meals = meals
+        .into_iter()
+        .enumerate()
+        .map(|(index, meal)| MealEntry {
+            id: format!("meal-{}-{}", meal.date, index + 1),
+            timestamp: meal.timestamp,
+            meal_type: meal.meal_type,
+            description: meal.description,
+            foods: meal.foods,
+            estimated_calories: meal.estimated_calories,
+        })
+        .collect();
+
+    Ok(NutritionDashboard {
+        meta,
+        stats,
+        meals,
+        weekly_trend,
+    })
+}
+
+pub(crate) async fn build_exercise_dashboard(
+    workspace_path: &str,
+    obsidian_root: Option<&str>,
+    range: &str,
+) -> Result<ExerciseDashboard, String> {
+    let root = resolve_obsidian_root(workspace_path, obsidian_root);
+    if !root.exists() {
+        return Err(format!(
+            "Obsidian root not found: {}",
+            root.to_string_lossy()
+        ));
+    }
+    let today = Utc::now().date_naive();
+    let (start_date, end_date) = match range {
+        "today" => (Some(today), Some(today)),
+        "week" | "7d" => (Some(today - Duration::days(6)), Some(today)),
+        "month" | "30d" => (Some(today - Duration::days(29)), Some(today)),
+        "lifetime" => (None, Some(today)),
+        _ => (None, Some(today)),
+    };
+
+    let entries = load_exercise_entries(&root, start_date, end_date);
+    let all_activity_dates = load_activity_dates(&root);
+
+    let mut stats = ExerciseStats::default();
+    let mut by_type: HashMap<String, u32> = HashMap::new();
+    let mut active_days: HashMap<NaiveDate, bool> = HashMap::new();
+
+    for entry in &entries {
+        let counter = by_type.entry(entry.entry_type.clone()).or_insert(0);
+        *counter += 1;
+        active_days.insert(entry.date, true);
+        if entry.entry_type == "walk" {
+            if let Some(miles) = entry.miles {
+                stats.walking_miles += miles;
+            }
+        } else {
+            stats.workout_count += 1;
+        }
+    }
+
+    stats.active_days = active_days.len() as u32;
+    stats.current_streak = compute_activity_streak(today, &all_activity_dates);
+
+    let period_start = start_date
+        .or_else(|| entries.iter().map(|entry| entry.date).min())
+        .unwrap_or(today)
+        .to_string();
+    let period_end = end_date
+        .or_else(|| entries.iter().map(|entry| entry.date).max())
+        .unwrap_or(today)
+        .to_string();
+
+    let meta = DashboardMeta {
+        domain: "exercise".to_string(),
+        range: range.to_string(),
+        period_start,
+        period_end,
+        generated_at: Utc::now().to_rfc3339(),
+        sources: vec!["obsidian".to_string()],
+        cache_hit: None,
+    };
+
+    let entries = entries
+        .into_iter()
+        .enumerate()
+        .map(|(index, entry)| ExerciseEntry {
+            id: format!("exercise-{}-{}", entry.date, index + 1),
+            timestamp: entry.timestamp,
+            entry_type: entry.entry_type,
+            description: entry.description,
+            miles: entry.miles,
+            duration: entry.duration,
+        })
+        .collect();
+
+    Ok(ExerciseDashboard {
+        meta,
+        stats,
+        entries,
+        by_type,
+    })
+}
+
+pub(crate) async fn build_finance_dashboard(
+    workspace_path: &str,
+    obsidian_root: Option<&str>,
+    range: &str,
+) -> Result<FinanceDashboard, String> {
+    let root = resolve_obsidian_root(workspace_path, obsidian_root);
+    if !root.exists() {
+        return Err(format!(
+            "Obsidian root not found: {}",
+            root.to_string_lossy()
+        ));
+    }
+
+    let today = Utc::now().date_naive();
+    let bills_dir = root.join("Entities").join("Finance").join("Bills");
+    let bill_records = load_bill_records(&bills_dir, today);
+
+    let period_start = today.to_string();
+    let period_end = today.to_string();
+    let meta = DashboardMeta {
+        domain: "finance".to_string(),
+        range: range.to_string(),
+        period_start,
+        period_end,
+        generated_at: Utc::now().to_rfc3339(),
+        sources: vec!["obsidian".to_string()],
+        cache_hit: None,
+    };
+
+    if bill_records.is_empty() && bills_dir.exists() {
+        return Ok(FinanceDashboard {
+            meta,
+            stats: FinanceStats::default(),
+            bills: Vec::new(),
+            by_category: HashMap::new(),
+            status_message: Some(
+                "Coming soon — needs data migration. Expected YAML frontmatter:\nname: \"Rent\"\namount: 1200\ndue_day: 1\nfrequency: \"monthly\"\ncategory: \"housing\"\nauto_pay: true"
+                    .to_string(),
+            ),
+        });
+    }
+
+    let mut stats = FinanceStats::default();
+    let mut by_category: HashMap<String, f64> = HashMap::new();
+    let mut bills: Vec<Bill> = Vec::new();
+
+    for record in &bill_records {
+        stats.monthly_total += record.monthly_equivalent;
+        if record.bill.auto_pay {
+            stats.auto_pay_count += 1;
+        }
+        let entry = by_category
+            .entry(record.bill.category.clone())
+            .or_insert(0.0);
+        *entry += record.monthly_equivalent;
+        if record.due_date >= today && record.due_date <= today + Duration::days(7) {
+            stats.due_soon_count += 1;
+        }
+        bills.push(record.bill.clone());
+    }
+
+    bills.sort_by_key(|bill| bill.next_due_date.clone());
+
+    Ok(FinanceDashboard {
+        meta,
+        stats,
+        bills,
+        by_category,
+        status_message: None,
+    })
+}
+
 pub(crate) async fn build_media_library(
     workspace_path: &str,
     obsidian_root: Option<&str>,
@@ -494,8 +960,9 @@ pub(crate) async fn build_media_library(
         ));
     }
 
-    let items = load_media_items(&root);
-    let total_count = items.len() as u32;
+    let mut records = load_media_items(&root);
+    let cache = load_media_cover_cache(&root);
+    let total_count = records.len() as u32;
     let mut completed_count = 0u32;
     let mut backlog_count = 0u32;
     let mut rating_total = 0.0;
@@ -503,17 +970,22 @@ pub(crate) async fn build_media_library(
     let mut earliest: Option<DateTime<Utc>> = None;
     let mut latest: Option<DateTime<Utc>> = None;
 
-    for item in &items {
-        match item.status.as_str() {
+    for record in &mut records {
+        if record.item.cover_url.is_none() {
+            if let Some(entry) = cache.get(&record.item.id) {
+                record.item.cover_url = Some(entry.cover_url.clone());
+            }
+        }
+        match record.item.status.as_str() {
             "Completed" => completed_count += 1,
             "Backlog" => backlog_count += 1,
             _ => {}
         }
-        if let Some(rating) = item.rating {
+        if let Some(rating) = record.item.rating {
             rating_total += rating;
             rating_count += 1;
         }
-        if let Some(updated_at) = parse_datetime(&item.updated_at) {
+        if let Some(updated_at) = parse_datetime(&record.item.updated_at) {
             earliest = match earliest {
                 Some(value) if value <= updated_at => Some(value),
                 _ => Some(updated_at),
@@ -548,6 +1020,8 @@ pub(crate) async fn build_media_library(
         cache_hit: None,
     };
 
+    let items = records.into_iter().map(|record| record.item).collect();
+
     Ok(MediaLibrary {
         meta,
         total_count,
@@ -558,11 +1032,10 @@ pub(crate) async fn build_media_library(
     })
 }
 
-pub(crate) async fn build_youtube_dashboard(
+pub(crate) async fn build_youtube_library(
     workspace_path: &str,
     obsidian_root: Option<&str>,
-    range: &str,
-) -> Result<YouTubeDashboard, String> {
+) -> Result<YouTubeLibrary, String> {
     let root = resolve_obsidian_root(workspace_path, obsidian_root);
     if !root.exists() {
         return Err(format!(
@@ -580,12 +1053,12 @@ pub(crate) async fn build_youtube_dashboard(
     }
 
     let ideas = load_youtube_ideas(&root);
-    let mut pipeline_stats: HashMap<String, u32> = HashMap::new();
     let mut earliest: Option<DateTime<Utc>> = None;
     let mut latest: Option<DateTime<Utc>> = None;
+    let mut in_progress_count = 0u32;
+    let mut published_count = 0u32;
 
     for idea in &ideas {
-        *pipeline_stats.entry(idea.stage.clone()).or_insert(0) += 1;
         if let Some(updated_at) = idea.updated_at_dt {
             earliest = match earliest {
                 Some(value) if value <= updated_at => Some(value),
@@ -596,18 +1069,11 @@ pub(crate) async fn build_youtube_dashboard(
                 _ => Some(updated_at),
             };
         }
-    }
-
-    for stage in [
-        "brain_dump",
-        "development",
-        "outline",
-        "evaluation",
-        "script",
-        "edit",
-        "published",
-    ] {
-        pipeline_stats.entry(stage.to_string()).or_insert(0);
+        if idea.stage == "published" {
+            published_count += 1;
+        } else if idea.stage != "idea" {
+            in_progress_count += 1;
+        }
     }
 
     let period_start = earliest
@@ -619,37 +1085,97 @@ pub(crate) async fn build_youtube_dashboard(
 
     let meta = DashboardMeta {
         domain: "youtube".to_string(),
-        range: range.to_string(),
+        range: "all".to_string(),
         period_start,
         period_end,
         generated_at: Utc::now().to_rfc3339(),
         sources: vec!["obsidian".to_string()],
         cache_hit: None,
     };
+    let total_count = ideas.len() as u32;
+    let items = ideas.into_iter().map(|idea| idea.into_item()).collect();
 
-    let mut s_tier: Vec<VideoIdea> = ideas
-        .iter()
-        .filter(|idea| idea.tier == "S")
-        .cloned()
-        .map(|idea| idea.into_item())
-        .collect();
-    s_tier.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
-    s_tier.truncate(8);
-
-    let mut in_progress: Vec<VideoIdea> = ideas
-        .iter()
-        .filter(|idea| idea.stage != "published" && idea.stage != "brain_dump")
-        .cloned()
-        .map(|idea| idea.into_item())
-        .collect();
-    in_progress.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
-    in_progress.truncate(8);
-
-    Ok(YouTubeDashboard {
+    Ok(YouTubeLibrary {
         meta,
-        pipeline_stats,
-        s_tier,
-        in_progress,
+        total_count,
+        in_progress_count,
+        published_count,
+        items,
+    })
+}
+
+pub async fn enrich_media_covers(
+    workspace_path: &str,
+    obsidian_root: Option<&str>,
+    tmdb_api_key: Option<&str>,
+    igdb_client_id: Option<&str>,
+    igdb_client_secret: Option<&str>,
+) -> Result<MediaCoverSummary, String> {
+    let root = resolve_obsidian_root(workspace_path, obsidian_root);
+    if !root.exists() {
+        return Err(format!(
+            "Obsidian root not found: {}",
+            root.to_string_lossy()
+        ));
+    }
+
+    let records = load_media_items(&root);
+    let total = records.len() as u32;
+    let mut cache = load_media_cover_cache(&root);
+    let mut found = 0u32;
+    let mut skipped = 0u32;
+    let mut failed = 0u32;
+
+    let igdb_token = if records
+        .iter()
+        .any(|record| record.item.media_type == "Game")
+    {
+        match (igdb_client_id, igdb_client_secret) {
+            (Some(id), Some(secret)) if !id.is_empty() && !secret.is_empty() => {
+                fetch_igdb_token(id, secret).await?
+            }
+            _ => String::new(),
+        }
+    } else {
+        String::new()
+    };
+
+    for record in records {
+        if cache.contains_key(&record.item.id) || record.item.cover_url.is_some() {
+            skipped += 1;
+            continue;
+        }
+        let maybe_cover = match record.item.media_type.as_str() {
+            "Film" => fetch_tmdb_cover(&record.item.title, "movie", tmdb_api_key).await?,
+            "TV" | "Anime" => fetch_tmdb_cover(&record.item.title, "tv", tmdb_api_key).await?,
+            "Book" => fetch_open_library_cover(&record.item.title).await?,
+            "Game" => fetch_igdb_cover(&record.item.title, igdb_client_id, &igdb_token).await?,
+            "YouTube" => fetch_youtube_cover(record.youtube_id.as_deref(), record.url.as_deref()),
+            _ => None,
+        };
+
+        if let Some((cover_url, source)) = maybe_cover {
+            cache.insert(
+                record.item.id,
+                MediaCoverEntry {
+                    cover_url,
+                    source,
+                    fetched_at: Utc::now().to_rfc3339(),
+                },
+            );
+            found += 1;
+        } else {
+            failed += 1;
+        }
+    }
+
+    write_media_cover_cache(&root, &cache)?;
+
+    Ok(MediaCoverSummary {
+        total,
+        found,
+        skipped,
+        failed,
     })
 }
 
@@ -892,7 +1418,14 @@ fn load_delivery_merchant_tiers(root: &Path) -> HashMap<String, String> {
         .collect()
 }
 
-fn load_media_items(root: &Path) -> Vec<MediaItem> {
+#[derive(Debug, Clone)]
+struct MediaRecord {
+    item: MediaItem,
+    url: Option<String>,
+    youtube_id: Option<String>,
+}
+
+fn load_media_items(root: &Path) -> Vec<MediaRecord> {
     let dir = root.join("Entities").join("Media");
     let entries = match std::fs::read_dir(&dir) {
         Ok(entries) => entries,
@@ -938,42 +1471,75 @@ fn load_media_items(root: &Path) -> Vec<MediaItem> {
             .clone()
             .or_else(|| Some(created_at.clone()))
             .unwrap_or_else(|| created_at.clone());
-        items.push(MediaItem {
+        let item = MediaItem {
             id,
             title,
             media_type,
             status,
             rating: parsed.rating,
-            cover_url: None,
+            cover_url: parsed.cover_url,
             created_at,
             updated_at,
             completed_at: parsed.completed_at,
+        };
+        items.push(MediaRecord {
+            item,
+            url: parsed.url,
+            youtube_id: parsed.youtube_id,
         });
     }
 
     items
 }
 
+fn media_cover_cache_path(root: &Path) -> PathBuf {
+    root.join("Indexes").join("media.covers.v1.json")
+}
+
+fn load_media_cover_cache(root: &Path) -> HashMap<String, MediaCoverEntry> {
+    let path = media_cover_cache_path(root);
+    let content = match std::fs::read_to_string(path) {
+        Ok(content) => content,
+        Err(_) => return HashMap::new(),
+    };
+    serde_json::from_str::<HashMap<String, MediaCoverEntry>>(&content).unwrap_or_default()
+}
+
+fn write_media_cover_cache(
+    root: &Path,
+    cache: &HashMap<String, MediaCoverEntry>,
+) -> Result<(), String> {
+    let path = media_cover_cache_path(root);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    let payload = serde_json::to_string_pretty(cache).map_err(|err| err.to_string())?;
+    std::fs::write(path, payload).map_err(|err| err.to_string())?;
+    Ok(())
+}
+
 #[derive(Debug, Clone)]
 struct YouTubeIdeaRecord {
     id: String,
     title: String,
+    slug: Option<String>,
     tier: String,
     stage: String,
+    created_at: String,
     updated_at: String,
     updated_at_dt: Option<DateTime<Utc>>,
 }
 
 impl YouTubeIdeaRecord {
-    fn into_item(self) -> VideoIdea {
-        VideoIdea {
+    fn into_item(self) -> YouTubeIdea {
+        YouTubeIdea {
             id: self.id,
             title: self.title,
+            slug: self.slug,
             tier: self.tier,
             stage: self.stage,
-            thesis: None,
+            created_at: self.created_at,
             updated_at: self.updated_at,
-            next_action: None,
         }
     }
 }
@@ -1013,18 +1579,24 @@ fn load_youtube_ideas(root: &Path) -> Vec<YouTubeIdeaRecord> {
             .unwrap_or_else(|| fallback_title.clone());
         let id = parsed.id.unwrap_or_else(|| fallback_title.clone());
         let tier = normalize_idea_tier(parsed.tier.as_deref());
-        let stage = normalize_pipeline_stage(parsed.stage.as_deref());
+        let stage = normalize_youtube_stage(parsed.stage.as_deref());
+        let created_at = parsed
+            .created_at
+            .clone()
+            .unwrap_or_else(|| Utc::now().date_naive().to_string());
         let updated_at = parsed
             .updated_at
             .clone()
-            .or_else(|| parsed.created_at.clone())
-            .unwrap_or_else(|| Utc::now().to_rfc3339());
+            .or_else(|| Some(created_at.clone()))
+            .unwrap_or_else(|| created_at.clone());
         let updated_at_dt = parse_datetime(&updated_at);
         ideas.push(YouTubeIdeaRecord {
             id,
             title,
+            slug: parsed.slug,
             tier,
             stage,
+            created_at,
             updated_at,
             updated_at_dt,
         });
@@ -1113,19 +1685,167 @@ fn normalize_idea_tier(value: Option<&str>) -> String {
     .to_string()
 }
 
-fn normalize_pipeline_stage(value: Option<&str>) -> String {
+fn normalize_youtube_stage(value: Option<&str>) -> String {
     let trimmed = value.unwrap_or("").trim().to_lowercase();
     match trimmed.as_str() {
-        "idea" | "brain_dump" => "brain_dump",
-        "notes" | "development" => "development",
+        "idea" => "idea",
+        "notes" => "notes",
         "outline" | "outlining" => "outline",
-        "draft" | "evaluation" => "evaluation",
+        "draft" => "draft",
         "script" | "scripting" => "script",
-        "ready" | "edit" | "editing" => "edit",
+        "ready" => "ready",
         "published" => "published",
-        _ => "brain_dump",
+        _ => "idea",
     }
     .to_string()
+}
+
+async fn fetch_tmdb_cover(
+    title: &str,
+    media_type: &str,
+    tmdb_api_key: Option<&str>,
+) -> Result<Option<(String, String)>, String> {
+    let Some(api_key) = tmdb_api_key else {
+        return Ok(None);
+    };
+    if api_key.trim().is_empty() {
+        return Ok(None);
+    }
+    let base = format!("https://api.themoviedb.org/3/search/{media_type}");
+    let mut url = Url::parse(&base).map_err(|err| err.to_string())?;
+    url.query_pairs_mut()
+        .append_pair("api_key", api_key)
+        .append_pair("query", title)
+        .append_pair("include_adult", "false");
+    let resp = Client::new()
+        .get(url)
+        .send()
+        .await
+        .map_err(|err| err.to_string())?;
+    if !resp.status().is_success() {
+        return Ok(None);
+    }
+    let payload: TmdbSearchResponse = resp.json().await.map_err(|err| err.to_string())?;
+    if let Some(result) = payload
+        .results
+        .into_iter()
+        .find(|result| result.poster_path.is_some())
+    {
+        let poster_path = result.poster_path.unwrap();
+        let cover_url = format!("https://image.tmdb.org/t/p/w500{poster_path}");
+        return Ok(Some((cover_url, "tmdb".to_string())));
+    }
+    Ok(None)
+}
+
+async fn fetch_open_library_cover(title: &str) -> Result<Option<(String, String)>, String> {
+    let mut url =
+        Url::parse("https://openlibrary.org/search.json").map_err(|err| err.to_string())?;
+    url.query_pairs_mut()
+        .append_pair("title", title)
+        .append_pair("limit", "1");
+    let resp = Client::new()
+        .get(url)
+        .send()
+        .await
+        .map_err(|err| err.to_string())?;
+    if !resp.status().is_success() {
+        return Ok(None);
+    }
+    let payload: OpenLibrarySearchResponse = resp.json().await.map_err(|err| err.to_string())?;
+    if let Some(doc) = payload.docs.into_iter().find(|doc| doc.cover_i.is_some()) {
+        let cover_id = doc.cover_i.unwrap();
+        let cover_url = format!("https://covers.openlibrary.org/b/id/{cover_id}-M.jpg");
+        return Ok(Some((cover_url, "openlibrary".to_string())));
+    }
+    Ok(None)
+}
+
+async fn fetch_igdb_token(client_id: &str, client_secret: &str) -> Result<String, String> {
+    let url = format!(
+        "https://id.twitch.tv/oauth2/token?client_id={client_id}&client_secret={client_secret}&grant_type=client_credentials"
+    );
+    let resp = Client::new()
+        .post(url)
+        .send()
+        .await
+        .map_err(|err| err.to_string())?;
+    if !resp.status().is_success() {
+        let text = resp.text().await.unwrap_or_default();
+        return Err(format!("IGDB auth failed: {text}"));
+    }
+    let payload: IgdbTokenResponse = resp.json().await.map_err(|err| err.to_string())?;
+    Ok(payload.access_token)
+}
+
+async fn fetch_igdb_cover(
+    title: &str,
+    client_id: Option<&str>,
+    access_token: &str,
+) -> Result<Option<(String, String)>, String> {
+    let Some(client_id) = client_id else {
+        return Ok(None);
+    };
+    if client_id.trim().is_empty() || access_token.trim().is_empty() {
+        return Ok(None);
+    }
+    let body = format!(
+        "search \"{}\"; fields cover.image_id; limit 1;",
+        title.replace('\"', "")
+    );
+    let resp = Client::new()
+        .post("https://api.igdb.com/v4/games")
+        .header("Client-ID", client_id)
+        .header("Authorization", format!("Bearer {access_token}"))
+        .body(body)
+        .send()
+        .await
+        .map_err(|err| err.to_string())?;
+    if !resp.status().is_success() {
+        return Ok(None);
+    }
+    let results: Vec<IgdbGameResult> = resp.json().await.map_err(|err| err.to_string())?;
+    if let Some(result) = results.into_iter().find(|item| item.cover.is_some()) {
+        let cover = result.cover.unwrap();
+        let cover_url = format!(
+            "https://images.igdb.com/igdb/image/upload/t_cover_big/{}.jpg",
+            cover.image_id
+        );
+        return Ok(Some((cover_url, "igdb".to_string())));
+    }
+    Ok(None)
+}
+
+fn fetch_youtube_cover(youtube_id: Option<&str>, url: Option<&str>) -> Option<(String, String)> {
+    let id = youtube_id
+        .and_then(|value| {
+            if value.trim().is_empty() {
+                None
+            } else {
+                Some(value)
+            }
+        })
+        .or_else(|| url.and_then(extract_youtube_id));
+    id.map(|video_id| {
+        (
+            format!("https://img.youtube.com/vi/{video_id}/hqdefault.jpg"),
+            "youtube".to_string(),
+        )
+    })
+}
+
+fn extract_youtube_id(url: &str) -> Option<&str> {
+    if let Some(index) = url.find("v=") {
+        let id = &url[(index + 2)..];
+        let end = id.find('&').unwrap_or(id.len());
+        return Some(&id[..end]);
+    }
+    if let Some(index) = url.find("youtu.be/") {
+        let id = &url[(index + 9)..];
+        let end = id.find('?').unwrap_or(id.len());
+        return Some(&id[..end]);
+    }
+    None
 }
 
 fn parse_datetime(value: &str) -> Option<DateTime<Utc>> {

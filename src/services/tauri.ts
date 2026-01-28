@@ -16,8 +16,9 @@ import type {
   DomainTrendSnapshot,
   DeliveryDashboard,
   MediaLibrary,
+  MediaCoverSummary,
   LifeTimeRange,
-  YouTubeDashboard,
+  YouTubeLibrary,
 } from "../types";
 import type {
   GitFileDiff,
@@ -98,9 +99,14 @@ export async function getMediaDashboard(
 
 export async function getYouTubeDashboard(
   workspaceId: string,
-  range: LifeTimeRange,
-): Promise<YouTubeDashboard> {
-  return invoke<YouTubeDashboard>("get_youtube_dashboard", { workspaceId, range });
+): Promise<YouTubeLibrary> {
+  return invoke<YouTubeLibrary>("get_youtube_dashboard", { workspaceId });
+}
+
+export async function enrichMediaCovers(
+  workspaceId: string,
+): Promise<MediaCoverSummary> {
+  return invoke<MediaCoverSummary>("enrich_media_covers", { workspaceId });
 }
 
 export async function addWorkspace(

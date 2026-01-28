@@ -15,6 +15,7 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
     public var domainId: String?
     public var applyDomainInstructions: Bool?
     public var purpose: WorkspacePurpose?
+    public var obsidianRoot: String?
 
     public init(
         sidebarCollapsed: Bool = false,
@@ -23,7 +24,8 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
         gitRoot: String? = nil,
         domainId: String? = nil,
         applyDomainInstructions: Bool? = nil,
-        purpose: WorkspacePurpose? = nil
+        purpose: WorkspacePurpose? = nil,
+        obsidianRoot: String? = nil
     ) {
         self.sidebarCollapsed = sidebarCollapsed
         self.sortOrder = sortOrder
@@ -32,6 +34,7 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
         self.domainId = domainId
         self.applyDomainInstructions = applyDomainInstructions
         self.purpose = purpose
+        self.obsidianRoot = obsidianRoot
     }
 
     enum CodingKeys: String, CodingKey {
@@ -42,6 +45,7 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
         case domainId
         case applyDomainInstructions
         case purpose
+        case obsidianRoot
     }
 }
 

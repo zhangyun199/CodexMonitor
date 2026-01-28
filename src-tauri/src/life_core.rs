@@ -175,9 +175,10 @@ pub(crate) fn build_life_workspace_prompt() -> Result<String, String> {
 
 pub(crate) fn build_delivery_dashboard(
     workspace_path: &str,
+    obsidian_root: Option<&str>,
     range: &str,
 ) -> Result<DeliveryDashboard, String> {
-    let root = PathBuf::from(workspace_path);
+    let root = resolve_obsidian_root(workspace_path, obsidian_root);
     let today = Utc::now().date_naive();
     let (start_date, end_date) = match range {
         "today" => (Some(today), Some(today)),
@@ -269,6 +270,12 @@ pub(crate) fn build_delivery_dashboard(
         orders,
         top_merchants,
     })
+}
+
+fn resolve_obsidian_root(workspace_path: &str, obsidian_root: Option<&str>) -> PathBuf {
+    obsidian_root
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(workspace_path))
 }
 
 fn load_delivery_sessions(root: &Path) -> Vec<DeliverySessionRecord> {

@@ -45,7 +45,7 @@ pub(crate) async fn get_delivery_dashboard(
     }
     let workspaces = state.workspaces.lock().await;
     let entry = workspaces.get(&workspace_id).ok_or("workspace not found")?;
-    build_delivery_dashboard(&entry.path, &range)
+    build_delivery_dashboard(&entry.path, entry.settings.obsidian_root.as_deref(), &range)
 }
 
 #[tauri::command]

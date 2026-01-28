@@ -1035,7 +1035,11 @@ impl DaemonState {
             .get(&workspace_id)
             .cloned()
             .ok_or("workspace not found")?;
-        let dashboard = life::build_delivery_dashboard(&entry.path, &range)?;
+        let dashboard = life::build_delivery_dashboard(
+            &entry.path,
+            entry.settings.obsidian_root.as_deref(),
+            &range,
+        )?;
         serde_json::to_value(dashboard).map_err(|err| err.to_string())
     }
 

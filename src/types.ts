@@ -8,6 +8,7 @@ export type WorkspaceSettings = {
   domainId?: string | null;
   applyDomainInstructions?: boolean | null;
   purpose?: WorkspacePurpose | null;
+  obsidianRoot?: string | null;
 };
 
 export * from "./features/life/types";

@@ -251,6 +251,8 @@ pub(crate) struct WorkspaceSettings {
     pub(crate) apply_domain_instructions: Option<bool>,
     #[serde(default)]
     pub(crate) purpose: Option<WorkspacePurpose>,
+    #[serde(default, rename = "obsidianRoot")]
+    pub(crate) obsidian_root: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -954,6 +956,7 @@ mod tests {
         assert!(entry.settings.sort_order.is_none());
         assert!(entry.settings.group_id.is_none());
         assert!(entry.settings.purpose.is_none());
+        assert!(entry.settings.obsidian_root.is_none());
     }
 
     #[test]
@@ -964,5 +967,6 @@ mod tests {
         assert!(settings.group_id.is_none());
         assert!(settings.git_root.is_none());
         assert!(settings.purpose.is_none());
+        assert!(settings.obsidian_root.is_none());
     }
 }

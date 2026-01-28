@@ -1541,6 +1541,7 @@ mod tests {
                 domain_id: None,
                 apply_domain_instructions: None,
                 purpose: None,
+                obsidian_root: None,
             },
         }
     }

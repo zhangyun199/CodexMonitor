@@ -1,9 +1,9 @@
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::backend::events::{AppServerEvent, EventSink, TerminalOutput};
 use crate::auto_flush::{
     build_snapshot, parse_memory_flush_result, run_memory_flush_summarizer, write_memory_flush,
 };
+use crate::backend::events::{AppServerEvent, EventSink, TerminalOutput};
 use crate::state::AppState;
 
 #[derive(Clone)]

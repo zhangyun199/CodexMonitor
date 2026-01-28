@@ -1,6 +1,6 @@
-pub mod supabase;
 pub mod embeddings;
 pub mod service;
+pub mod supabase;
 
 pub use service::MemoryService;
 

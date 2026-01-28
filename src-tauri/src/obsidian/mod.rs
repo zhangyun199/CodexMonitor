@@ -758,7 +758,10 @@ fn parse_header_date(line: &str, year: Option<i32>) -> Option<NaiveDate> {
     if !trimmed.starts_with("## ") {
         return None;
     }
-    let parts: Vec<&str> = trimmed.trim_start_matches("## ").split_whitespace().collect();
+    let parts: Vec<&str> = trimmed
+        .trim_start_matches("## ")
+        .split_whitespace()
+        .collect();
     if parts.len() < 3 {
         return None;
     }

@@ -391,19 +391,30 @@ fn find_usage_map<'a>(
 fn read_i64(map: &serde_json::Map<String, Value>, keys: &[&str]) -> i64 {
     keys.iter()
         .find_map(|key| map.get(*key))
-        .and_then(|value| value.as_i64().or_else(|| value.as_f64().map(|value| value as i64)))
+        .and_then(|value| {
+            value
+                .as_i64()
+                .or_else(|| value.as_f64().map(|value| value as i64))
+        })
         .unwrap_or(0)
 }
 
 fn read_timestamp_ms(value: &Value) -> Option<i64> {
-    value
-        .get("timestamp")
-        .and_then(|value| value.as_i64().or_else(|| value.as_f64().map(|value| value as i64)))
+    value.get("timestamp").and_then(|value| {
+        value
+            .as_i64()
+            .or_else(|| value.as_f64().map(|value| value as i64))
+    })
 }
 
 fn day_key_for_timestamp_ms(timestamp_ms: i64) -> Option<String> {
     let timestamp = Utc.timestamp_millis_opt(timestamp_ms).single()?;
-    Some(timestamp.with_timezone(&Local).format("%Y-%m-%d").to_string())
+    Some(
+        timestamp
+            .with_timezone(&Local)
+            .format("%Y-%m-%d")
+            .to_string(),
+    )
 }
 
 fn make_day_keys(days: u32) -> Vec<String> {

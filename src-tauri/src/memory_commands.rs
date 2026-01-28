@@ -16,7 +16,8 @@ pub(crate) async fn memory_status(
     app: AppHandle,
 ) -> Result<MemoryStatus, String> {
     if remote_backend::is_remote_mode(&*state).await {
-        let response = remote_backend::call_remote(&*state, app, "memory_status", json!({})).await?;
+        let response =
+            remote_backend::call_remote(&*state, app, "memory_status", json!({})).await?;
         return serde_json::from_value(response).map_err(|err| err.to_string());
     }
 

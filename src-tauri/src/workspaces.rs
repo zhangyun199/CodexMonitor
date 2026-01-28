@@ -1540,6 +1540,7 @@ mod tests {
                 git_root: None,
                 domain_id: None,
                 apply_domain_instructions: None,
+                purpose: None,
             },
         }
     }

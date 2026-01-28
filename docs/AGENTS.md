@@ -40,6 +40,18 @@ Obsidian (raw) → Daemon parses → Dashboard data
              Supabase (aggregations) → Week/Month/Lifetime stats
 ```
 
+### Implementation Status
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| **Phase 0** | ✅ Complete | `WorkspacePurpose` enum, `get_life_workspace_prompt`, thread-level injection, skip per-turn injection |
+| Phase 1 | 🔲 Pending | Delivery Dashboard (React + Rust + iOS) |
+| Phase 2 | 🔲 Pending | Media Dashboard (covers, ratings) |
+| Phase 3 | 🔲 Pending | Remaining domains (Nutrition, Exercise, Finance, YouTube) |
+| Phase 4 | 🔲 Pending | Polish (caching, skeletons, filters, auto-detect) |
+
+**Debug logging**: Set `LIFE_DEBUG=1` to see Life workspace logging.
+
 ## Key paths
 
 | What | Path |
@@ -56,6 +68,8 @@ Obsidian (raw) → Daemon parses → Dashboard data
 | iOS app store | `ios/CodexMonitorMobile/CodexMonitorMobile/CodexStore.swift` |
 | **Life workspace (React)** | `src/features/life/` |
 | **Life workspace (iOS)** | `ios/.../Views/LifeWorkspaceView.swift` |
+| **Life Rust commands** | `src-tauri/src/life.rs` |
+| **Life prompt builder** | `src-tauri/src/life_core.rs` |
 | **Domain prompts** | `workspace-*.md` files |
 
 ## RPC Quick Reference (daemon)

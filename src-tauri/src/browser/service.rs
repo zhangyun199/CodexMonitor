@@ -100,17 +100,18 @@ impl BrowserWorkerClient {
         let mut stdin = self.stdin.lock().await;
         let mut line = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
         line.push('\n');
-        stdin.write_all(line.as_bytes()).await.map_err(|e| e.to_string())?;
+        stdin
+            .write_all(line.as_bytes())
+            .await
+            .map_err(|e| e.to_string())?;
 
         let response = rx.await.map_err(|_| "worker request canceled")?;
         if let Some(error) = response.get("error") {
-            return Err(
-                error
-                    .get("message")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("worker error")
-                    .to_string(),
-            );
+            return Err(error
+                .get("message")
+                .and_then(|v| v.as_str())
+                .unwrap_or("worker error")
+                .to_string());
         }
         Ok(response.get("result").cloned().unwrap_or(Value::Null))
     }

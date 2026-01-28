@@ -17,83 +17,85 @@ fn main() {
         .expect("failed to build tokio runtime");
 
     runtime.block_on(async {
-    let supabase_url = env::var("SUPABASE_URL").unwrap_or_default();
-    let supabase_anon_key = env::var("SUPABASE_ANON_KEY").unwrap_or_default();
-    let minimax_api_key = env::var("MINIMAX_API_KEY").unwrap_or_default();
+        let supabase_url = env::var("SUPABASE_URL").unwrap_or_default();
+        let supabase_anon_key = env::var("SUPABASE_ANON_KEY").unwrap_or_default();
+        let minimax_api_key = env::var("MINIMAX_API_KEY").unwrap_or_default();
 
-    let enabled = !supabase_url.is_empty() && !supabase_anon_key.is_empty();
-    let memory = MemoryService::new(
-        &supabase_url,
-        &supabase_anon_key,
-        if minimax_api_key.is_empty() {
-            None
-        } else {
-            Some(minimax_api_key.as_str())
-        },
-        enabled,
-    );
+        let enabled = !supabase_url.is_empty() && !supabase_anon_key.is_empty();
+        let memory = MemoryService::new(
+            &supabase_url,
+            &supabase_anon_key,
+            if minimax_api_key.is_empty() {
+                None
+            } else {
+                Some(minimax_api_key.as_str())
+            },
+            enabled,
+        );
 
-    eprintln!(
-        "codex-monitor-memory-mcp running (enabled={}, embeddings={})",
-        enabled,
-        !minimax_api_key.is_empty()
-    );
+        eprintln!(
+            "codex-monitor-memory-mcp running (enabled={}, embeddings={})",
+            enabled,
+            !minimax_api_key.is_empty()
+        );
 
-    let stdin = BufReader::new(tokio::io::stdin());
-    let mut lines = stdin.lines();
-    let stdout = tokio::io::stdout();
-    let mut writer = BufWriter::new(stdout);
+        let stdin = BufReader::new(tokio::io::stdin());
+        let mut lines = stdin.lines();
+        let stdout = tokio::io::stdout();
+        let mut writer = BufWriter::new(stdout);
 
-    while let Ok(Some(line)) = lines.next_line().await {
-        let trimmed = line.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        let message: Value = match serde_json::from_str(trimmed) {
-            Ok(value) => value,
-            Err(err) => {
-                eprintln!("Failed to parse MCP message: {err}");
+        while let Ok(Some(line)) = lines.next_line().await {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
                 continue;
             }
-        };
 
-        let id = message.get("id").cloned();
-        let method = message
-            .get("method")
-            .and_then(|value| value.as_str())
-            .unwrap_or("");
-        let params = message.get("params").cloned().unwrap_or(Value::Null);
+            let message: Value = match serde_json::from_str(trimmed) {
+                Ok(value) => value,
+                Err(err) => {
+                    eprintln!("Failed to parse MCP message: {err}");
+                    continue;
+                }
+            };
 
-        let response = match method {
-            "initialize" => id.map(|id| build_result(&id, initialize_result())),
-            "tools/list" => id.map(|id| build_result(&id, json!({ "tools": tool_definitions() }))),
-            "tools/call" => {
-                if let Some(id) = id {
-                    let result = handle_tool_call(&memory, params).await;
-                    Some(match result {
-                        Ok(value) => build_result(&id, value),
-                        Err(err) => build_error(&id, -32602, &err),
-                    })
-                } else {
-                    None
+            let id = message.get("id").cloned();
+            let method = message
+                .get("method")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+            let params = message.get("params").cloned().unwrap_or(Value::Null);
+
+            let response = match method {
+                "initialize" => id.map(|id| build_result(&id, initialize_result())),
+                "tools/list" => {
+                    id.map(|id| build_result(&id, json!({ "tools": tool_definitions() })))
+                }
+                "tools/call" => {
+                    if let Some(id) = id {
+                        let result = handle_tool_call(&memory, params).await;
+                        Some(match result {
+                            Ok(value) => build_result(&id, value),
+                            Err(err) => build_error(&id, -32602, &err),
+                        })
+                    } else {
+                        None
+                    }
+                }
+                "resources/list" => id.map(|id| build_result(&id, json!({ "resources": [] }))),
+                "prompts/list" => id.map(|id| build_result(&id, json!({ "prompts": [] }))),
+                "initialized" => None,
+                "ping" => id.map(|id| build_result(&id, json!({ "ok": true }))),
+                _ => id.map(|id| build_error(&id, -32601, &format!("Unknown method: {method}"))),
+            };
+
+            if let Some(payload) = response {
+                if let Ok(serialized) = serde_json::to_string(&payload) {
+                    let _ = writer.write_all(serialized.as_bytes()).await;
+                    let _ = writer.write_all(b"\n").await;
+                    let _ = writer.flush().await;
                 }
             }
-            "resources/list" => id.map(|id| build_result(&id, json!({ "resources": [] }))),
-            "prompts/list" => id.map(|id| build_result(&id, json!({ "prompts": [] }))),
-            "initialized" => None,
-            "ping" => id.map(|id| build_result(&id, json!({ "ok": true }))),
-            _ => id.map(|id| build_error(&id, -32601, &format!("Unknown method: {method}"))),
-        };
-
-        if let Some(payload) = response {
-            if let Ok(serialized) = serde_json::to_string(&payload) {
-                let _ = writer.write_all(serialized.as_bytes()).await;
-                let _ = writer.write_all(b"\n").await;
-                let _ = writer.flush().await;
-            }
         }
-    }
     });
 }
 
@@ -251,10 +253,7 @@ fn format_search(query: &str, results: &[MemorySearchResult]) -> String {
         };
         let line1 = format!("• {}{}", tag_str, preview(&entry.content, 140));
         let score = format_score(entry.score, entry.rank, entry.distance);
-        let line2 = format!(
-            "  type={} {} id={}",
-            entry.memory_type, score, entry.id
-        );
+        let line2 = format!("  type={} {} id={}", entry.memory_type, score, entry.id);
         out.push_str(&line1);
         out.push('\n');
         out.push_str(&line2);

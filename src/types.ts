@@ -1,3 +1,5 @@
+export type WorkspacePurpose = "coding" | "life";
+
 export type WorkspaceSettings = {
   sidebarCollapsed: boolean;
   sortOrder?: number | null;
@@ -5,6 +7,7 @@ export type WorkspaceSettings = {
   gitRoot?: string | null;
   domainId?: string | null;
   applyDomainInstructions?: boolean | null;
+  purpose?: WorkspacePurpose | null;
 };
 
 export type WorkspaceGroup = {

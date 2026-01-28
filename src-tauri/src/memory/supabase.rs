@@ -84,7 +84,10 @@ impl SupabaseClient {
         }
 
         let entries: Vec<MemoryEntry> = resp.json().await.map_err(|e| e.to_string())?;
-        entries.into_iter().next().ok_or("No entry returned".to_string())
+        entries
+            .into_iter()
+            .next()
+            .ok_or("No entry returned".to_string())
     }
 
     /// Update memory with embedding
@@ -227,10 +230,7 @@ impl SupabaseClient {
     /// Get memory status (counts by status)
     pub async fn get_status(&self) -> Result<Value, String> {
         // Count total, pending, ready, error
-        let url = format!(
-            "{}/rest/v1/memory?select=embedding_status",
-            self.url
-        );
+        let url = format!("{}/rest/v1/memory?select=embedding_status", self.url);
 
         let resp = self
             .client
@@ -365,7 +365,10 @@ mod tests {
         });
 
         let client = SupabaseClient::new(&server.base_url(), "anon");
-        let results = client.search_by_embedding(&[0.1, 0.2], 10, Some(0.5)).await.unwrap();
+        let results = client
+            .search_by_embedding(&[0.1, 0.2], 10, Some(0.5))
+            .await
+            .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "vec");
     }

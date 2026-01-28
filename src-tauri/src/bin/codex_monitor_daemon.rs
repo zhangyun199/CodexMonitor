@@ -1,30 +1,32 @@
+#[path = "../memory/auto_flush.rs"]
+mod auto_flush;
 #[allow(dead_code)]
 #[path = "../backend/mod.rs"]
 mod backend;
-#[path = "../codex_params.rs"]
-mod codex_params;
+#[path = "../browser/mod.rs"]
+mod browser;
 #[path = "../codex_config.rs"]
 mod codex_config;
 #[path = "../codex_home.rs"]
 mod codex_home;
-#[path = "../browser/mod.rs"]
-mod browser;
+#[path = "../codex_params.rs"]
+mod codex_params;
 #[path = "../git_utils.rs"]
 mod git_utils;
+#[path = "../life_core.rs"]
+mod life;
 #[path = "../local_usage_core.rs"]
 mod local_usage_core;
 #[path = "../memory/mod.rs"]
 mod memory;
-#[path = "../memory/auto_flush.rs"]
-mod auto_flush;
+#[path = "../obsidian/mod.rs"]
+mod obsidian;
 #[path = "../rules.rs"]
 mod rules;
 #[path = "../skills/mod.rs"]
 mod skills;
 #[path = "../storage.rs"]
 mod storage;
-#[path = "../obsidian/mod.rs"]
-mod obsidian;
 #[allow(dead_code)]
 #[path = "../types.rs"]
 mod types;
@@ -53,6 +55,10 @@ use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tokio::task;
 use uuid::Uuid;
 
+use auto_flush::{
+    build_snapshot, parse_memory_flush_result, run_memory_flush_summarizer, write_memory_flush,
+    AutoMemoryRuntime,
+};
 use backend::app_server::{spawn_workspace_session, WorkspaceSession};
 use backend::events::{AppServerEvent, EventSink, TerminalOutput};
 use browser::service::BrowserService;
@@ -61,6 +67,8 @@ use git_utils::{
     checkout_branch, commit_to_entry, diff_patch_to_string, diff_stats_for_path,
     list_git_roots as scan_git_roots, parse_github_repo, resolve_git_root,
 };
+use memory::MemoryService;
+use skills::skill_md::{parse_skill_md, validate_skill};
 use storage::{
     read_domains, read_settings, read_workspaces, seed_domains_from_files, write_domains,
     write_settings, write_workspaces,
@@ -72,12 +80,6 @@ use types::{
     LocalUsageSnapshot, WorkspaceEntry, WorkspaceInfo, WorkspaceKind, WorkspaceSettings,
     WorktreeInfo,
 };
-use auto_flush::{
-    build_snapshot, parse_memory_flush_result, run_memory_flush_summarizer, write_memory_flush,
-    AutoMemoryRuntime,
-};
-use memory::MemoryService;
-use skills::skill_md::{parse_skill_md, validate_skill};
 use utils::normalize_git_path;
 
 const DEFAULT_LISTEN_ADDR: &str = "127.0.0.1:4732";
@@ -1019,13 +1021,84 @@ impl DaemonState {
         read_workspace_file_inner(&root, &path)
     }
 
+    async fn get_life_workspace_prompt(&self) -> Result<String, String> {
+        life::build_life_workspace_prompt()
+    }
+
+    async fn get_delivery_dashboard(
+        &self,
+        _workspace_id: String,
+        _range: String,
+    ) -> Result<Value, String> {
+        Ok(json!({}))
+    }
+
+    async fn get_nutrition_dashboard(
+        &self,
+        _workspace_id: String,
+        _range: String,
+    ) -> Result<Value, String> {
+        Ok(json!({}))
+    }
+
+    async fn get_exercise_dashboard(
+        &self,
+        _workspace_id: String,
+        _range: String,
+    ) -> Result<Value, String> {
+        Ok(json!({}))
+    }
+
+    async fn get_media_dashboard(
+        &self,
+        _workspace_id: String,
+        _range: String,
+    ) -> Result<Value, String> {
+        Ok(json!({}))
+    }
+
+    async fn get_youtube_dashboard(
+        &self,
+        _workspace_id: String,
+        _range: String,
+    ) -> Result<Value, String> {
+        Ok(json!({}))
+    }
+
+    async fn get_finance_dashboard(
+        &self,
+        _workspace_id: String,
+        _range: String,
+    ) -> Result<Value, String> {
+        Ok(json!({}))
+    }
+
     async fn start_thread(&self, workspace_id: String) -> Result<Value, String> {
         let session = self.get_session(&workspace_id).await?;
-        let params = json!({
-            "cwd": session.entry.path,
-            "approvalPolicy": "on-request"
-        });
-        session.send_request("thread/start", params).await
+        let is_life = {
+            let workspaces = self.workspaces.lock().await;
+            workspaces
+                .get(&workspace_id)
+                .map(|workspace| life::is_life_workspace(&workspace.settings))
+                .unwrap_or(false)
+        };
+
+        let mut params = Map::new();
+        params.insert("cwd".to_string(), json!(session.entry.path));
+        params.insert("approvalPolicy".to_string(), json!("on-request"));
+        if is_life {
+            let prompt = life::build_life_workspace_prompt()?;
+            if life::life_debug_enabled() {
+                eprintln!(
+                    "[life] start_thread: injecting systemPrompt (len={})",
+                    prompt.len()
+                );
+            }
+            params.insert("systemPrompt".to_string(), json!(prompt));
+        }
+        session
+            .send_request("thread/start", Value::Object(params))
+            .await
     }
 
     async fn resume_thread(
@@ -1099,29 +1172,41 @@ impl DaemonState {
 
         let input = build_user_input(&text, images.as_deref())?;
 
-        let domain_instructions = {
+        let (is_life_workspace, domain_instructions) = {
             let workspaces = self.workspaces.lock().await;
             let workspace = workspaces.get(&workspace_id);
             if let Some(workspace) = workspace {
-                let apply = workspace
-                    .settings
-                    .apply_domain_instructions
-                    .unwrap_or(true);
-                if apply {
-                    let domains = self.domains.lock().await;
-                    workspace
-                        .settings
-                        .domain_id
-                        .as_ref()
-                        .and_then(|id| domains.iter().find(|domain| &domain.id == id))
-                        .map(|domain| domain.system_prompt.clone())
+                let is_life_workspace = life::is_life_workspace(&workspace.settings);
+                if is_life_workspace {
+                    (true, None)
                 } else {
-                    None
+                    let apply = workspace.settings.apply_domain_instructions.unwrap_or(true);
+                    if apply {
+                        let domains = self.domains.lock().await;
+                        (
+                            false,
+                            workspace
+                                .settings
+                                .domain_id
+                                .as_ref()
+                                .and_then(|id| domains.iter().find(|domain| &domain.id == id))
+                                .map(|domain| domain.system_prompt.clone()),
+                        )
+                    } else {
+                        (false, None)
+                    }
                 }
             } else {
-                None
+                (false, None)
             }
         };
+
+        if is_life_workspace && life::life_debug_enabled() {
+            eprintln!(
+                "[life] send_user_message: skipping per-turn domain injection (thread={})",
+                thread_id
+            );
+        }
 
         let params = build_turn_start_params(
             &thread_id,
@@ -1197,13 +1282,19 @@ impl DaemonState {
         session.send_request("skills/list", params).await
     }
 
-    async fn skills_config_write(&self, workspace_id: String, config: Value) -> Result<Value, String> {
+    async fn skills_config_write(
+        &self,
+        workspace_id: String,
+        config: Value,
+    ) -> Result<Value, String> {
         let session = self.get_session(&workspace_id).await?;
         let mut payload = match config {
             Value::Object(map) => map,
             _ => Map::new(),
         };
-        payload.entry("cwd".to_string()).or_insert(json!(session.entry.path));
+        payload
+            .entry("cwd".to_string())
+            .or_insert(json!(session.entry.path));
         let payload_value = Value::Object(payload.clone());
         let result = session
             .send_request("skills/config/write", payload_value)
@@ -1280,7 +1371,9 @@ impl DaemonState {
         target: String,
         workspace_id: Option<String>,
     ) -> Result<Value, String> {
-        let root = self.resolve_skill_root(&target, workspace_id.as_deref()).await?;
+        let root = self
+            .resolve_skill_root(&target, workspace_id.as_deref())
+            .await?;
         std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
 
         let repo_name = source_url
@@ -1320,7 +1413,9 @@ impl DaemonState {
         target: String,
         workspace_id: Option<String>,
     ) -> Result<Value, String> {
-        let root = self.resolve_skill_root(&target, workspace_id.as_deref()).await?;
+        let root = self
+            .resolve_skill_root(&target, workspace_id.as_deref())
+            .await?;
         let dest = root.join(&name);
         if !dest.exists() {
             return Err("Skill not found".to_string());
@@ -1343,9 +1438,7 @@ impl DaemonState {
                 let workspace_id =
                     workspace_id.ok_or("workspaceId required for workspace target")?;
                 let workspaces = self.workspaces.lock().await;
-                let entry = workspaces
-                    .get(workspace_id)
-                    .ok_or("workspace not found")?;
+                let entry = workspaces.get(workspace_id).ok_or("workspace not found")?;
                 Ok(PathBuf::from(&entry.path).join(".codex").join("skills"))
             }
             _ => Err("Invalid target (use 'global' or 'workspace')".to_string()),
@@ -4530,10 +4623,7 @@ async fn handle_rpc_request(
                 .get("query")
                 .and_then(|v| v.as_str())
                 .ok_or("Missing query")?;
-            let limit = params
-                .get("limit")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(10) as usize;
+            let limit = params.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
 
             let memory = state.memory.read().await;
             match memory.as_ref() {
@@ -4545,7 +4635,10 @@ async fn handle_rpc_request(
             }
         }
         "memory_append" => {
-            let memory_type = params.get("type").and_then(|v| v.as_str()).unwrap_or("daily");
+            let memory_type = params
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("daily");
             let content = params
                 .get("content")
                 .and_then(|v| v.as_str())
@@ -4593,49 +4686,123 @@ async fn handle_rpc_request(
             state.memory_flush_now(workspace_id, thread_id, force).await
         }
         "browser_create_session" => {
-            let params = if params.is_object() { params } else { json!({}) };
+            let params = if params.is_object() {
+                params
+            } else {
+                json!({})
+            };
             state.browser.request("browser.create", params).await
         }
         "browser_list_sessions" => {
-            let params = if params.is_object() { params } else { json!({}) };
+            let params = if params.is_object() {
+                params
+            } else {
+                json!({})
+            };
             state.browser.request("browser.list", params).await
         }
         "browser_close_session" => {
-            let params = if params.is_object() { params } else { json!({}) };
+            let params = if params.is_object() {
+                params
+            } else {
+                json!({})
+            };
             state.browser.request("browser.close", params).await
         }
         "browser_navigate" => {
-            let params = if params.is_object() { params } else { json!({}) };
+            let params = if params.is_object() {
+                params
+            } else {
+                json!({})
+            };
             state.browser.request("browser.navigate", params).await
         }
         "browser_screenshot" => {
-            let params = if params.is_object() { params } else { json!({}) };
+            let params = if params.is_object() {
+                params
+            } else {
+                json!({})
+            };
             state.browser.request("browser.screenshot", params).await
         }
         "browser_click" => {
-            let params = if params.is_object() { params } else { json!({}) };
+            let params = if params.is_object() {
+                params
+            } else {
+                json!({})
+            };
             state.browser.request("browser.click", params).await
         }
         "browser_type" => {
-            let params = if params.is_object() { params } else { json!({}) };
+            let params = if params.is_object() {
+                params
+            } else {
+                json!({})
+            };
             state.browser.request("browser.type", params).await
         }
         "browser_press" => {
-            let params = if params.is_object() { params } else { json!({}) };
+            let params = if params.is_object() {
+                params
+            } else {
+                json!({})
+            };
             state.browser.request("browser.press", params).await
         }
         "browser_snapshot" => {
-            let params = if params.is_object() { params } else { json!({}) };
+            let params = if params.is_object() {
+                params
+            } else {
+                json!({})
+            };
             state.browser.request("browser.snapshot", params).await
         }
         "browser_evaluate" => {
-            let params = if params.is_object() { params } else { json!({}) };
+            let params = if params.is_object() {
+                params
+            } else {
+                json!({})
+            };
             state.browser.request("browser.evaluate", params).await
         }
         "codex_doctor" => {
             let codex_bin = parse_optional_string(&params, "codexBin");
             let result = state.codex_doctor(codex_bin).await?;
             Ok(result)
+        }
+        "get_life_workspace_prompt" => {
+            let prompt = state.get_life_workspace_prompt().await?;
+            serde_json::to_value(prompt).map_err(|err| err.to_string())
+        }
+        "get_delivery_dashboard" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let range = parse_string(&params, "range")?;
+            state.get_delivery_dashboard(workspace_id, range).await
+        }
+        "get_nutrition_dashboard" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let range = parse_string(&params, "range")?;
+            state.get_nutrition_dashboard(workspace_id, range).await
+        }
+        "get_exercise_dashboard" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let range = parse_string(&params, "range")?;
+            state.get_exercise_dashboard(workspace_id, range).await
+        }
+        "get_media_dashboard" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let range = parse_string(&params, "range")?;
+            state.get_media_dashboard(workspace_id, range).await
+        }
+        "get_youtube_dashboard" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let range = parse_string(&params, "range")?;
+            state.get_youtube_dashboard(workspace_id, range).await
+        }
+        "get_finance_dashboard" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let range = parse_string(&params, "range")?;
+            state.get_finance_dashboard(workspace_id, range).await
         }
         "get_commit_message_prompt" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
@@ -4731,10 +4898,7 @@ async fn handle_rpc_request(
         "skills_config_write" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
             let config = match params {
-                Value::Object(map) => map
-                    .get("config")
-                    .cloned()
-                    .unwrap_or_else(|| json!({})),
+                Value::Object(map) => map.get("config").cloned().unwrap_or_else(|| json!({})),
                 _ => json!({}),
             };
             state.skills_config_write(workspace_id, config).await

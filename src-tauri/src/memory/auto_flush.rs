@@ -211,7 +211,11 @@ fn extract_item_text(item: &Value) -> String {
         return text.to_string();
     }
     if let Some(content) = item.get("content") {
-        if let Some(text) = content.get(0).and_then(|v| v.get("text")).and_then(|v| v.as_str()) {
+        if let Some(text) = content
+            .get(0)
+            .and_then(|v| v.get("text"))
+            .and_then(|v| v.as_str())
+        {
             return text.to_string();
         }
     }
@@ -380,8 +384,7 @@ pub async fn run_memory_flush_summarizer(
 }
 
 fn build_memory_flush_prompt(snapshot: &MemoryFlushSnapshot) -> Result<String, String> {
-    let snapshot_json =
-        serde_json::to_string_pretty(snapshot).map_err(|err| err.to_string())?;
+    let snapshot_json = serde_json::to_string_pretty(snapshot).map_err(|err| err.to_string())?;
     Ok(format!(
         "You are CodexMonitor Auto-Memory.\n\n\
 TASK:\n\

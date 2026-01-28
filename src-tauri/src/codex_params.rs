@@ -41,10 +41,7 @@ pub(crate) fn normalize_collaboration_mode(value: Option<Value>) -> Option<Value
             }
             if !settings.contains_key("developer_instructions") {
                 if let Some(developer_instructions) = developer_instructions.clone() {
-                    settings.insert(
-                        "developer_instructions".to_string(),
-                        developer_instructions,
-                    );
+                    settings.insert("developer_instructions".to_string(), developer_instructions);
                 }
             }
             Some(Value::Object(settings))
@@ -60,10 +57,7 @@ pub(crate) fn normalize_collaboration_mode(value: Option<Value>) -> Option<Value
                 settings.insert("reasoning_effort".to_string(), reasoning_effort);
             }
             if let Some(developer_instructions) = developer_instructions.clone() {
-                settings.insert(
-                    "developer_instructions".to_string(),
-                    developer_instructions,
-                );
+                settings.insert("developer_instructions".to_string(), developer_instructions);
             }
             Some(Value::Object(settings))
         }
@@ -160,10 +154,7 @@ fn extract_developer_instructions(collaboration_mode: &Option<Value>) -> Option<
         .map(|value| value.to_string())
 }
 
-fn merge_instruction_injection(
-    base: Option<String>,
-    extra: Option<String>,
-) -> Option<String> {
+fn merge_instruction_injection(base: Option<String>, extra: Option<String>) -> Option<String> {
     let base = base.and_then(|value| {
         let trimmed = value.trim();
         if trimmed.is_empty() {
@@ -194,7 +185,10 @@ mod tests {
 
     #[test]
     fn normalize_collaboration_mode_returns_none_for_null() {
-        assert_eq!(normalize_collaboration_mode(Some(serde_json::Value::Null)), None);
+        assert_eq!(
+            normalize_collaboration_mode(Some(serde_json::Value::Null)),
+            None
+        );
     }
 
     #[test]

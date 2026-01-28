@@ -5,10 +5,12 @@ use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tokio::sync::{Mutex, RwLock};
 
+use crate::auto_flush::AutoMemoryRuntime;
 use crate::dictation::DictationState;
 use crate::memory::MemoryService;
-use crate::auto_flush::AutoMemoryRuntime;
-use crate::storage::{read_domains, read_settings, read_workspaces, seed_domains_from_files, write_domains};
+use crate::storage::{
+    read_domains, read_settings, read_workspaces, seed_domains_from_files, write_domains,
+};
 use crate::types::{AppSettings, Domain, WorkspaceEntry};
 
 pub(crate) struct AppState {

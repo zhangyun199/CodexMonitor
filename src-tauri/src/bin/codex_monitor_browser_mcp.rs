@@ -66,7 +66,8 @@ impl DaemonClient {
                                 .unwrap_or("daemon error");
                             let _ = tx.send(Err(msg.to_string()));
                         } else {
-                            let _ = tx.send(Ok(value.get("result").cloned().unwrap_or(Value::Null)));
+                            let _ =
+                                tx.send(Ok(value.get("result").cloned().unwrap_or(Value::Null)));
                         }
                     }
                 }
@@ -165,13 +166,14 @@ fn tool_definitions() -> Vec<Value> {
             "name": "browser_snapshot",
             "description": "Get screenshot + simplified DOM list.",
             "inputSchema": { "type": "object", "properties": { "sessionId": { "type": "string" }, "fullPage": { "type": "boolean" } }, "required": ["sessionId"] }
-        })
+        }),
     ]
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let addr = env::var("CODEX_MONITOR_DAEMON_ADDR").unwrap_or_else(|_| "127.0.0.1:4732".to_string());
+    let addr =
+        env::var("CODEX_MONITOR_DAEMON_ADDR").unwrap_or_else(|_| "127.0.0.1:4732".to_string());
     let token = env::var("CODEX_MONITOR_DAEMON_TOKEN").ok();
     let client = match DaemonClient::connect(&addr, token).await {
         Ok(client) => client,

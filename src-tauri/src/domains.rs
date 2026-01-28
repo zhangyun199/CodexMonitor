@@ -1,11 +1,11 @@
 use serde_json::json;
 use tauri::{AppHandle, State};
 
+use crate::obsidian::compute_domain_trends;
 use crate::remote_backend;
 use crate::state::AppState;
 use crate::storage::write_domains;
 use crate::types::{Domain, DomainTrendSnapshot};
-use crate::obsidian::compute_domain_trends;
 
 fn normalize_domain(mut domain: Domain) -> Domain {
     if domain.view_type.trim().is_empty() {
@@ -20,8 +20,7 @@ pub(crate) async fn domains_list(
     app: AppHandle,
 ) -> Result<Vec<Domain>, String> {
     if remote_backend::is_remote_mode(&*state).await {
-        let response =
-            remote_backend::call_remote(&*state, app, "domains_list", json!({})).await?;
+        let response = remote_backend::call_remote(&*state, app, "domains_list", json!({})).await?;
         return serde_json::from_value(response).map_err(|err| err.to_string());
     }
     let domains = state.domains.lock().await;
@@ -133,5 +132,7 @@ pub(crate) async fn domain_trends(
 
 #[tauri::command]
 pub(crate) async fn read_text_file(path: String) -> Result<String, String> {
-    tokio::fs::read_to_string(path).await.map_err(|e| e.to_string())
+    tokio::fs::read_to_string(path)
+        .await
+        .map_err(|e| e.to_string())
 }

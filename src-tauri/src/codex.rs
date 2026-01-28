@@ -4,26 +4,27 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use chrono::{DateTime, Utc};
+use ignore::WalkBuilder;
 use tauri::{AppHandle, State};
 use tokio::process::Command;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
-use chrono::{DateTime, Utc};
-use ignore::WalkBuilder;
 
 pub(crate) use crate::backend::app_server::WorkspaceSession;
 use crate::backend::app_server::{
     build_codex_command_with_bin, build_codex_path_env, check_codex_installation,
     spawn_workspace_session as spawn_workspace_session_inner,
 };
-use crate::codex_params::{build_turn_start_params, build_user_input};
+use crate::codex_home::resolve_codex_home;
 use crate::codex_home::resolve_workspace_codex_home;
+use crate::codex_params::{build_turn_start_params, build_user_input};
 use crate::event_sink::TauriEventSink;
+use crate::life;
 use crate::remote_backend;
 use crate::rules;
 use crate::state::AppState;
 use crate::types::WorkspaceEntry;
-use crate::codex_home::resolve_codex_home;
 
 pub(crate) async fn spawn_workspace_session(
     entry: WorkspaceEntry,
@@ -176,11 +177,30 @@ pub(crate) async fn start_thread(
             .cloned()
             .ok_or("workspace not connected")?
     };
-    let params = json!({
-        "cwd": session.entry.path,
-        "approvalPolicy": "on-request"
-    });
-    session.send_request("thread/start", params).await
+    let is_life = {
+        let workspaces = state.workspaces.lock().await;
+        workspaces
+            .get(&workspace_id)
+            .map(|workspace| life::is_life_workspace(&workspace.settings))
+            .unwrap_or(false)
+    };
+
+    let mut params = Map::new();
+    params.insert("cwd".to_string(), json!(session.entry.path));
+    params.insert("approvalPolicy".to_string(), json!("on-request"));
+    if is_life {
+        let prompt = life::build_life_workspace_prompt()?;
+        if life::life_debug_enabled() {
+            eprintln!(
+                "[life] start_thread: injecting systemPrompt (len={})",
+                prompt.len()
+            );
+        }
+        params.insert("systemPrompt".to_string(), json!(prompt));
+    }
+    session
+        .send_request("thread/start", Value::Object(params))
+        .await
 }
 
 #[tauri::command]
@@ -448,29 +468,41 @@ pub(crate) async fn send_user_message(
     };
 
     let input = build_user_input(&text, images.as_deref())?;
-    let domain_instructions = {
+    let (is_life_workspace, domain_instructions) = {
         let workspaces = state.workspaces.lock().await;
         let workspace = workspaces.get(&workspace_id);
         if let Some(workspace) = workspace {
-            let apply = workspace
-                .settings
-                .apply_domain_instructions
-                .unwrap_or(true);
-            if apply {
-                let domains = state.domains.lock().await;
-                workspace
-                    .settings
-                    .domain_id
-                    .as_ref()
-                    .and_then(|id| domains.iter().find(|domain| &domain.id == id))
-                    .map(|domain| domain.system_prompt.clone())
+            let is_life_workspace = life::is_life_workspace(&workspace.settings);
+            if is_life_workspace {
+                (true, None)
             } else {
-                None
+                let apply = workspace.settings.apply_domain_instructions.unwrap_or(true);
+                if apply {
+                    let domains = state.domains.lock().await;
+                    (
+                        false,
+                        workspace
+                            .settings
+                            .domain_id
+                            .as_ref()
+                            .and_then(|id| domains.iter().find(|domain| &domain.id == id))
+                            .map(|domain| domain.system_prompt.clone()),
+                    )
+                } else {
+                    (false, None)
+                }
             }
         } else {
-            None
+            (false, None)
         }
     };
+
+    if is_life_workspace && life::life_debug_enabled() {
+        eprintln!(
+            "[life] send_user_message: skipping per-turn domain injection (thread={})",
+            thread_id
+        );
+    }
 
     let params = build_turn_start_params(
         &thread_id,

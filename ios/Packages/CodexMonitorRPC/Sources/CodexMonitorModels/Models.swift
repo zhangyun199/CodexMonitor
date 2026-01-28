@@ -2,6 +2,11 @@ import Foundation
 
 // MARK: - Workspace Models
 
+public enum WorkspacePurpose: String, Codable, Sendable {
+    case coding
+    case life
+}
+
 public struct WorkspaceSettings: Codable, Hashable, Sendable {
     public var sidebarCollapsed: Bool
     public var sortOrder: Int?
@@ -9,6 +14,7 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
     public var gitRoot: String?
     public var domainId: String?
     public var applyDomainInstructions: Bool?
+    public var purpose: WorkspacePurpose?
 
     public init(
         sidebarCollapsed: Bool = false,
@@ -16,7 +22,8 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
         groupId: String? = nil,
         gitRoot: String? = nil,
         domainId: String? = nil,
-        applyDomainInstructions: Bool? = nil
+        applyDomainInstructions: Bool? = nil,
+        purpose: WorkspacePurpose? = nil
     ) {
         self.sidebarCollapsed = sidebarCollapsed
         self.sortOrder = sortOrder
@@ -24,6 +31,7 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
         self.gitRoot = gitRoot
         self.domainId = domainId
         self.applyDomainInstructions = applyDomainInstructions
+        self.purpose = purpose
     }
 
     enum CodingKeys: String, CodingKey {
@@ -33,6 +41,7 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
         case gitRoot
         case domainId
         case applyDomainInstructions
+        case purpose
     }
 }
 

@@ -1,22 +1,23 @@
 use tauri::Manager;
 
-mod backend;
-mod codex;
-mod codex_params;
-mod codex_config;
-mod codex_home;
 #[path = "memory/auto_flush.rs"]
 mod auto_flush;
+mod backend;
+mod codex;
+mod codex_config;
+mod codex_home;
+mod codex_params;
 #[cfg(not(target_os = "windows"))]
 #[path = "dictation.rs"]
 mod dictation;
 #[cfg(target_os = "windows")]
 #[path = "dictation_stub.rs"]
 mod dictation;
-mod event_sink;
 mod domains;
+mod event_sink;
 mod git;
 mod git_utils;
+mod life;
 mod local_usage;
 mod local_usage_core;
 mod memory;
@@ -138,6 +139,13 @@ pub fn run() {
             prompts::prompts_delete,
             prompts::prompts_move,
             prompts::prompts_workspace_dir,
+            life::get_life_workspace_prompt,
+            life::get_delivery_dashboard,
+            life::get_nutrition_dashboard,
+            life::get_exercise_dashboard,
+            life::get_media_dashboard,
+            life::get_youtube_dashboard,
+            life::get_finance_dashboard,
             prompts::prompts_global_dir,
             memory_commands::memory_status,
             memory_commands::memory_search,

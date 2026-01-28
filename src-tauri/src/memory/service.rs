@@ -181,7 +181,10 @@ fn merge_results(
 
     for item in semantic {
         let key = item.id.clone();
-        let score = item.score.or_else(|| item.distance.map(|d| 1.0 - d)).unwrap_or(0.0);
+        let score = item
+            .score
+            .or_else(|| item.distance.map(|d| 1.0 - d))
+            .unwrap_or(0.0);
         scores.insert(key.clone(), score);
         by_id.insert(key, item);
     }

@@ -42,8 +42,7 @@ pub fn parse_skill_md(path: &Path) -> Result<SkillDescriptor, String> {
     let mut requirements = Requirements::default();
 
     if let Some(frontmatter) = frontmatter {
-        let fm: SkillFrontmatter =
-            serde_yaml::from_str(&frontmatter).map_err(|e| e.to_string())?;
+        let fm: SkillFrontmatter = serde_yaml::from_str(&frontmatter).map_err(|e| e.to_string())?;
         if let Some(fm_name) = fm.name {
             name = fm_name;
         }
@@ -61,11 +60,7 @@ pub fn parse_skill_md(path: &Path) -> Result<SkillDescriptor, String> {
     Ok(SkillDescriptor {
         name,
         description,
-        path: path
-            .parent()
-            .unwrap_or(Path::new(""))
-            .display()
-            .to_string(),
+        path: path.parent().unwrap_or(Path::new("")).display().to_string(),
         requirements,
     })
 }

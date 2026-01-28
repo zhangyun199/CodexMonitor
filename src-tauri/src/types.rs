@@ -213,6 +213,13 @@ impl WorkspaceKind {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum WorkspacePurpose {
+    Coding,
+    Life,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct WorktreeInfo {
     pub(crate) branch: String,
@@ -242,6 +249,8 @@ pub(crate) struct WorkspaceSettings {
     pub(crate) domain_id: Option<String>,
     #[serde(default, rename = "applyDomainInstructions")]
     pub(crate) apply_domain_instructions: Option<bool>,
+    #[serde(default)]
+    pub(crate) purpose: Option<WorkspacePurpose>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -806,8 +815,8 @@ impl Default for AppSettings {
 #[cfg(test)]
 mod tests {
     use super::{
-        AppSettings, AutoMemorySettings, BackendMode, WorkspaceEntry, WorkspaceGroup, WorkspaceKind,
-        WorkspaceSettings,
+        AppSettings, AutoMemorySettings, BackendMode, WorkspaceEntry, WorkspaceGroup,
+        WorkspaceKind, WorkspaceSettings,
     };
 
     #[test]
@@ -944,6 +953,7 @@ mod tests {
         assert!(entry.worktree.is_none());
         assert!(entry.settings.sort_order.is_none());
         assert!(entry.settings.group_id.is_none());
+        assert!(entry.settings.purpose.is_none());
     }
 
     #[test]
@@ -953,5 +963,6 @@ mod tests {
         assert!(settings.sort_order.is_none());
         assert!(settings.group_id.is_none());
         assert!(settings.git_root.is_none());
+        assert!(settings.purpose.is_none());
     }
 }

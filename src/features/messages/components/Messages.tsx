@@ -800,6 +800,7 @@ export const Messages = memo(function Messages({
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const autoScrollRef = useRef(true);
+  const wasThinkingRef = useRef(isThinking);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [collapsedToolGroups, setCollapsedToolGroups] = useState<Set<string>>(
     new Set(),
@@ -838,6 +839,23 @@ export const Messages = memo(function Messages({
   useEffect(() => {
     autoScrollRef.current = true;
   }, [threadId]);
+
+  useEffect(() => {
+    const wasThinking = wasThinkingRef.current;
+    if (wasThinking && !isThinking) {
+      const reasoningIds = items
+        .filter((item) => item.kind === "reasoning")
+        .map((item) => item.id);
+      if (reasoningIds.length > 0) {
+        setExpandedItems((prev) => {
+          const next = new Set(prev);
+          reasoningIds.forEach((id) => next.delete(id));
+          return next;
+        });
+      }
+    }
+    wasThinkingRef.current = isThinking;
+  }, [isThinking, items]);
   const toggleExpanded = useCallback((id: string) => {
     setExpandedItems((prev) => {
       const next = new Set(prev);

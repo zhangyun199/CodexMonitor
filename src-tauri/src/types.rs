@@ -238,6 +238,87 @@ pub(crate) struct WorkspaceSettings {
     pub(crate) group_id: Option<String>,
     #[serde(default, rename = "gitRoot")]
     pub(crate) git_root: Option<String>,
+    #[serde(default, rename = "domainId")]
+    pub(crate) domain_id: Option<String>,
+    #[serde(default, rename = "applyDomainInstructions")]
+    pub(crate) apply_domain_instructions: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub(crate) struct DomainTheme {
+    pub(crate) icon: String,
+    pub(crate) color: String,
+    pub(crate) accent: String,
+    #[serde(default)]
+    pub(crate) background: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct Domain {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) description: Option<String>,
+    #[serde(rename = "systemPrompt")]
+    pub(crate) system_prompt: String,
+    #[serde(default = "default_domain_view_type", rename = "viewType")]
+    pub(crate) view_type: String,
+    #[serde(default)]
+    pub(crate) theme: DomainTheme,
+    #[serde(default, rename = "defaultModel")]
+    pub(crate) default_model: Option<String>,
+    #[serde(default, rename = "defaultAccessMode")]
+    pub(crate) default_access_mode: Option<String>,
+    #[serde(default, rename = "defaultReasoningEffort")]
+    pub(crate) default_reasoning_effort: Option<String>,
+    #[serde(default, rename = "defaultApprovalPolicy")]
+    pub(crate) default_approval_policy: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct TrendCard {
+    pub(crate) id: String,
+    pub(crate) label: String,
+    pub(crate) value: String,
+    #[serde(default, rename = "subLabel")]
+    pub(crate) sub_label: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct TrendListItem {
+    pub(crate) label: String,
+    pub(crate) value: String,
+    #[serde(default, rename = "subLabel")]
+    pub(crate) sub_label: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct TrendList {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) items: Vec<TrendListItem>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct TrendSeries {
+    pub(crate) id: String,
+    pub(crate) label: String,
+    pub(crate) points: Vec<f64>,
+    #[serde(default)]
+    pub(crate) labels: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct DomainTrendSnapshot {
+    #[serde(rename = "domainId")]
+    pub(crate) domain_id: String,
+    pub(crate) range: String,
+    #[serde(rename = "updatedAt")]
+    pub(crate) updated_at: String,
+    pub(crate) cards: Vec<TrendCard>,
+    pub(crate) lists: Vec<TrendList>,
+    #[serde(default)]
+    pub(crate) series: Option<Vec<TrendSeries>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -371,7 +452,7 @@ pub(crate) struct AppSettings {
     pub(crate) dictation_preferred_language: Option<String>,
     #[serde(default = "default_dictation_hold_key", rename = "dictationHoldKey")]
     pub(crate) dictation_hold_key: String,
-    #[serde(default)]
+    #[serde(default = "default_memory_enabled")]
     pub(crate) memory_enabled: bool,
     #[serde(default)]
     pub(crate) supabase_url: String,
@@ -502,6 +583,10 @@ fn default_code_font_size() -> u8 {
     11
 }
 
+fn default_domain_view_type() -> String {
+    "chat".to_string()
+}
+
 fn default_composer_model_shortcut() -> Option<String> {
     Some("cmd+shift+m".to_string())
 }
@@ -584,6 +669,10 @@ fn default_experimental_unified_exec_enabled() -> bool {
 
 fn default_memory_embedding_enabled() -> bool {
     false
+}
+
+fn default_memory_enabled() -> bool {
+    true
 }
 
 fn default_auto_memory_settings() -> AutoMemorySettings {
@@ -692,7 +781,7 @@ impl Default for AppSettings {
             dictation_model_id: default_dictation_model_id(),
             dictation_preferred_language: None,
             dictation_hold_key: default_dictation_hold_key(),
-            memory_enabled: false,
+            memory_enabled: true,
             supabase_url: String::new(),
             supabase_anon_key: String::new(),
             minimax_api_key: String::new(),
@@ -786,7 +875,7 @@ mod tests {
         assert_eq!(settings.dictation_model_id, "base");
         assert!(settings.dictation_preferred_language.is_none());
         assert_eq!(settings.dictation_hold_key, "alt");
-        assert!(!settings.memory_enabled);
+        assert!(settings.memory_enabled);
         assert!(settings.supabase_url.is_empty());
         assert!(settings.supabase_anon_key.is_empty());
         assert!(settings.minimax_api_key.is_empty());

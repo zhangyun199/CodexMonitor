@@ -7,12 +7,23 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
     public var sortOrder: Int?
     public var groupId: String?
     public var gitRoot: String?
+    public var domainId: String?
+    public var applyDomainInstructions: Bool?
 
-    public init(sidebarCollapsed: Bool = false, sortOrder: Int? = nil, groupId: String? = nil, gitRoot: String? = nil) {
+    public init(
+        sidebarCollapsed: Bool = false,
+        sortOrder: Int? = nil,
+        groupId: String? = nil,
+        gitRoot: String? = nil,
+        domainId: String? = nil,
+        applyDomainInstructions: Bool? = nil
+    ) {
         self.sidebarCollapsed = sidebarCollapsed
         self.sortOrder = sortOrder
         self.groupId = groupId
         self.gitRoot = gitRoot
+        self.domainId = domainId
+        self.applyDomainInstructions = applyDomainInstructions
     }
 
     enum CodingKeys: String, CodingKey {
@@ -20,6 +31,8 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
         case sortOrder
         case groupId
         case gitRoot
+        case domainId
+        case applyDomainInstructions
     }
 }
 
@@ -135,6 +148,87 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var composerListContinuation: Bool
     public var composerCodeBlockCopyUseModifier: Bool
     public var workspaceGroups: [WorkspaceGroup]
+}
+
+// MARK: - Domains
+
+public struct DomainTheme: Codable, Hashable, Sendable {
+    public var icon: String
+    public var color: String
+    public var accent: String
+    public var background: String?
+}
+
+public struct Domain: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var name: String
+    public var description: String?
+    public var systemPrompt: String
+    public var viewType: String
+    public var theme: DomainTheme
+    public var defaultModel: String?
+    public var defaultAccessMode: String?
+    public var defaultReasoningEffort: String?
+    public var defaultApprovalPolicy: String?
+
+    public init(
+        id: String = UUID().uuidString,
+        name: String,
+        description: String? = nil,
+        systemPrompt: String = "",
+        viewType: String = "dashboard",
+        theme: DomainTheme,
+        defaultModel: String? = nil,
+        defaultAccessMode: String? = nil,
+        defaultReasoningEffort: String? = nil,
+        defaultApprovalPolicy: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.systemPrompt = systemPrompt
+        self.viewType = viewType
+        self.theme = theme
+        self.defaultModel = defaultModel
+        self.defaultAccessMode = defaultAccessMode
+        self.defaultReasoningEffort = defaultReasoningEffort
+        self.defaultApprovalPolicy = defaultApprovalPolicy
+    }
+}
+
+public struct TrendCard: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var label: String
+    public var value: String
+    public var subLabel: String?
+}
+
+public struct TrendListItem: Codable, Hashable, Sendable {
+    public var label: String
+    public var value: String
+    public var subLabel: String?
+}
+
+public struct TrendList: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var title: String
+    public var items: [TrendListItem]
+}
+
+public struct TrendSeries: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var label: String
+    public var points: [Double]
+    public var labels: [String]?
+}
+
+public struct DomainTrendSnapshot: Codable, Hashable, Sendable {
+    public var domainId: String
+    public var range: String
+    public var updatedAt: String
+    public var cards: [TrendCard]
+    public var lists: [TrendList]
+    public var series: [TrendSeries]?
 }
 
 public struct AutoMemorySettings: Codable, Hashable, Sendable {

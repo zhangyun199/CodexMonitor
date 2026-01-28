@@ -3,6 +3,8 @@ export type WorkspaceSettings = {
   sortOrder?: number | null;
   groupId?: string | null;
   gitRoot?: string | null;
+  domainId?: string | null;
+  applyDomainInstructions?: boolean | null;
 };
 
 export type WorkspaceGroup = {
@@ -61,6 +63,12 @@ export type ConversationItem =
 export type ThreadSummary = {
   id: string;
   name: string;
+  updatedAt: number;
+};
+
+export type SessionThreadInfo = {
+  threadId: string;
+  cwd: string;
   updatedAt: number;
 };
 
@@ -141,6 +149,61 @@ export type AppSettings = {
   composerListContinuation: boolean;
   composerCodeBlockCopyUseModifier: boolean;
   workspaceGroups: WorkspaceGroup[];
+};
+
+export type DomainTheme = {
+  icon: string;
+  color: string;
+  accent: string;
+  background?: string | null;
+};
+
+export type Domain = {
+  id: string;
+  name: string;
+  description?: string | null;
+  systemPrompt: string;
+  viewType: "dashboard" | "chat";
+  theme: DomainTheme;
+  defaultModel?: string | null;
+  defaultAccessMode?: AccessMode | null;
+  defaultReasoningEffort?: string | null;
+  defaultApprovalPolicy?: "on-request" | "never" | null;
+};
+
+export type TrendCard = {
+  id: string;
+  label: string;
+  value: string;
+  subLabel?: string | null;
+};
+
+export type TrendListItem = {
+  label: string;
+  value: string;
+  subLabel?: string | null;
+};
+
+export type TrendList = {
+  id: string;
+  title: string;
+  items: TrendListItem[];
+};
+
+export type TrendSeries = {
+  id: string;
+  label: string;
+  points: number[];
+  labels?: string[] | null;
+};
+
+export type DomainTrendSnapshot = {
+  domainId: string;
+  range: "7d" | "30d" | "lifetime";
+  updatedAt: string;
+  cards: TrendCard[];
+  lists: TrendList[];
+  series?: TrendSeries[] | null;
 };
 
 export type AutoMemorySettings = {

@@ -36,6 +36,30 @@ function normalizeStringList(value: unknown) {
   return single ? [single] : [];
 }
 
+function extractTextValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "object" && value) {
+    const record = value as Record<string, unknown>;
+    const directText = asString(record.text ?? record.content ?? record.summary);
+    if (directText) {
+      return directText;
+    }
+  }
+  return "";
+}
+
+function extractTextLines(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => extractTextValue(entry))
+      .filter(Boolean);
+  }
+  const single = extractTextValue(value);
+  return single ? [single] : [];
+}
+
 function formatCollabAgentStates(value: unknown) {
   if (!value || typeof value !== "object") {
     return "";
@@ -197,10 +221,8 @@ export function buildConversationItem(
     };
   }
   if (type === "reasoning") {
-    const summary = asString(item.summary ?? "");
-    const content = Array.isArray(item.content)
-      ? item.content.map((entry) => asString(entry)).join("\n")
-      : asString(item.content ?? "");
+    const summary = extractTextLines(item.summary ?? "").join("\n");
+    const content = extractTextLines(item.content ?? "").join("\n");
     return { id, kind: "reasoning", summary, content };
   }
   if (type === "commandExecution") {
@@ -387,12 +409,8 @@ export function buildConversationItemFromThreadItem(
     };
   }
   if (type === "reasoning") {
-    const summary = Array.isArray(item.summary)
-      ? item.summary.map((entry) => asString(entry)).join("\n")
-      : asString(item.summary ?? "");
-    const content = Array.isArray(item.content)
-      ? item.content.map((entry) => asString(entry)).join("\n")
-      : asString(item.content ?? "");
+    const summary = extractTextLines(item.summary ?? "").join("\n");
+    const content = extractTextLines(item.content ?? "").join("\n");
     return { id, kind: "reasoning", summary, content };
   }
   return buildConversationItem(item);

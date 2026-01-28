@@ -148,6 +148,32 @@ describe("threadItems", () => {
     }
   });
 
+  it("extracts reasoning text from structured arrays", () => {
+    const item = buildConversationItem({
+      type: "reasoning",
+      id: "reason-1",
+      summary: [{ type: "summary_text", text: "Plan step 1" }],
+      content: [{ type: "summary_text", text: "Details here" }],
+    });
+    expect(item).not.toBeNull();
+    if (item && item.kind === "reasoning") {
+      expect(item.summary).toBe("Plan step 1");
+      expect(item.content).toBe("Details here");
+    }
+
+    const threadItem = buildConversationItemFromThreadItem({
+      type: "reasoning",
+      id: "reason-2",
+      summary: [{ text: "Step A" }, { text: "Step B" }],
+      content: [{ content: "Body A" }, { content: "Body B" }],
+    });
+    expect(threadItem).not.toBeNull();
+    if (threadItem && threadItem.kind === "reasoning") {
+      expect(threadItem.summary).toBe("Step A\nStep B");
+      expect(threadItem.content).toBe("Body A\nBody B");
+    }
+  });
+
   it("formats collab tool calls with receivers and agent states", () => {
     const item = buildConversationItem({
       type: "collabToolCall",

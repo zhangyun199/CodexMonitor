@@ -254,6 +254,11 @@ The daemon persists a full `AppSettings` blob:
 - experimental feature toggles (collab/steer/unified_exec)
 - workspace grouping preferences
 
+**macOS app data path (desktop build):**
+```
+~/Library/Application Support/com.codexmonitor.app/settings.json
+```
+
 ### Codex feature flags (`$CODEX_HOME/config.toml`)
 
 `get_app_settings` overlays feature flags from Codex config:

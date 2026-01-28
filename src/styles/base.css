@@ -46,7 +46,7 @@
     #1f1f1f 100%
   );
   --surface-bubble: rgba(61, 170, 255, 0.6);
-  --surface-bubble-user: rgba(67, 227, 138, 0.58);
+  --surface-bubble-user: rgba(139, 126, 200, 0.58);
   --surface-context-core: rgba(12, 16, 24, 0.9);
   --surface-popover: rgba(12, 16, 24, 0.985);
   --surface-review: rgba(255, 144, 200, 0.1);
@@ -64,8 +64,8 @@
   --border-accent-soft: rgba(61, 170, 255, 0.55);
   --text-accent: rgba(190, 230, 255, 0.96);
   --shadow-accent: rgba(61, 170, 255, 0.5);
-  --border-user: rgba(67, 227, 138, 0.65);
-  --shadow-user: rgba(67, 227, 138, 0.5);
+  --border-user: rgba(139, 126, 200, 0.65);
+  --shadow-user: rgba(139, 126, 200, 0.5);
   --surface-raised: rgba(255, 255, 255, 0.08);
   --glass-blur: 24px;
   --glass-saturate: 1.35;
@@ -116,7 +116,7 @@
   --surface-command: rgba(10, 14, 20, 0.98);
   --surface-diff-card: rgba(12, 16, 24, 0.92);
   --surface-bubble: rgba(61, 170, 255, 0.78);
-  --surface-bubble-user: rgba(67, 227, 138, 0.72);
+  --surface-bubble-user: rgba(139, 126, 200, 0.72);
   --surface-context-core: rgba(16, 20, 30, 0.98);
   --surface-popover: rgba(16, 20, 30, 0.995);
 }

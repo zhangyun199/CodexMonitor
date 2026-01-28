@@ -46,6 +46,20 @@ private struct PhoneRootView: View {
             }
 
             NavigationStack {
+                DomainDashboardView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(action: { showSettings = true }) {
+                                Image(systemName: "gearshape")
+                            }
+                        }
+                    }
+            }
+            .tabItem {
+                Label("Domain", systemImage: "rectangle.grid.2x2")
+            }
+
+            NavigationStack {
                 ConversationTabView()
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
@@ -142,6 +156,7 @@ private struct TabletRootView: View {
 
     enum TabletDetail: String, CaseIterable {
         case conversation = "Conversation"
+        case domain = "Domain"
         case memory = "Memory"
         case git = "Git"
         case files = "Files"
@@ -190,6 +205,8 @@ private struct DetailColumnView: View {
                 switch detailSelection {
                 case .conversation:
                     ConversationTabView(selectedThreadId: selectedThreadId)
+                case .domain:
+                    DomainDashboardView()
                 case .memory:
                     MemoryView()
                 case .git:
@@ -255,6 +272,7 @@ private struct GlassSegmentedPicker: View {
     private func iconFor(_ item: TabletRootView.TabletDetail) -> String {
         switch item {
         case .conversation: return "bubble.left.and.text.bubble.right"
+        case .domain: return "rectangle.grid.2x2"
         case .memory: return "brain.head.profile"
         case .git: return "arrow.triangle.branch"
         case .files: return "folder"

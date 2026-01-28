@@ -44,6 +44,10 @@ Conversation surface (core user journey):
 - Composer (text + options + attachments)
 - Optional side panels (Git, Prompts, Terminal)
 
+Composer attachments:
+- Drag/drop images to attach directly to the composer.
+- Drag/drop non-image files to insert their paths into the prompt text.
+
 The exact composition varies per layout, but those are the core conceptual nodes.
 
 ---
@@ -69,6 +73,179 @@ The frontend is organized by feature folders under `src/features/`:
 | toasts | `src/features/toasts/` | Toast notification UI |
 | debug | `src/features/debug/` | Debug panels/logging |
 | navigation | `src/features/navigation/` | Routing + navigation helpers |
+| **life** | `src/features/life/` | **Life workspace: domain dashboards, combined prompts** |
+
+---
+
+## Life Workspace Feature (`src/features/life/`)
+
+The Life workspace is a unified hub for all life domains with domain-specific dashboard views.
+
+### Component Structure
+
+```
+src/features/life/
+├── components/
+│   ├── LifeWorkspaceView.tsx       # Main container
+│   ├── DomainSelector.tsx          # Right panel domain tabs
+│   ├── DomainViewContainer.tsx     # Switches between domain views
+│   │
+│   ├── domains/
+│   │   ├── DeliveryDashboard.tsx   # Earnings, orders, hourly rates
+│   │   ├── NutritionDashboard.tsx  # Macros, meals, weekly trends
+│   │   ├── ExerciseDashboard.tsx   # Workouts, streaks, progress
+│   │   ├── MediaDashboard.tsx      # Bookshelf covers, ratings
+│   │   ├── YouTubeDashboard.tsx    # Pipeline by tier, ideas
+│   │   └── FinanceDashboard.tsx    # Bills, due dates, calendar
+│   │
+│   └── shared/
+│       ├── StatCard.tsx            # Reusable stat display
+│       ├── TimeRangeSelector.tsx   # Today/Week/Month/Lifetime
+│       ├── DataTable.tsx           # Sortable table
+│       ├── CoverImage.tsx          # Media covers with fallback
+│       └── ProgressBar.tsx         # Visual progress
+│
+├── hooks/
+│   ├── useLifeWorkspace.ts         # State management
+│   ├── useDomainDashboard.ts       # Generic data fetching
+│   ├── useDeliveryData.ts
+│   ├── useNutritionData.ts
+│   ├── useMediaData.ts
+│   ├── useYouTubeData.ts
+│   └── useFinanceData.ts
+│
+└── styles/
+    └── life-dashboard.css
+```
+
+### Domain View State
+
+```typescript
+type LifeDomain = 'delivery' | 'nutrition' | 'exercise' | 'media' | 'youtube' | 'finance';
+
+interface DomainViewState {
+  activeDomain: LifeDomain | null;  // null = show chat
+  timeRange: 'today' | 'week' | 'month' | 'lifetime';
+  filters: Record<string, string>;
+  sortBy: string;
+  sortDirection: 'asc' | 'desc';
+}
+```
+
+### Center Panel Behavior
+
+The center panel switches between two modes:
+
+1. **Chat Mode** (default): Standard Codex conversation with full life context injected
+2. **Dashboard Mode**: When a domain is selected, renders the domain-specific dashboard component
+
+```tsx
+// LifeWorkspaceView.tsx
+function LifeWorkspaceView() {
+  const { activeDomain, setActiveDomain } = useLifeWorkspace();
+
+  return (
+    <div className="life-workspace">
+      <div className="center-panel">
+        {activeDomain ? (
+          <DomainViewContainer
+            domain={activeDomain}
+            onBack={() => setActiveDomain(null)}
+          />
+        ) : (
+          <ChatPanel />
+        )}
+      </div>
+      <div className="right-panel">
+        <DomainSelector
+          activeDomain={activeDomain}
+          onSelect={setActiveDomain}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+### Combined Prompt Injection
+
+When starting a thread in the Life workspace, all four domain prompts are combined:
+
+```typescript
+// useLifeWorkspace.ts
+async function getLifeWorkspacePrompt(): Promise<string> {
+  const prompts = await Promise.all([
+    readPromptFile('workspace-delivery-finance.md'),
+    readPromptFile('workspace-food-exercise.md'),
+    readPromptFile('workspace-media.md'),
+    readPromptFile('workspace-youtube.md'),
+  ]);
+
+  return prompts.join('\n---\n') + '\n\nYou are the life assistant...';
+}
+```
+
+### Dashboard Data Hooks
+
+Each domain has a dedicated hook following this pattern:
+
+```typescript
+// useDeliveryData.ts
+function useDeliveryData(timeRange: TimeRange = 'today') {
+  const [data, setData] = useState<DeliveryDashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    invoke('get_delivery_dashboard', { workspaceId, range: timeRange })
+      .then(setData)
+      .catch(setError)
+      .finally(() => setLoading(false));
+  }, [timeRange]);
+
+  return { data, loading, error, refetch };
+}
+```
+
+### Visual Design
+
+**Dark grid aesthetic** matching user's iPad logging style:
+
+```css
+/* life-dashboard.css */
+.life-workspace {
+  background: linear-gradient(to bottom, #1a1a2e, #16213e);
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.stat-card {
+  background: rgba(30, 30, 50, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+/* Domain accent colors */
+.domain-delivery { --accent: #3b82f6; }  /* blue-500 */
+.domain-nutrition { --accent: #22c55e; } /* green-500 */
+.domain-finance { --accent: #eab308; }   /* yellow-500 */
+.domain-youtube { --accent: #ef4444; }   /* red-500 */
+.domain-media { --accent: #a855f7; }     /* purple-500 */
+```
+
+### Progressive Disclosure
+
+To avoid overwhelming users (Schwartz's paradox of choice):
+
+| Domain | Initial View | Expanded View |
+|--------|--------------|---------------|
+| Delivery | Today's stats + last 5 orders | Full history with filters |
+| Nutrition | Today's macros + meals | Weekly trends, food frequency |
+| Media | Last 10 watched + backlog | Full library with type filters |
+| YouTube | S-tier + in-progress | Full pipeline by tier |
+| Finance | Next 7 days bills | Full month calendar |
 
 ---
 

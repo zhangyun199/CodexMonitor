@@ -66,6 +66,24 @@ pub(crate) async fn update_app_settings(
     write_settings(&state.settings_path, &settings)?;
     let mut current = state.app_settings.lock().await;
     *current = settings.clone();
+    let mut memory_lock = state.memory.write().await;
+    *memory_lock = if settings.memory_enabled
+        && !settings.supabase_url.is_empty()
+        && !settings.supabase_anon_key.is_empty()
+    {
+        Some(crate::memory::MemoryService::new(
+            &settings.supabase_url,
+            &settings.supabase_anon_key,
+            if settings.memory_embedding_enabled {
+                Some(&settings.minimax_api_key)
+            } else {
+                None
+            },
+            true,
+        ))
+    } else {
+        None
+    };
     let _ = window::apply_window_appearance(&window, settings.theme.as_str());
     Ok(settings)
 }

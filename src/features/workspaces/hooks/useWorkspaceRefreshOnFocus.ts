@@ -1,10 +1,12 @@
 import { useEffect } from "react";
-import type { WorkspaceInfo } from "../../../types";
+import type { ThreadSummary, WorkspaceInfo } from "../../../types";
 
 type WorkspaceRefreshOptions = {
   workspaces: WorkspaceInfo[];
   refreshWorkspaces: () => Promise<WorkspaceInfo[] | void>;
-  listThreadsForWorkspace: (workspace: WorkspaceInfo) => Promise<void>;
+  listThreadsForWorkspace: (
+    workspace: WorkspaceInfo,
+  ) => Promise<ThreadSummary[] | void>;
 };
 
 export function useWorkspaceRefreshOnFocus({

@@ -5,6 +5,7 @@ import {
   getGitHubIssues,
   getGitLog,
   getGitStatus,
+  listSessionThreads,
   stageGitAll,
   respondToServerRequest,
   sendUserMessage,
@@ -136,6 +137,18 @@ describe("tauri invoke wrappers", () => {
       workspaceId: "ws-6",
       requestId: 101,
       result: { decision: "accept" },
+    });
+  });
+
+  it("lists session threads with workspace path and limit", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockResolvedValueOnce({ data: [] });
+
+    await listSessionThreads("/tmp/project", 50);
+
+    expect(invokeMock).toHaveBeenCalledWith("list_session_threads", {
+      workspacePath: "/tmp/project",
+      limit: 50,
     });
   });
 });

@@ -20,16 +20,14 @@ export function SidebarFooter({
       <div className="usage-bars">
         <div className="usage-block">
           <div className="usage-label">
-            <span className="usage-title">
-              <span>Session</span>
-              {sessionResetLabel && (
-                <span className="usage-reset">· {sessionResetLabel}</span>
-              )}
-            </span>
+            <span className="usage-title">Session</span>
             <span className="usage-value">
-              {sessionPercent === null ? "--" : `${sessionPercent}%`}
+              {sessionPercent === null ? "--" : `${sessionPercent}% remaining`}
             </span>
           </div>
+          {sessionResetLabel && (
+            <span className="usage-reset">{sessionResetLabel}</span>
+          )}
           <div className="usage-bar">
             <span
               className="usage-bar-fill"
@@ -40,16 +38,14 @@ export function SidebarFooter({
         {showWeekly && (
           <div className="usage-block">
             <div className="usage-label">
-              <span className="usage-title">
-                <span>Weekly</span>
-                {weeklyResetLabel && (
-                  <span className="usage-reset">· {weeklyResetLabel}</span>
-                )}
-              </span>
+              <span className="usage-title">Weekly</span>
               <span className="usage-value">
-                {weeklyPercent === null ? "--" : `${weeklyPercent}%`}
+                {weeklyPercent === null ? "--" : `${weeklyPercent}% remaining`}
               </span>
             </div>
+            {weeklyResetLabel && (
+              <span className="usage-reset">{weeklyResetLabel}</span>
+            )}
             <div className="usage-bar">
               <span
                 className="usage-bar-fill"

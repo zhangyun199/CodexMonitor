@@ -52,10 +52,10 @@ export function getUsageLabels(
   const usagePercent = accountRateLimits?.primary?.usedPercent;
   const globalUsagePercent = accountRateLimits?.secondary?.usedPercent;
   const sessionPercent =
-    typeof usagePercent === "number" ? clampPercent(usagePercent) : null;
+    typeof usagePercent === "number" ? clampPercent(100 - usagePercent) : null;
   const weeklyPercent =
     typeof globalUsagePercent === "number"
-      ? clampPercent(globalUsagePercent)
+      ? clampPercent(100 - globalUsagePercent)
       : null;
 
   return {

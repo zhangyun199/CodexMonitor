@@ -9,7 +9,7 @@ import {
 } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
-import type { AppSettings } from "../../../types";
+import type { AppSettings, Domain } from "../../../types";
 import { SettingsView } from "./SettingsView";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
@@ -80,6 +80,24 @@ const baseSettings: AppSettings = {
   workspaceGroups: [],
 };
 
+const baseDomain: Domain = {
+  id: "domain-1",
+  name: "Domain",
+  description: null,
+  systemPrompt: "",
+  viewType: "dashboard",
+  theme: {
+    icon: "✨",
+    color: "#7c3aed",
+    accent: "#7c3aed",
+    background: null,
+  },
+  defaultModel: null,
+  defaultAccessMode: null,
+  defaultReasoningEffort: null,
+  defaultApprovalPolicy: null,
+};
+
 const createDoctorResult = () => ({
   ok: true,
   codexBin: null,
@@ -120,8 +138,13 @@ const renderDisplaySection = (
     onMoveWorkspaceGroup: vi.fn().mockResolvedValue(null),
     onDeleteWorkspaceGroup: vi.fn().mockResolvedValue(null),
     onAssignWorkspaceGroup: vi.fn().mockResolvedValue(null),
+    onAssignWorkspaceDomain: vi.fn().mockResolvedValue(null),
     onRunDoctor: vi.fn().mockResolvedValue(createDoctorResult()),
     onUpdateWorkspaceCodexBin: vi.fn().mockResolvedValue(undefined),
+    domains: [baseDomain],
+    onCreateDomain: vi.fn().mockResolvedValue(baseDomain),
+    onUpdateDomain: vi.fn().mockResolvedValue(baseDomain),
+    onDeleteDomain: vi.fn().mockResolvedValue(undefined),
     scaleShortcutTitle: "Scale shortcut",
     scaleShortcutText: "Use Command +/-",
     onTestNotificationSound: vi.fn(),
@@ -294,12 +317,17 @@ describe("SettingsView Shortcuts", () => {
         onMoveWorkspaceGroup={vi.fn().mockResolvedValue(null)}
         onDeleteWorkspaceGroup={vi.fn().mockResolvedValue(null)}
         onAssignWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        onAssignWorkspaceDomain={vi.fn().mockResolvedValue(null)}
         reduceTransparency={false}
         onToggleTransparency={vi.fn()}
         appSettings={baseSettings}
         onUpdateAppSettings={vi.fn().mockResolvedValue(undefined)}
         onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
         onUpdateWorkspaceCodexBin={vi.fn().mockResolvedValue(undefined)}
+        domains={[baseDomain]}
+        onCreateDomain={vi.fn().mockResolvedValue(baseDomain)}
+        onUpdateDomain={vi.fn().mockResolvedValue(baseDomain)}
+        onDeleteDomain={vi.fn().mockResolvedValue(undefined)}
         scaleShortcutTitle="Scale shortcut"
         scaleShortcutText="Use Command +/-"
         onTestNotificationSound={vi.fn()}
@@ -332,12 +360,17 @@ describe("SettingsView Shortcuts", () => {
         onMoveWorkspaceGroup={vi.fn().mockResolvedValue(null)}
         onDeleteWorkspaceGroup={vi.fn().mockResolvedValue(null)}
         onAssignWorkspaceGroup={vi.fn().mockResolvedValue(null)}
+        onAssignWorkspaceDomain={vi.fn().mockResolvedValue(null)}
         reduceTransparency={false}
         onToggleTransparency={vi.fn()}
         appSettings={baseSettings}
         onUpdateAppSettings={vi.fn().mockResolvedValue(undefined)}
         onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
         onUpdateWorkspaceCodexBin={vi.fn().mockResolvedValue(undefined)}
+        domains={[baseDomain]}
+        onCreateDomain={vi.fn().mockResolvedValue(baseDomain)}
+        onUpdateDomain={vi.fn().mockResolvedValue(baseDomain)}
+        onDeleteDomain={vi.fn().mockResolvedValue(undefined)}
         scaleShortcutTitle="Scale shortcut"
         scaleShortcutText="Use Command +/-"
         onTestNotificationSound={vi.fn()}

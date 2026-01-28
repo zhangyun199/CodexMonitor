@@ -218,6 +218,25 @@ describe("Composer attachments integration", () => {
     restoreFileReader();
   });
 
+  it("inserts dropped file paths into the composer text", async () => {
+    const harness = renderComposerHarness({
+      activeThreadId: "thread-1",
+      activeWorkspaceId: "ws-1",
+    });
+    const textarea = getTextarea(harness.container);
+
+    const doc = new File(["data"], "notes.txt", { type: "text/plain" });
+    (doc as File & { path?: string }).path = "/tmp/notes.txt";
+
+    await act(async () => {
+      dispatchDrop(textarea, [doc]);
+    });
+
+    expect(textarea.value).toContain("/tmp/notes.txt");
+
+    harness.unmount();
+  });
+
   it("removes attachments and clears drafts", async () => {
     const harness = renderComposerHarness({
       activeThreadId: "thread-1",

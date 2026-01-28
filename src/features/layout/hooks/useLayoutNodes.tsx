@@ -20,6 +20,7 @@ import { TerminalPanel } from "../../terminal/components/TerminalPanel";
 import { MemoryPanel } from "../../memory/components/MemoryPanel";
 import { BrowserPanel } from "../../browser/components/BrowserPanel";
 import { SkillsPanel } from "../../skills/components/SkillsPanel";
+import { DomainPanel } from "../../domains/components/DomainPanel";
 import {
   RightPanelTabs,
   type RightPanelTabId,
@@ -49,6 +50,7 @@ import type {
   ThreadSummary,
   ThreadTokenUsage,
   TurnPlan,
+  Domain,
   WorkspaceInfo,
 } from "../../../types";
 import type { UpdateState } from "../../update/hooks/useUpdater";
@@ -191,6 +193,7 @@ type LayoutNodesOptions = {
   onSelectTab: (tab: "projects" | "codex" | "git" | "log") => void;
   tabletNavTab: "codex" | "git" | "log";
   rightPanelMode: RightPanelTabId;
+  activeDomain: Domain | null;
   onSelectRightPanelMode: (mode: RightPanelTabId) => void;
   gitPanelMode: "diff" | "log" | "issues" | "prs";
   onGitPanelModeChange: (mode: "diff" | "log" | "issues" | "prs") => void;
@@ -734,13 +737,18 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
   );
 
   const memoryPanelNode = <MemoryPanel workspaceId={options.activeWorkspaceId} />;
+  const domainPanelNode = (
+    <DomainPanel
+      workspaceId={options.activeWorkspaceId}
+      domain={options.activeDomain}
+    />
+  );
   const browserPanelNode = <BrowserPanel />;
   const skillsPanelNode = <SkillsPanel workspaceId={options.activeWorkspaceId} />;
 
   const rightPanelNode = (
     <div className="right-panel-stack">
       <div className="right-panel-switch">
-        <span className="right-panel-switch-title">Panel</span>
         <RightPanelTabs
           active={options.rightPanelMode}
           onSelect={options.onSelectRightPanelMode}
@@ -749,7 +757,9 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       <div className="right-panel-content">
         {options.rightPanelMode === "memory"
           ? memoryPanelNode
-          : options.rightPanelMode === "browser"
+          : options.rightPanelMode === "domain"
+            ? domainPanelNode
+            : options.rightPanelMode === "browser"
             ? browserPanelNode
             : options.rightPanelMode === "skills"
               ? skillsPanelNode

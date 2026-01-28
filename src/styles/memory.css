@@ -6,6 +6,14 @@
   gap: 12px;
 }
 
+.right-panel-tabs {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  flex: 1;
+}
+
 .right-panel-stack {
   display: flex;
   flex-direction: column;
@@ -32,6 +40,33 @@
   text-transform: uppercase;
 }
 
+.panel-tabs-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  height: 0;
+  overflow: hidden;
+  inset: 0;
+}
+
+.panel-tabs-measure-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.right-panel-select-wrap {
+  margin-left: auto;
+  max-width: 100%;
+}
+
+.right-panel-select {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+  max-width: 180px;
+}
+
 .right-panel-content {
   flex: 1;
   min-height: 0;
@@ -43,7 +78,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   padding: 12px;
   overflow: hidden;
 }
@@ -181,6 +216,86 @@
   font-size: 12px;
   color: var(--text-emphasis);
   white-space: pre-wrap;
+}
+
+.memory-panel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.memory-panel-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.memory-panel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.memory-panel-input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-control);
+  color: var(--text-emphasis);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.memory-panel-input:focus {
+  outline: none;
+  border-color: var(--border-accent-soft);
+}
+
+.memory-panel-select {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-control);
+  color: var(--text-emphasis);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.memory-panel-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-emphasis);
+  cursor: pointer;
+}
+
+.memory-panel-result {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-card);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.memory-panel-result-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-emphasis);
+}
+
+.memory-panel-result-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.memory-panel-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 0;
 }
 
 .memory-panel-entry-meta {

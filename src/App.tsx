@@ -18,6 +18,7 @@ import "./styles/terminal.css";
 import "./styles/request-user-input.css";
 import "./styles/plan.css";
 import "./styles/memory.css";
+import "./styles/domain.css";
 import "./styles/about.css";
 import "./styles/tabbar.css";
 import "./styles/worktree-modal.css";
@@ -78,6 +79,7 @@ import { useLocalUsage } from "./features/home/hooks/useLocalUsage";
 import { useGitHubPanelController } from "./features/app/hooks/useGitHubPanelController";
 import { useSettingsModalState } from "./features/app/hooks/useSettingsModalState";
 import { usePersistComposerSettings } from "./features/app/hooks/usePersistComposerSettings";
+import { useDomains } from "./features/domains/hooks/useDomains";
 import { useSyncSelectedDiffPath } from "./features/app/hooks/useSyncSelectedDiffPath";
 import { useMenuAcceleratorController } from "./features/app/hooks/useMenuAcceleratorController";
 import { useAppMenuEvents } from "./features/app/hooks/useAppMenuEvents";
@@ -88,7 +90,7 @@ import { useLiquidGlassEffect } from "./features/app/hooks/useLiquidGlassEffect"
 import { useCopyThread } from "./features/threads/hooks/useCopyThread";
 import { useTerminalController } from "./features/terminal/hooks/useTerminalController";
 import { useGitCommitController } from "./features/app/hooks/useGitCommitController";
-import { pickWorkspacePath } from "./services/tauri";
+import { listSessionThreads, pickWorkspacePath } from "./services/tauri";
 import type {
   AccessMode,
   ComposerEditorSettings,
@@ -154,9 +156,7 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState<
     "projects" | "codex" | "git" | "log"
   >("codex");
-  const [rightPanelMode, setRightPanelMode] = useState<
-    "git" | "memory" | "browser" | "skills"
-  >("git");
+  const [rightPanelMode, setRightPanelMode] = useState<RightPanelTabId>("git");
   const tabletTab = activeTab === "projects" ? "codex" : activeTab;
   const {
     workspaces,
@@ -192,6 +192,15 @@ function MainApp() {
     addDebugEntry,
     queueSaveSettings,
   });
+  const {
+    domains,
+    domainsById,
+    createDomain,
+    updateDomain,
+    deleteDomain,
+  } = useDomains();
+  const activeDomainId = activeWorkspace?.settings.domainId ?? null;
+  const activeDomain = activeDomainId ? domainsById[activeDomainId] : null;
   const workspacesById = useMemo(
     () => new Map(workspaces.map((workspace) => [workspace.id, workspace])),
     [workspaces],
@@ -608,6 +617,7 @@ function MainApp() {
     getPinTimestamp,
     renameThread,
     startThreadForWorkspace,
+    resumeThreadForWorkspace,
     listThreadsForWorkspace,
     loadOlderThreadsForWorkspace,
     resetWorkspaceThreads,
@@ -1127,7 +1137,10 @@ function MainApp() {
     workspaces,
     hasLoaded,
     connectWorkspace,
-    listThreadsForWorkspace
+    listSessionThreads,
+    listThreadsForWorkspace,
+    resumeThreadForWorkspace,
+    setActiveThreadId,
   });
   useWorkspaceRefreshOnFocus({
     workspaces,
@@ -1473,6 +1486,7 @@ function MainApp() {
       }
     },
     activeWorkspace,
+    activeDomain,
     activeParentWorkspace,
     worktreeLabel,
     worktreeRename: worktreeRename ?? undefined,
@@ -1707,6 +1721,7 @@ function MainApp() {
   return (
     <div
       className={appClassName}
+      data-domain={activeDomain?.id ?? undefined}
       style={
         {
           "--sidebar-width": `${
@@ -1721,7 +1736,10 @@ function MainApp() {
           "--ui-scale": String(uiScale),
           "--ui-font-family": appSettings.uiFontFamily,
           "--code-font-family": appSettings.codeFontFamily,
-          "--code-font-size": `${appSettings.codeFontSize}px`
+          "--code-font-size": `${appSettings.codeFontSize}px`,
+          "--domain-accent": activeDomain?.theme.accent ?? undefined,
+          "--domain-color": activeDomain?.theme.color ?? undefined,
+          "--domain-background": activeDomain?.theme.background ?? undefined
         } as React.CSSProperties
       }
     >
@@ -1809,6 +1827,17 @@ function MainApp() {
           onMoveWorkspaceGroup: moveWorkspaceGroup,
           onDeleteWorkspaceGroup: deleteWorkspaceGroup,
           onAssignWorkspaceGroup: assignWorkspaceGroup,
+          onAssignWorkspaceDomain: async (workspaceId, domainId) => {
+            const workspace = workspacesById.get(workspaceId);
+            if (!workspace) {
+              return null;
+            }
+            await updateWorkspaceSettings(workspaceId, {
+              ...workspace.settings,
+              domainId,
+            });
+            return true;
+          },
           reduceTransparency,
           onToggleTransparency: setReduceTransparency,
           appSettings,
@@ -1819,6 +1848,10 @@ function MainApp() {
           onUpdateWorkspaceCodexBin: async (id, codexBin) => {
             await updateWorkspaceCodexBin(id, codexBin);
           },
+          domains,
+          onCreateDomain: createDomain,
+          onUpdateDomain: updateDomain,
+          onDeleteDomain: deleteDomain,
           scaleShortcutTitle,
           scaleShortcutText,
           onTestNotificationSound: handleTestNotificationSound,

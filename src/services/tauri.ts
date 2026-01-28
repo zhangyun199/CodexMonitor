@@ -9,8 +9,11 @@ import type {
   MemoryEntry,
   MemorySearchResult,
   MemoryStatus,
+  SessionThreadInfo,
   WorkspaceInfo,
   WorkspaceSettings,
+  Domain,
+  DomainTrendSnapshot,
 } from "../types";
 import type {
   GitFileDiff,
@@ -50,6 +53,30 @@ export async function pickImageFiles(): Promise<string[]> {
 
 export async function listWorkspaces(): Promise<WorkspaceInfo[]> {
   return invoke<WorkspaceInfo[]>("list_workspaces");
+}
+
+export async function listDomains(): Promise<Domain[]> {
+  return invoke<Domain[]>("domains_list");
+}
+
+export async function createDomain(domain: Domain): Promise<Domain> {
+  return invoke<Domain>("domains_create", domain);
+}
+
+export async function updateDomain(domain: Domain): Promise<Domain> {
+  return invoke<Domain>("domains_update", domain);
+}
+
+export async function deleteDomain(domainId: string): Promise<void> {
+  return invoke("domains_delete", { domainId });
+}
+
+export async function getDomainTrends(
+  workspaceId: string,
+  domainId: string,
+  range: "7d" | "30d" | "lifetime",
+): Promise<DomainTrendSnapshot> {
+  return invoke<DomainTrendSnapshot>("domain_trends", { workspaceId, domainId, range });
 }
 
 export async function addWorkspace(
@@ -667,6 +694,18 @@ export async function listThreads(
   limit?: number | null,
 ) {
   return invoke<any>("list_threads", { workspaceId, cursor, limit });
+}
+
+export async function listSessionThreads(
+  workspacePath: string,
+  limit?: number | null,
+): Promise<SessionThreadInfo[]> {
+  const response = await invoke<any>("list_session_threads", {
+    workspacePath,
+    limit,
+  });
+  const data = (response?.data ?? response) as SessionThreadInfo[] | undefined;
+  return Array.isArray(data) ? data : [];
 }
 
 export async function resumeThread(workspaceId: string, threadId: string) {

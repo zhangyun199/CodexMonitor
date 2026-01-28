@@ -1538,6 +1538,8 @@ mod tests {
                 sort_order,
                 group_id: None,
                 git_root: None,
+                domain_id: None,
+                apply_domain_instructions: None,
             },
         }
     }

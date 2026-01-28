@@ -209,6 +209,24 @@ Conventions:
 
 - [RPCError](#rpcerror)
 
+### Life Workspace Types
+
+- [LifeDomain](#lifedomain)
+
+- [DomainViewState](#domainviewstate)
+
+- [TimeRange](#timerange)
+
+- [DeliveryDashboard](#deliverydashboard)
+
+- [NutritionDashboard](#nutritiondashboard)
+
+- [MediaDashboard](#mediadashboard)
+
+- [YouTubeDashboard](#youtubedashboard)
+
+- [FinanceDashboard](#financedashboard)
+
 
 ---
 
@@ -4511,5 +4529,619 @@ _N/A_
 
 _N/A_
 
+
+---
+
+# Life Workspace Types
+
+The following types support the Life workspace domain dashboard views.
+
+---
+
+## LifeDomain
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ✅
+
+
+**Definition (wire shape)**
+
+_Not a simple object type (union/enum/utility). See code snippets below._
+
+**Swift**
+
+```swift
+public enum LifeDomain: String, Codable, CaseIterable, Identifiable, Sendable {
+    case delivery
+    case nutrition
+    case exercise
+    case media
+    case youtube
+    case finance
+
+    public var id: String { rawValue }
+}
+```
+
+**TypeScript**
+
+```ts
+export type LifeDomain =
+  | 'delivery'
+  | 'nutrition'
+  | 'exercise'
+  | 'media'
+  | 'youtube'
+  | 'finance';
+```
+
+**Rust**
+
+```rust
+pub enum LifeDomain {
+    Delivery,
+    Nutrition,
+    Exercise,
+    Media,
+    YouTube,
+    Finance,
+}
+```
+
+---
+
+## DomainViewState
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ❌
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `activeDomain` | `LifeDomain \| null` | yes | Currently selected domain (null = show chat) |
+| `timeRange` | `TimeRange` | no | Selected time range filter |
+| `filters` | `Record<string, string>` | no | Domain-specific filters |
+| `sortBy` | `string` | no | Sort field |
+| `sortDirection` | `'asc' \| 'desc'` | no | Sort direction |
+
+
+**Swift**
+
+```swift
+public struct DomainViewState: Codable, Sendable {
+    public var activeDomain: LifeDomain?
+    public var timeRange: TimeRange
+    public var filters: [String: String]
+    public var sortBy: String
+    public var sortDirection: SortDirection
+
+    public enum SortDirection: String, Codable, Sendable {
+        case asc
+        case desc
+    }
+}
+```
+
+**TypeScript**
+
+```ts
+export type DomainViewState = {
+  activeDomain: LifeDomain | null;
+  timeRange: 'today' | 'week' | 'month' | 'lifetime';
+  filters: Record<string, string>;
+  sortBy: string;
+  sortDirection: 'asc' | 'desc';
+};
+```
+
+**Rust**
+
+_N/A_
+
+
+---
+
+## TimeRange
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ✅
+
+
+**Definition (wire shape)**
+
+_Not a simple object type (union/enum/utility). See code snippets below._
+
+**Swift**
+
+```swift
+public enum TimeRange: String, Codable, CaseIterable, Sendable {
+    case today
+    case week
+    case month
+    case lifetime
+}
+```
+
+**TypeScript**
+
+```ts
+export type TimeRange = 'today' | 'week' | 'month' | 'lifetime';
+```
+
+**Rust**
+
+```rust
+pub enum TimeRange {
+    Today,
+    Week,
+    Month,
+    Lifetime,
+}
+```
+
+---
+
+## DeliveryDashboard
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ✅
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `stats` | `DeliveryStats` | no | Aggregated delivery statistics |
+| `orders` | `DeliveryOrder[]` | no | List of orders |
+| `topMerchants` | `MerchantStats[]` | no | Top performing merchants |
+| `timeRange` | `string` | no | Time range for this data |
+
+
+**TypeScript**
+
+```ts
+export type DeliveryDashboard = {
+  stats: {
+    totalEarnings: number;
+    orderCount: number;
+    activeHours: number;
+    hourlyRate: number;
+    perMileRate: number;
+  };
+  orders: DeliveryOrder[];
+  topMerchants: MerchantStats[];
+  timeRange: string;
+};
+
+export type DeliveryOrder = {
+  id: string;
+  merchant: string;
+  earnings: number;
+  miles: number;
+  timestamp: number;
+};
+
+export type MerchantStats = {
+  name: string;
+  orderCount: number;
+  avgEarnings: number;
+  avgWaitTime: number;
+};
+```
+
+**Swift**
+
+```swift
+public struct DeliveryDashboard: Codable, Sendable {
+    public var stats: DeliveryStats
+    public var orders: [DeliveryOrder]
+    public var topMerchants: [MerchantStats]
+    public var timeRange: String
+}
+
+public struct DeliveryStats: Codable, Sendable {
+    public var totalEarnings: Double
+    public var orderCount: Int
+    public var activeHours: Double
+    public var hourlyRate: Double
+    public var perMileRate: Double
+}
+
+public struct DeliveryOrder: Codable, Identifiable, Sendable {
+    public var id: String
+    public var merchant: String
+    public var earnings: Double
+    public var miles: Double
+    public var timestamp: Double
+}
+
+public struct MerchantStats: Codable, Sendable {
+    public var name: String
+    public var orderCount: Int
+    public var avgEarnings: Double
+    public var avgWaitTime: Double
+}
+```
+
+**Rust**
+
+```rust
+pub struct DeliveryDashboard {
+    pub stats: DeliveryStats,
+    pub orders: Vec<DeliveryOrder>,
+    #[serde(rename = "topMerchants")]
+    pub top_merchants: Vec<MerchantStats>,
+    #[serde(rename = "timeRange")]
+    pub time_range: String,
+}
+```
+
+---
+
+## NutritionDashboard
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ✅
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `today` | `DailyNutrition` | no | Today's nutrition data |
+| `targets` | `NutritionTargets` | no | Daily nutrition targets |
+| `weeklyTrend` | `DailyNutrition[]` | no | Last 7 days of nutrition |
+
+
+**TypeScript**
+
+```ts
+export type NutritionDashboard = {
+  today: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber: number;
+    meals: MealEntry[];
+  };
+  targets: NutritionTargets;
+  weeklyTrend: DailyNutrition[];
+};
+
+export type MealEntry = {
+  id: string;
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  timestamp: number;
+};
+
+export type NutritionTargets = {
+  calories: { min: number; max: number };
+  protein: { min: number; max: number };
+  carbs: { min: number; max: number };
+  fat: { min: number; max: number };
+  fiber: number;
+};
+
+export type DailyNutrition = {
+  date: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  mealsLogged: number;
+};
+```
+
+**Swift**
+
+```swift
+public struct NutritionDashboard: Codable, Sendable {
+    public var today: DailyNutritionDetail
+    public var targets: NutritionTargets
+    public var weeklyTrend: [DailyNutrition]
+}
+
+public struct DailyNutritionDetail: Codable, Sendable {
+    public var calories: Double
+    public var protein: Double
+    public var carbs: Double
+    public var fat: Double
+    public var fiber: Double
+    public var meals: [MealEntry]
+}
+
+public struct MealEntry: Codable, Identifiable, Sendable {
+    public var id: String
+    public var name: String
+    public var calories: Double
+    public var protein: Double
+    public var carbs: Double
+    public var fat: Double
+    public var timestamp: Double
+}
+```
+
+**Rust**
+
+```rust
+pub struct NutritionDashboard {
+    pub today: DailyNutritionDetail,
+    pub targets: NutritionTargets,
+    #[serde(rename = "weeklyTrend")]
+    pub weekly_trend: Vec<DailyNutrition>,
+}
+```
+
+---
+
+## MediaDashboard
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ✅
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `recentlyWatched` | `MediaItem[]` | no | Recently consumed media |
+| `stats` | `MediaStats` | no | Aggregated media statistics |
+| `byType` | `Record<MediaType, number>` | no | Count by media type |
+
+
+**TypeScript**
+
+```ts
+export type MediaDashboard = {
+  recentlyWatched: MediaItem[];
+  stats: {
+    backlogCount: number;
+    completedCount: number;
+    avgRating: number;
+  };
+  byType: Record<MediaType, number>;
+};
+
+export type MediaType = 'film' | 'tv' | 'game' | 'anime' | 'book';
+
+export type MediaItem = {
+  id: string;
+  title: string;
+  type: MediaType;
+  status: 'backlog' | 'watching' | 'completed' | 'dropped';
+  rating?: number;
+  coverUrl?: string;
+  year?: number;
+};
+```
+
+**Swift**
+
+```swift
+public struct MediaDashboard: Codable, Sendable {
+    public var recentlyWatched: [MediaItem]
+    public var stats: MediaStats
+    public var byType: [String: Int]
+}
+
+public struct MediaStats: Codable, Sendable {
+    public var backlogCount: Int
+    public var completedCount: Int
+    public var avgRating: Double
+}
+
+public struct MediaItem: Codable, Identifiable, Sendable {
+    public var id: String
+    public var title: String
+    public var type: String
+    public var status: String
+    public var rating: Double?
+    public var coverUrl: String?
+    public var year: Int?
+}
+```
+
+**Rust**
+
+```rust
+pub struct MediaDashboard {
+    #[serde(rename = "recentlyWatched")]
+    pub recently_watched: Vec<MediaItem>,
+    pub stats: MediaStats,
+    #[serde(rename = "byType")]
+    pub by_type: HashMap<String, i32>,
+}
+```
+
+---
+
+## YouTubeDashboard
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ✅
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `pipelineStats` | `Record<PipelineStage, number>` | no | Count by pipeline stage |
+| `sTierIdeas` | `VideoIdea[]` | no | S-tier video ideas |
+| `inProgress` | `VideoIdea[]` | no | Currently in-progress ideas |
+| `recentActivity` | `PipelineEvent[]` | no | Recent pipeline activity |
+
+
+**TypeScript**
+
+```ts
+export type YouTubeDashboard = {
+  pipelineStats: Record<PipelineStage, number>;
+  sTierIdeas: VideoIdea[];
+  inProgress: VideoIdea[];
+  recentActivity: PipelineEvent[];
+};
+
+export type PipelineStage =
+  | 'brain_dump'
+  | 'researching'
+  | 'outlining'
+  | 'scripting'
+  | 'recording'
+  | 'editing'
+  | 'published'
+  | 'archived';
+
+export type VideoIdea = {
+  id: string;
+  title: string;
+  tier: 'S' | 'A' | 'B' | 'C';
+  stage: PipelineStage;
+  thesis?: string;
+  updatedAt: number;
+};
+
+export type PipelineEvent = {
+  id: string;
+  ideaId: string;
+  ideaTitle: string;
+  fromStage: PipelineStage;
+  toStage: PipelineStage;
+  timestamp: number;
+};
+```
+
+**Swift**
+
+```swift
+public struct YouTubeDashboard: Codable, Sendable {
+    public var pipelineStats: [String: Int]
+    public var sTierIdeas: [VideoIdea]
+    public var inProgress: [VideoIdea]
+    public var recentActivity: [PipelineEvent]
+}
+
+public struct VideoIdea: Codable, Identifiable, Sendable {
+    public var id: String
+    public var title: String
+    public var tier: String
+    public var stage: String
+    public var thesis: String?
+    public var updatedAt: Double
+}
+
+public struct PipelineEvent: Codable, Identifiable, Sendable {
+    public var id: String
+    public var ideaId: String
+    public var ideaTitle: String
+    public var fromStage: String
+    public var toStage: String
+    public var timestamp: Double
+}
+```
+
+**Rust**
+
+```rust
+pub struct YouTubeDashboard {
+    #[serde(rename = "pipelineStats")]
+    pub pipeline_stats: HashMap<String, i32>,
+    #[serde(rename = "sTierIdeas")]
+    pub s_tier_ideas: Vec<VideoIdea>,
+    #[serde(rename = "inProgress")]
+    pub in_progress: Vec<VideoIdea>,
+    #[serde(rename = "recentActivity")]
+    pub recent_activity: Vec<PipelineEvent>,
+}
+```
+
+---
+
+## FinanceDashboard
+
+**Used in:** iOS ✅, Desktop ✅, Daemon ✅
+
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `upcomingBills` | `Bill[]` | no | Bills due soon |
+| `monthlyTotal` | `number` | no | Total monthly bills |
+| `paidThisMonth` | `number` | no | Amount paid this month |
+| `remainingThisMonth` | `number` | no | Amount remaining this month |
+| `calendarView` | `BillCalendarDay[]` | no | Calendar view of bills |
+
+
+**TypeScript**
+
+```ts
+export type FinanceDashboard = {
+  upcomingBills: Bill[];
+  monthlyTotal: number;
+  paidThisMonth: number;
+  remainingThisMonth: number;
+  calendarView: BillCalendarDay[];
+};
+
+export type Bill = {
+  id: string;
+  name: string;
+  amount: number;
+  dueDay: number;
+  isPaid: boolean;
+  category: string;
+};
+
+export type BillCalendarDay = {
+  date: string;
+  bills: Bill[];
+  totalDue: number;
+};
+```
+
+**Swift**
+
+```swift
+public struct FinanceDashboard: Codable, Sendable {
+    public var upcomingBills: [Bill]
+    public var monthlyTotal: Double
+    public var paidThisMonth: Double
+    public var remainingThisMonth: Double
+    public var calendarView: [BillCalendarDay]
+}
+
+public struct Bill: Codable, Identifiable, Sendable {
+    public var id: String
+    public var name: String
+    public var amount: Double
+    public var dueDay: Int
+    public var isPaid: Bool
+    public var category: String
+}
+
+public struct BillCalendarDay: Codable, Sendable {
+    public var date: String
+    public var bills: [Bill]
+    public var totalDue: Double
+}
+```
+
+**Rust**
+
+```rust
+pub struct FinanceDashboard {
+    #[serde(rename = "upcomingBills")]
+    pub upcoming_bills: Vec<Bill>,
+    #[serde(rename = "monthlyTotal")]
+    pub monthly_total: f64,
+    #[serde(rename = "paidThisMonth")]
+    pub paid_this_month: f64,
+    #[serde(rename = "remainingThisMonth")]
+    pub remaining_this_month: f64,
+    #[serde(rename = "calendarView")]
+    pub calendar_view: Vec<BillCalendarDay>,
+}
+```
 
 ---

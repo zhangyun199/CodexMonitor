@@ -4,7 +4,41 @@
 
 ## Architecture (1-paragraph summary)
 
-CodexMonitor is a multi-client UI (Desktop Tauri+React, iOS SwiftUI, and an optional remote Rust daemon) for driving **Codex `app-server`** sessions. The core backend concept is **one `codex app-server` process per workspace**, with UI state driven by streamed JSON notifications from Codex. The desktop app can run the backend locally, or proxy all calls to a daemon over TCP. iOS is a thin remote client that always talks to the daemon over newline-delimited JSON “RPC” with a shared token.
+CodexMonitor is a multi-client UI (Desktop Tauri+React, iOS SwiftUI, and an optional remote Rust daemon) for driving **Codex `app-server`** sessions. The core backend concept is **one `codex app-server` process per workspace**, with UI state driven by streamed JSON notifications from Codex. The desktop app can run the backend locally, or proxy all calls to a daemon over TCP. iOS is a thin remote client that always talks to the daemon over newline-delimited JSON "RPC" with a shared token.
+
+## Two-Workspace Model
+
+CodexMonitor uses a **simplified two-workspace architecture**:
+
+| Workspace | Purpose | Features |
+|-----------|---------|----------|
+| **CodexMonitor** | Coding workspace | Standard Codex, git operations, terminal |
+| **Life** | Unified life assistant | All 6 domains, combined prompt injection, domain dashboards |
+
+### Life Workspace Domains
+
+| Domain | Data Source | Dashboard Features |
+|--------|-------------|-------------------|
+| Delivery | Obsidian Sessions + Supabase | Earnings, orders, $/hr, merchant analysis |
+| Nutrition | Obsidian Stream + Food entities | Macros, meals, weekly trends |
+| Exercise | Obsidian Behaviors | Workouts, streaks, progress |
+| Media | Obsidian Entities/Media | Bookshelf covers, ratings, type filters |
+| YouTube | Obsidian Entities/YouTube | Pipeline by tier, ideas, stages |
+| Finance | Obsidian Entities/Finance/Bills | Due dates, calendar, monthly totals |
+
+### Life Workspace Behavior
+
+1. **Chat Mode (default)**: Full life context (4 prompts combined) injected into every thread
+2. **Dashboard Mode**: Clicking domain tab replaces center panel with rendered dashboard
+3. **Domain prompts**: `workspace-delivery-finance.md`, `workspace-food-exercise.md`, `workspace-media.md`, `workspace-youtube.md`
+
+### Data Flow
+
+```
+Obsidian (raw) → Daemon parses → Dashboard data
+                      ↓
+             Supabase (aggregations) → Week/Month/Lifetime stats
+```
 
 ## Key paths
 
@@ -20,6 +54,9 @@ CodexMonitor is a multi-client UI (Desktop Tauri+React, iOS SwiftUI, and an opti
 | Shared Swift models | `ios/Packages/CodexMonitorRPC/Sources/CodexMonitorModels/Models.swift` |
 | iOS RPC client | `ios/Packages/CodexMonitorRPC/Sources/CodexMonitorRPC/RPCClient.swift` |
 | iOS app store | `ios/CodexMonitorMobile/CodexMonitorMobile/CodexStore.swift` |
+| **Life workspace (React)** | `src/features/life/` |
+| **Life workspace (iOS)** | `ios/.../Views/LifeWorkspaceView.swift` |
+| **Domain prompts** | `workspace-*.md` files |
 
 ## RPC Quick Reference (daemon)
 
@@ -79,6 +116,29 @@ Full details: `docs/API_REFERENCE.md`
    - daemon RPC payloads in `handle_rpc_request`
 4. Update `docs/DATA_MODELS.md`.
 
+### Add a new Life workspace domain dashboard
+
+1. Create the React component in `src/features/life/components/domains/`:
+   - Follow pattern from existing dashboards (stats cards, time range, data table)
+   - Use shared components from `src/features/life/components/shared/`
+2. Create the data hook in `src/features/life/hooks/`:
+   - Pattern: `useDomainData.ts` with `invoke('get_domain_dashboard', {...})`
+3. Add Rust backend command:
+   - Implement `get_[domain]_dashboard` in daemon
+   - Parse Obsidian entities and/or query Supabase aggregations
+4. Add to `DomainViewContainer.tsx` switch statement
+5. Create iOS equivalent:
+   - SwiftUI view in `Views/domains/`
+   - CodexStore method for fetching
+6. Add dashboard types to `docs/DATA_MODELS.md`
+
+### Modify Life workspace prompt injection
+
+1. Edit the relevant workspace prompt file (`workspace-*.md`)
+2. Combined prompt is built in `get_life_workspace_prompt()` Rust command
+3. Prompt files are concatenated with `---` separators
+4. Test with thread/start to verify full injection
+
 ## Gotchas & landmines
 
 - **Mixed JSON naming**: some payloads are snake_case (`codex_bin`, `workspace_id`), others camelCase (`parentId`, request params). Don't "normalize" without changing all clients.
@@ -86,6 +146,9 @@ Full details: `docs/API_REFERENCE.md`
 - **Auth vs insecure mode**: iOS always performs `auth` and will not connect to a daemon started with `--insecure-no-auth` (unless mobile is changed).
 - **Terminal output is unbounded**: output streams can flood UI; trim buffers and consider backpressure if adding new streams.
 - **Approval rules are security-sensitive**: `remember_approval_rule` changes CODEX_HOME rules; treat it like editing sudoers.
+- **Life workspace prompts are large**: Combined 4-prompt injection can be 3000+ lines. Monitor token usage.
+- **Domain dashboards replace center panel**: Not a modal/overlay. Similar to Git diff view pattern.
+- **Two data sources for Life**: Obsidian for real-time/today, Supabase for aggregations.
 
 ---
 

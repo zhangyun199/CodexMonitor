@@ -2,8 +2,11 @@ use tauri::Manager;
 
 mod backend;
 mod codex;
+mod codex_params;
 mod codex_config;
 mod codex_home;
+#[path = "memory/auto_flush.rs"]
+mod auto_flush;
 #[cfg(not(target_os = "windows"))]
 #[path = "dictation.rs"]
 mod dictation;
@@ -11,12 +14,15 @@ mod dictation;
 #[path = "dictation_stub.rs"]
 mod dictation;
 mod event_sink;
+mod domains;
 mod git;
 mod git_utils;
 mod local_usage;
 mod local_usage_core;
 mod memory;
+mod memory_commands;
 mod menu;
+mod obsidian;
 mod prompts;
 mod remote_backend;
 mod rules;
@@ -68,6 +74,10 @@ pub fn run() {
             settings::update_app_settings,
             menu::menu_set_accelerators,
             codex::codex_doctor,
+            domains::domains_list,
+            domains::domains_create,
+            domains::domains_update,
+            domains::domains_delete,
             workspaces::list_workspaces,
             workspaces::is_workspace_path_dir,
             workspaces::add_workspace,
@@ -90,6 +100,7 @@ pub fn run() {
             codex::generate_commit_message,
             codex::resume_thread,
             codex::list_threads,
+            codex::list_session_threads,
             codex::archive_thread,
             codex::collaboration_mode_list,
             workspaces::connect_workspace,
@@ -128,6 +139,17 @@ pub fn run() {
             prompts::prompts_move,
             prompts::prompts_workspace_dir,
             prompts::prompts_global_dir,
+            memory_commands::memory_status,
+            memory_commands::memory_search,
+            memory_commands::memory_append,
+            memory_commands::memory_bootstrap,
+            memory_commands::memory_flush_now,
+            domains::domains_list,
+            domains::domains_create,
+            domains::domains_update,
+            domains::domains_delete,
+            domains::domain_trends,
+            domains::read_text_file,
             terminal::terminal_open,
             terminal::terminal_write,
             terminal::terminal_resize,

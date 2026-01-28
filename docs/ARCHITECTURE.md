@@ -1,15 +1,90 @@
 # CodexMonitor Architecture
 
-This repository contains **CodexMonitor**, a multi-client UI for orchestrating **Codex `app-server`** sessions across multiple git workspaces.
+This repository contains **CodexMonitor**, a multi-client UI for orchestrating **Codex `app-server`** sessions.
 
-CodexMonitor has three “front doors”:
+CodexMonitor has three "front doors":
 
 - **Desktop app**: a **Tauri v2 + React** application (`src/` + `src-tauri/`).
 - **iOS/iPadOS app**: a **SwiftUI** application (`ios/CodexMonitorMobile/`).
 - **Rust daemon**: a **headless JSON-RPC-over-TCP server** that hosts Codex sessions (`src-tauri/src/bin/codex_monitor_daemon.rs`).
 
-All clients ultimately drive the same backend concept:  
+All clients ultimately drive the same backend concept:
 **one `codex app-server` process per workspace**, with UI state driven primarily by **streamed app-server events**.
+
+---
+
+## Two-Workspace Model
+
+CodexMonitor uses a **simplified two-workspace architecture**:
+
+| Workspace | Purpose | Prompt Source |
+|-----------|---------|---------------|
+| **CodexMonitor** | Coding workspace (development, git operations) | Standard Codex prompts |
+| **Life** | Unified life assistant (all life domains) | Combined 4-file prompt injection |
+
+### Life Workspace
+
+The Life workspace is a **unified hub** that combines ALL life domains into a single conversational interface with domain-specific dashboard views:
+
+**Domains included:**
+- **Delivery** — Earnings, orders, hourly rates, merchant analysis
+- **Nutrition** — Daily macros, meal logs, weekly trends
+- **Exercise** — Workout logs, streaks, progress tracking
+- **Media** — Movies/shows/games backlog, ratings, covers
+- **YouTube** — Video pipeline (S/A/B/C tiers), idea tracking
+- **Finance/Bills** — Due dates, monthly totals, payment history
+
+### Layout Architecture
+
+```
+Life Workspace Layout
+├── Center Panel
+│   ├── DEFAULT: Chat threads with Codex (full life context)
+│   │   └── All 4 domain prompts combined and injected
+│   │
+│   └── WHEN DOMAIN SELECTED: Domain Dashboard View
+│       └── Rendered React component (not markdown)
+│
+└── Right Panel
+    ├── Domain Tabs: [Delivery] [Nutrition] [Exercise] [Media] [YouTube] [Finance]
+    └── Clicking domain → Center panel transforms to that domain's dashboard
+```
+
+### Domain View Behavior
+
+When a user clicks a domain tab in the right panel:
+1. Center panel **replaces** chat with the domain dashboard (similar to Git diff view)
+2. Dashboard shows domain-specific stats, lists, and visualizations
+3. "Back to Chat" button or clicking another domain switches views
+4. Chat history is preserved when switching back
+
+### Combined Prompt Injection
+
+When a thread starts in the Life workspace, **ALL four domain prompts** are combined and injected:
+
+```
+[workspace-delivery-finance.md content]
+---
+[workspace-food-exercise.md content]
+---
+[workspace-media.md content]
+---
+[workspace-youtube.md content]
+---
+
+You are JMWillis's life assistant with full context across all domains.
+Auto-detect the domain from user messages and respond appropriately.
+```
+
+**Domain detection keywords:**
+| Domain | Trigger Keywords |
+|--------|------------------|
+| Delivery | order, miles, doordash, uber, grubhub, merchant, $/mi |
+| Nutrition | ate, had, breakfast, lunch, dinner, calories, protein |
+| Exercise | workout, walk, gym, strength, run |
+| Media | watched, finished, playing, rating, movie, show, anime |
+| YouTube | video idea, pipeline, thesis, hook, script, tier |
+| Finance | bill, paid, due, spent, expense |
 
 ---
 
@@ -57,6 +132,13 @@ workspaces.json + settings.json"]
 threads, sessions, rules, prompts"]
   end
 
+  subgraph Data["Data Sources"]
+    Obsidian["Obsidian Vault
+(raw life logs, entities)"]
+    Supabase["Supabase
+(aggregations, search)"]
+  end
+
   %% Local mode: Desktop Tauri runs app-server itself
   Tauri <--> AppServer
   Tauri <--> Git
@@ -77,7 +159,167 @@ TCP JSON-RPC + token auth" .-> RPCServer
   RPCServer <--> FS
   RPCServer <--> CodexHome
   RPCServer <--> GH
+
+  %% Data sources for Life workspace
+  RPCServer <--> Obsidian
+  RPCServer <--> Supabase
 ```
+
+---
+
+## Life Workspace Data Architecture
+
+### Data Sources
+
+| Need | Source | Why |
+|------|--------|-----|
+| Today's entries | Obsidian Stream | Fast, local, real-time |
+| Week/month/lifetime aggregations | Supabase | Pre-computed, performant |
+| Entity details | Obsidian Entities folder | Source of truth |
+| Images/covers | External APIs (TMDB, IGDB) or stored URLs | Visual richness |
+
+### Obsidian Vault Structure
+
+```
+/Volumes/YouTube 4TB/Obsidian/
+├── Stream/
+│   └── 2026-01.md              ← Monthly logs (primary input)
+├── Entities/
+│   ├── Delivery/
+│   │   └── Sessions/           ← Shift logs with YAML frontmatter
+│   ├── Finance/
+│   │   └── Bills/              ← Bill entity files
+│   ├── Food/                   ← Food/nutrition entities
+│   ├── Media/                  ← Media entities (173 items)
+│   ├── YouTube/                ← Video ideas (210 items)
+│   └── Behaviors/              ← Exercise behaviors
+├── Domains/                    ← Dashboard markdown pages
+├── Indexes/                    ← JSON aggregation files
+└── _config/                    ← YAML configs
+```
+
+### Supabase Aggregation Tables
+
+Pre-computed aggregations for dashboard performance:
+
+- `delivery_aggregations` — period stats (earnings, orders, hourly rate)
+- `nutrition_aggregations` — period stats (avg macros, meals logged)
+- `exercise_aggregations` — workout summaries
+- `media_aggregations` — viewing stats
+- `youtube_aggregations` — pipeline stats
+- `finance_aggregations` — bill summaries
+
+---
+
+## Domain Dashboard Components
+
+### React Component Architecture (Desktop)
+
+```
+src/features/life/
+├── components/
+│   ├── LifeWorkspaceView.tsx       # Main container, handles domain/chat switching
+│   ├── DomainSelector.tsx          # Right panel domain tabs
+│   ├── DomainViewContainer.tsx     # Switches between domain dashboard views
+│   │
+│   ├── domains/
+│   │   ├── DeliveryDashboard.tsx   # Stats cards, orders table, merchant analysis
+│   │   ├── NutritionDashboard.tsx  # Macros, meal log, weekly trends
+│   │   ├── ExerciseDashboard.tsx   # Workout log, streaks, progress grid
+│   │   ├── MediaDashboard.tsx      # Bookshelf covers, ratings, type filters
+│   │   ├── YouTubeDashboard.tsx    # Pipeline by tier, video ideas, stages
+│   │   └── FinanceDashboard.tsx    # Due dates, calendar view, totals
+│   │
+│   └── shared/
+│       ├── StatCard.tsx            # Reusable stat display card
+│       ├── TimeRangeSelector.tsx   # Today/Week/Month/Lifetime picker
+│       ├── DataTable.tsx           # Generic sortable table
+│       ├── CoverImage.tsx          # Media cover with fallback
+│       └── ProgressBar.tsx         # Visual progress indicator
+│
+├── hooks/
+│   ├── useLifeWorkspace.ts         # Domain view state management
+│   ├── useDomainDashboard.ts       # Generic data fetching pattern
+│   ├── useDeliveryData.ts
+│   ├── useNutritionData.ts
+│   ├── useMediaData.ts
+│   ├── useYouTubeData.ts
+│   └── useFinanceData.ts
+│
+└── styles/
+    └── life-dashboard.css          # Dark grid aesthetic
+```
+
+### SwiftUI View Architecture (iOS)
+
+```
+ios/CodexMonitorMobile/CodexMonitorMobile/Views/
+├── LifeWorkspaceView.swift         # Main life workspace container
+├── DomainTabBar.swift              # Domain selector tabs
+├── domains/
+│   ├── DeliveryDashboardView.swift
+│   ├── NutritionDashboardView.swift
+│   ├── ExerciseDashboardView.swift
+│   ├── MediaDashboardView.swift
+│   ├── YouTubeDashboardView.swift
+│   └── FinanceDashboardView.swift
+└── shared/
+    ├── StatCardView.swift
+    ├── CoverImageView.swift
+    └── TimeRangePicker.swift
+```
+
+### Rust Backend Commands
+
+```rust
+// Life workspace prompt injection
+#[tauri::command]
+async fn get_life_workspace_prompt() -> Result<String, String>
+
+// Domain dashboard data fetching
+#[tauri::command]
+async fn get_delivery_dashboard(workspace_id: String, range: String) -> Result<DeliveryDashboard, String>
+
+#[tauri::command]
+async fn get_nutrition_dashboard(workspace_id: String, range: String) -> Result<NutritionDashboard, String>
+
+#[tauri::command]
+async fn get_media_dashboard(workspace_id: String, range: String) -> Result<MediaDashboard, String>
+
+#[tauri::command]
+async fn get_youtube_dashboard(workspace_id: String, range: String) -> Result<YouTubeDashboard, String>
+
+#[tauri::command]
+async fn get_finance_dashboard(workspace_id: String, range: String) -> Result<FinanceDashboard, String>
+```
+
+### Design Philosophy
+
+**Visual principles (from user's iPad logging style):**
+- **Dark mode with grid** — Graph paper aesthetic, subtle grid background
+- **Images are FIRST CLASS** — Media covers, food photos, merchant badges inline
+- **Cause → Effect thinking** — Action → Reward visual patterns
+- **Timestamps matter** — Every entry has specific time
+- **Compact but rich** — Lots of info in small space
+- **Progressive disclosure** — Smart defaults, expand on demand
+- **Mobile-first** — Glanceable from iPad while driving
+
+**Color semantics:**
+| Color | Meaning |
+|-------|---------|
+| Yellow | Headers |
+| Cyan/Teal | Categories, media titles, labels |
+| Green | Rewards, positive outcomes |
+| Red | Warnings, costs, negative |
+| White | General notes |
+| Grey | Dates, times |
+
+**Domain accent colors:**
+- Delivery: `blue-500`
+- Nutrition: `green-500`
+- Finance: `yellow-500`
+- YouTube: `red-500`
+- Media: `purple-500`
 
 ---
 

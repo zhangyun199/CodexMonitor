@@ -179,7 +179,7 @@ The top-level view is:
 
 - `RootView`
   - chooses between phone/tablet layout using horizontal size class
-  - provides a “glass” background style
+  - provides a "glass" background style
 
 ### Primary screens
 
@@ -198,6 +198,237 @@ The top-level view is:
 | Settings | `Views/SettingsView.swift` | Host/port/token + reconnect |
 | Debug log | `Views/DebugLogView.swift` | Shows internal log buffer |
 | Connection indicator | `Views/ConnectionStatusView.swift` | Small UI state indicator |
+| **Life Workspace** | `Views/LifeWorkspaceView.swift` | **Unified life assistant container** |
+| **Domain Tab Bar** | `Views/DomainTabBar.swift` | **Domain selector tabs** |
+
+---
+
+## Life Workspace Views (iOS)
+
+The Life workspace provides a unified hub for all life domains with domain-specific dashboard views.
+
+### View Structure
+
+```
+ios/CodexMonitorMobile/CodexMonitorMobile/Views/
+├── LifeWorkspaceView.swift         # Main life workspace container
+├── DomainTabBar.swift              # Domain selector tabs
+├── domains/
+│   ├── DeliveryDashboardView.swift # Earnings, orders, hourly rates
+│   ├── NutritionDashboardView.swift # Macros, meals, trends
+│   ├── ExerciseDashboardView.swift  # Workouts, streaks
+│   ├── MediaDashboardView.swift     # Bookshelf covers, ratings
+│   ├── YouTubeDashboardView.swift   # Pipeline by tier
+│   └── FinanceDashboardView.swift   # Bills, due dates
+└── shared/
+    ├── StatCardView.swift           # Reusable stat card
+    ├── CoverImageView.swift         # Async image with fallback
+    └── TimeRangePicker.swift        # Today/Week/Month/Lifetime
+```
+
+### LifeWorkspaceView
+
+The main container that switches between chat and domain dashboard views:
+
+```swift
+struct LifeWorkspaceView: View {
+    @EnvironmentObject var store: CodexStore
+    @State private var activeDomain: LifeDomain? = nil
+    @State private var timeRange: TimeRange = .today
+
+    var body: some View {
+        HStack(spacing: 0) {
+            // Center panel - chat or domain dashboard
+            if let domain = activeDomain {
+                DomainDashboardContainer(
+                    domain: domain,
+                    timeRange: $timeRange,
+                    onBack: { activeDomain = nil }
+                )
+            } else {
+                ConversationView()
+            }
+
+            // Right panel - domain tabs
+            DomainTabBar(
+                activeDomain: $activeDomain
+            )
+        }
+    }
+}
+```
+
+### DomainTabBar
+
+Displays domain tabs in the right panel:
+
+```swift
+struct DomainTabBar: View {
+    @Binding var activeDomain: LifeDomain?
+
+    var body: some View {
+        VStack(spacing: 12) {
+            ForEach(LifeDomain.allCases) { domain in
+                DomainTab(
+                    domain: domain,
+                    isActive: activeDomain == domain,
+                    onTap: { activeDomain = domain }
+                )
+            }
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+    }
+}
+```
+
+### Domain Dashboard Views
+
+Each domain has a dedicated SwiftUI view:
+
+```swift
+struct DeliveryDashboardView: View {
+    @EnvironmentObject var store: CodexStore
+    @Binding var timeRange: TimeRange
+    @State private var dashboard: DeliveryDashboard?
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // Stats row
+                HStack(spacing: 12) {
+                    StatCardView(title: "Earnings", value: dashboard?.stats.totalEarnings.formatted(.currency(code: "USD")) ?? "--")
+                    StatCardView(title: "Orders", value: "\(dashboard?.stats.orderCount ?? 0)")
+                    StatCardView(title: "$/hr", value: dashboard?.stats.hourlyRate.formatted() ?? "--")
+                }
+
+                // Time range picker
+                TimeRangePicker(selection: $timeRange)
+
+                // Orders table
+                if let orders = dashboard?.orders {
+                    OrdersListView(orders: orders)
+                }
+            }
+            .padding()
+        }
+        .task(id: timeRange) {
+            dashboard = await store.fetchDeliveryDashboard(range: timeRange.rawValue)
+        }
+    }
+}
+```
+
+### CodexStore Additions
+
+New methods for fetching domain dashboard data:
+
+```swift
+extension CodexStore {
+    func fetchDeliveryDashboard(range: String) async -> DeliveryDashboard? {
+        guard let workspaceId = activeWorkspaceId else { return nil }
+        return try? await api.call(
+            method: "get_delivery_dashboard",
+            params: ["workspaceId": workspaceId, "range": range]
+        )
+    }
+
+    func fetchNutritionDashboard(range: String) async -> NutritionDashboard?
+    func fetchMediaDashboard(range: String) async -> MediaDashboard?
+    func fetchYouTubeDashboard(range: String) async -> YouTubeDashboard?
+    func fetchFinanceDashboard(range: String) async -> FinanceDashboard?
+}
+```
+
+### Domain Types (Swift)
+
+```swift
+enum LifeDomain: String, CaseIterable, Identifiable {
+    case delivery
+    case nutrition
+    case exercise
+    case media
+    case youtube
+    case finance
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .delivery: return "car.fill"
+        case .nutrition: return "fork.knife"
+        case .exercise: return "figure.walk"
+        case .media: return "tv.fill"
+        case .youtube: return "play.rectangle.fill"
+        case .finance: return "dollarsign.circle.fill"
+        }
+    }
+
+    var accentColor: Color {
+        switch self {
+        case .delivery: return .blue
+        case .nutrition: return .green
+        case .exercise: return .orange
+        case .media: return .purple
+        case .youtube: return .red
+        case .finance: return .yellow
+        }
+    }
+}
+
+enum TimeRange: String, CaseIterable {
+    case today
+    case week
+    case month
+    case lifetime
+}
+```
+
+### Visual Design (iOS)
+
+The iOS Life workspace follows the same dark grid aesthetic:
+
+```swift
+struct LifeDashboardBackground: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: "1a1a2e"), Color(hex: "16213e")],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            GridPattern()
+                .stroke(Color.white.opacity(0.03), lineWidth: 1)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+struct StatCardView: View {
+    let title: String
+    let value: String
+    var accentColor: Color = .blue
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.gray)
+            Text(value)
+                .font(.title2.bold())
+                .foregroundColor(accentColor)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color.black.opacity(0.3))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+}
+```
 
 ### Shared “glass” components
 

@@ -18,6 +18,7 @@ const MINIMAX_RETRIES: u8 = 2;
 pub struct EmbeddingsClient {
     client: Client,
     api_key: String,
+    base_url: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -104,6 +105,15 @@ impl EmbeddingsClient {
         Self {
             client: Client::new(),
             api_key: api_key.to_string(),
+            base_url: MINIMAX_API_URL.to_string(),
+        }
+    }
+
+    pub fn with_base_url(api_key: &str, base_url: &str) -> Self {
+        Self {
+            client: Client::new(),
+            api_key: api_key.to_string(),
+            base_url: base_url.to_string(),
         }
     }
 
@@ -134,7 +144,7 @@ impl EmbeddingsClient {
 
             let resp = self
                 .client
-                .post(MINIMAX_API_URL)
+                .post(&self.base_url)
                 .header("Authorization", format!("Bearer {}", self.api_key))
                 .header("Content-Type", "application/json")
                 .json(&request)
@@ -186,5 +196,43 @@ impl EmbeddingsClient {
         }
 
         Err("MiniMax embeddings request failed after retries".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use httpmock::Method::POST;
+    use httpmock::MockServer;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn generate_parses_embedding_vector() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(POST).path("/v1/embeddings");
+            then.status(200).json_body(json!({
+                "data": [{ "embedding": [0.1, 0.2, 0.3] }],
+                "model": "embo-01"
+            }));
+        });
+
+        let client = EmbeddingsClient::with_base_url("test", &server.url("/v1/embeddings"));
+        let result = client.generate("hello", "query").await.unwrap();
+        assert_eq!(result.dim, 3);
+        assert_eq!(result.vector.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn generate_errors_when_missing_vector() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(POST).path("/v1/embeddings");
+            then.status(200).json_body(json!({ "model": "embo-01" }));
+        });
+
+        let client = EmbeddingsClient::with_base_url("test", &server.url("/v1/embeddings"));
+        let err = client.generate("hello", "query").await.unwrap_err();
+        assert!(err.contains("missing embedding vector"));
     }
 }

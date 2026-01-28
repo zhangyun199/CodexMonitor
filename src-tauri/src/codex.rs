@@ -1,5 +1,5 @@
 use serde_json::{json, Map, Value};
-use std::io::ErrorKind;
+use std::io::{BufRead, ErrorKind};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -8,18 +8,22 @@ use tauri::{AppHandle, State};
 use tokio::process::Command;
 use tokio::sync::mpsc;
 use tokio::time::timeout;
+use chrono::{DateTime, Utc};
+use ignore::WalkBuilder;
 
 pub(crate) use crate::backend::app_server::WorkspaceSession;
 use crate::backend::app_server::{
     build_codex_command_with_bin, build_codex_path_env, check_codex_installation,
     spawn_workspace_session as spawn_workspace_session_inner,
 };
+use crate::codex_params::{build_turn_start_params, build_user_input};
 use crate::codex_home::resolve_workspace_codex_home;
 use crate::event_sink::TauriEventSink;
 use crate::remote_backend;
 use crate::rules;
 use crate::state::AppState;
 use crate::types::WorkspaceEntry;
+use crate::codex_home::resolve_codex_home;
 
 pub(crate) async fn spawn_workspace_session(
     entry: WorkspaceEntry,
@@ -165,10 +169,13 @@ pub(crate) async fn start_thread(
         .await;
     }
 
-    let sessions = state.sessions.lock().await;
-    let session = sessions
-        .get(&workspace_id)
-        .ok_or("workspace not connected")?;
+    let session = {
+        let sessions = state.sessions.lock().await;
+        sessions
+            .get(&workspace_id)
+            .cloned()
+            .ok_or("workspace not connected")?
+    };
     let params = json!({
         "cwd": session.entry.path,
         "approvalPolicy": "on-request"
@@ -259,6 +266,130 @@ pub(crate) async fn archive_thread(
     session.send_request("thread/archive", params).await
 }
 
+#[derive(serde::Serialize, Clone)]
+struct SessionThreadInfo {
+    #[serde(rename = "threadId")]
+    thread_id: String,
+    cwd: String,
+    #[serde(rename = "updatedAt")]
+    updated_at: i64,
+}
+
+fn normalize_path(value: &str) -> String {
+    value.replace('\\', "/").trim_end_matches('/').to_string()
+}
+
+fn parse_session_meta(line: &str) -> Option<SessionThreadInfo> {
+    let parsed: Value = serde_json::from_str(line).ok()?;
+    if parsed.get("type")?.as_str()? != "session_meta" {
+        return None;
+    }
+    let payload = parsed.get("payload")?;
+    let thread_id = payload.get("id")?.as_str()?.to_string();
+    let cwd = payload.get("cwd")?.as_str()?.to_string();
+    let timestamp = payload
+        .get("timestamp")
+        .and_then(|value| value.as_str())
+        .or_else(|| parsed.get("timestamp").and_then(|value| value.as_str()))?;
+    let parsed_time = DateTime::parse_from_rfc3339(timestamp).ok()?;
+    Some(SessionThreadInfo {
+        thread_id,
+        cwd,
+        updated_at: parsed_time.with_timezone(&Utc).timestamp_millis(),
+    })
+}
+
+#[tauri::command]
+pub(crate) async fn list_session_threads(
+    workspace_path: String,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Value, String> {
+    if remote_backend::is_remote_mode(&*state).await {
+        return remote_backend::call_remote(
+            &*state,
+            app,
+            "list_session_threads",
+            json!({ "workspacePath": workspace_path, "limit": limit }),
+        )
+        .await;
+    }
+
+    let normalized_workspace = normalize_path(&workspace_path);
+    let max_count = limit.unwrap_or(50).max(1);
+    let Some(sessions_root) = resolve_codex_home().map(|path| path.join("sessions")) else {
+        return Ok(json!({ "data": Vec::<SessionThreadInfo>::new() }));
+    };
+    if !sessions_root.exists() {
+        return Ok(json!({ "data": Vec::<SessionThreadInfo>::new() }));
+    }
+
+    let sessions = tokio::task::spawn_blocking(move || {
+        let mut found: Vec<SessionThreadInfo> = Vec::new();
+        let walker = WalkBuilder::new(sessions_root)
+            .hidden(false)
+            .standard_filters(false)
+            .build();
+        for entry in walker.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            if path.extension().and_then(|ext| ext.to_str()) != Some("jsonl") {
+                continue;
+            }
+            let file = match std::fs::File::open(path) {
+                Ok(file) => file,
+                Err(_) => continue,
+            };
+            let mut reader = std::io::BufReader::new(file);
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_err() {
+                continue;
+            }
+            if let Some(meta) = parse_session_meta(line.trim_end()) {
+                if normalize_path(&meta.cwd) == normalized_workspace {
+                    found.push(meta);
+                }
+            }
+        }
+        found.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        found.truncate(max_count);
+        found
+    })
+    .await
+    .map_err(|err| err.to_string())?;
+
+    Ok(json!({ "data": sessions }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{normalize_path, parse_session_meta};
+
+    #[test]
+    fn parses_session_meta_line() {
+        let line = r#"{"timestamp":"2026-01-20T08:01:16.610Z","type":"session_meta","payload":{"id":"thread-123","timestamp":"2026-01-20T08:01:16.600Z","cwd":"/tmp/project","originator":"codex_cli_rs","cli_version":"0.87.0","instructions":"test"}}"#;
+        let meta = parse_session_meta(line).expect("meta parsed");
+        assert_eq!(meta.thread_id, "thread-123");
+        assert_eq!(meta.cwd, "/tmp/project");
+        assert!(meta.updated_at > 0);
+    }
+
+    #[test]
+    fn ignores_non_session_meta_lines() {
+        let line = r#"{"type":"message","payload":{"id":"thread-123"}}"#;
+        assert!(parse_session_meta(line).is_none());
+    }
+
+    #[test]
+    fn normalizes_paths() {
+        assert_eq!(normalize_path("/tmp/project/"), "/tmp/project");
+        assert_eq!(normalize_path("\\tmp\\project\\"), "/tmp/project");
+    }
+}
+
 #[tauri::command]
 pub(crate) async fn send_user_message(
     workspace_id: String,
@@ -316,41 +447,42 @@ pub(crate) async fn send_user_message(
         "on-request"
     };
 
-    let trimmed_text = text.trim();
-    let mut input: Vec<Value> = Vec::new();
-    if !trimmed_text.is_empty() {
-        input.push(json!({ "type": "text", "text": trimmed_text }));
-    }
-    if let Some(paths) = images {
-        for path in paths {
-            let trimmed = path.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
-            if trimmed.starts_with("data:")
-                || trimmed.starts_with("http://")
-                || trimmed.starts_with("https://")
-            {
-                input.push(json!({ "type": "image", "url": trimmed }));
+    let input = build_user_input(&text, images.as_deref())?;
+    let domain_instructions = {
+        let workspaces = state.workspaces.lock().await;
+        let workspace = workspaces.get(&workspace_id);
+        if let Some(workspace) = workspace {
+            let apply = workspace
+                .settings
+                .apply_domain_instructions
+                .unwrap_or(true);
+            if apply {
+                let domains = state.domains.lock().await;
+                workspace
+                    .settings
+                    .domain_id
+                    .as_ref()
+                    .and_then(|id| domains.iter().find(|domain| &domain.id == id))
+                    .map(|domain| domain.system_prompt.clone())
             } else {
-                input.push(json!({ "type": "localImage", "path": trimmed }));
+                None
             }
+        } else {
+            None
         }
-    }
-    if input.is_empty() {
-        return Err("empty user message".to_string());
-    }
+    };
 
-    let params = json!({
-        "threadId": thread_id,
-        "input": input,
-        "cwd": session.entry.path,
-        "approvalPolicy": approval_policy,
-        "sandboxPolicy": sandbox_policy,
-        "model": model,
-        "effort": effort,
-        "collaborationMode": collaboration_mode,
-    });
+    let params = build_turn_start_params(
+        &thread_id,
+        input,
+        &session.entry.path,
+        approval_policy,
+        sandbox_policy,
+        model,
+        effort,
+        collaboration_mode,
+        domain_instructions,
+    );
     session.send_request("turn/start", params).await
 }
 
@@ -721,13 +853,17 @@ Changes:\n{diff}"
     }
 
     // Start a turn with the commit message prompt
-    let turn_params = json!({
-        "threadId": thread_id,
-        "input": [{ "type": "text", "text": prompt }],
-        "cwd": session.entry.path,
-        "approvalPolicy": "never",
-        "sandboxPolicy": { "type": "readOnly" },
-    });
+    let turn_params = build_turn_start_params(
+        &thread_id,
+        vec![json!({ "type": "text", "text": prompt })],
+        &session.entry.path,
+        "never",
+        json!({ "type": "readOnly" }),
+        None,
+        None,
+        None,
+        None,
+    );
     let turn_result = session.send_request("turn/start", turn_params).await;
     let turn_result = match turn_result {
         Ok(result) => result,

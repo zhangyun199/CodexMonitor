@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ask, open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronUp from "lucide-react/dist/esm/icons/chevron-up";
 import LayoutGrid from "lucide-react/dist/esm/icons/layout-grid";
+import LayoutDashboard from "lucide-react/dist/esm/icons/layout-dashboard";
 import SlidersHorizontal from "lucide-react/dist/esm/icons/sliders-horizontal";
 import Mic from "lucide-react/dist/esm/icons/mic";
 import Keyboard from "lucide-react/dist/esm/icons/keyboard";
@@ -16,6 +18,7 @@ import type {
   AppSettings,
   CodexDoctorResult,
   DictationModelStatus,
+  Domain,
   WorkspaceGroup,
   WorkspaceInfo,
 } from "../../../types";
@@ -112,12 +115,20 @@ export type SettingsViewProps = {
     workspaceId: string,
     groupId: string | null,
   ) => Promise<boolean | null>;
+  onAssignWorkspaceDomain: (
+    workspaceId: string,
+    domainId: string | null,
+  ) => Promise<boolean | null>;
   reduceTransparency: boolean;
   onToggleTransparency: (value: boolean) => void;
   appSettings: AppSettings;
   onUpdateAppSettings: (next: AppSettings) => Promise<void>;
   onRunDoctor: (codexBin: string | null) => Promise<CodexDoctorResult>;
   onUpdateWorkspaceCodexBin: (id: string, codexBin: string | null) => Promise<void>;
+  domains: Domain[];
+  onCreateDomain: (domain: Domain) => Promise<Domain>;
+  onUpdateDomain: (domain: Domain) => Promise<Domain>;
+  onDeleteDomain: (domainId: string) => Promise<void>;
   scaleShortcutTitle: string;
   scaleShortcutText: string;
   onTestNotificationSound: () => void;
@@ -129,7 +140,8 @@ export type SettingsViewProps = {
 };
 
 type SettingsSection = "projects" | "display" | "composer" | "dictation" | "shortcuts";
-type CodexSection = SettingsSection | "codex" | "experimental";
+type SettingsSectionWithDomains = SettingsSection | "domains";
+type CodexSection = SettingsSectionWithDomains | "codex" | "experimental";
 type ShortcutSettingKey =
   | "composerModelShortcut"
   | "composerAccessShortcut"
@@ -196,12 +208,17 @@ export function SettingsView({
   onMoveWorkspaceGroup,
   onDeleteWorkspaceGroup,
   onAssignWorkspaceGroup,
+  onAssignWorkspaceDomain,
   reduceTransparency,
   onToggleTransparency,
   appSettings,
   onUpdateAppSettings,
   onRunDoctor,
   onUpdateWorkspaceCodexBin,
+  domains,
+  onCreateDomain,
+  onUpdateDomain,
+  onDeleteDomain,
   scaleShortcutTitle,
   scaleShortcutText,
   onTestNotificationSound,
@@ -225,6 +242,7 @@ export function SettingsView({
   );
   const [overrideDrafts, setOverrideDrafts] = useState<Record<string, string>>({});
   const [groupDrafts, setGroupDrafts] = useState<Record<string, string>>({});
+  const [domainDrafts, setDomainDrafts] = useState<Record<string, Domain>>({});
   const [newGroupName, setNewGroupName] = useState("");
   const [groupError, setGroupError] = useState<string | null>(null);
   const [doctorState, setDoctorState] = useState<{
@@ -250,6 +268,15 @@ export function SettingsView({
     cycleWorkspaceNext: appSettings.cycleWorkspaceNextShortcut ?? "",
     cycleWorkspacePrev: appSettings.cycleWorkspacePrevShortcut ?? "",
   });
+
+  useEffect(() => {
+    setDomainDrafts(
+      domains.reduce<Record<string, Domain>>((acc, domain) => {
+        acc[domain.id] = domain;
+        return acc;
+      }, {}),
+    );
+  }, [domains]);
   const dictationReady = dictationModelStatus?.state === "ready";
   const dictationProgress = dictationModelStatus?.progress ?? null;
   const selectedDictationModel = useMemo(() => {
@@ -522,6 +549,78 @@ export function SettingsView({
     });
   };
 
+  const updateDomainDraft = useCallback(
+    (id: string, updates: Partial<Domain>) => {
+      setDomainDrafts((prev) => {
+        const current = prev[id];
+        if (!current) {
+          return prev;
+        }
+        return { ...prev, [id]: { ...current, ...updates } };
+      });
+    },
+    [],
+  );
+
+  const handleCreateDomain = useCallback(async () => {
+    const created = await onCreateDomain({
+      id: "",
+      name: "New Domain",
+      description: null,
+      systemPrompt: "",
+      viewType: "dashboard",
+      theme: {
+        icon: "✨",
+        color: "#7c3aed",
+        accent: "#7c3aed",
+        background: null,
+      },
+      defaultModel: null,
+      defaultAccessMode: null,
+      defaultReasoningEffort: null,
+      defaultApprovalPolicy: null,
+    });
+    setDomainDrafts((prev) => ({ ...prev, [created.id]: created }));
+  }, [onCreateDomain]);
+
+  const handleSaveDomain = useCallback(
+    async (id: string) => {
+      const draft = domainDrafts[id];
+      if (!draft) {
+        return;
+      }
+      await onUpdateDomain(draft);
+    },
+    [domainDrafts, onUpdateDomain],
+  );
+
+  const handleDeleteDomain = useCallback(
+    async (id: string) => {
+      await onDeleteDomain(id);
+      setDomainDrafts((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    },
+    [onDeleteDomain],
+  );
+
+  const handleImportPrompt = useCallback(
+    async (id: string) => {
+      const selection = await open({
+        multiple: false,
+        filters: [{ name: "Markdown", extensions: ["md", "txt"] }],
+      });
+      if (!selection || Array.isArray(selection)) {
+        return;
+      }
+      const content = await invoke<string>("read_text_file", { path: selection });
+      updateDomainDraft(id, { systemPrompt: content });
+    },
+    [updateDomainDraft],
+  );
+
   const handleBrowseCodex = async () => {
     const selection = await open({ multiple: false, directory: false });
     if (!selection || Array.isArray(selection)) {
@@ -706,6 +805,14 @@ export function SettingsView({
             >
               <LayoutGrid aria-hidden />
               Projects
+            </button>
+            <button
+              type="button"
+              className={`settings-nav ${activeSection === "domains" ? "active" : ""}`}
+              onClick={() => setActiveSection("domains")}
+            >
+              <LayoutDashboard aria-hidden />
+              Domains
             </button>
             <button
               type="button"
@@ -933,6 +1040,21 @@ export function SettingsView({
                                   </option>
                                 ))}
                               </select>
+                              <select
+                                className="settings-select settings-select--compact"
+                                value={workspace.settings.domainId ?? ""}
+                                onChange={(event) => {
+                                  const nextDomainId = event.target.value || null;
+                                  void onAssignWorkspaceDomain(workspace.id, nextDomainId);
+                                }}
+                              >
+                                <option value="">No domain</option>
+                                {domains.map((domain) => (
+                                  <option key={domain.id} value={domain.id}>
+                                    {domain.theme.icon} {domain.name}
+                                  </option>
+                                ))}
+                              </select>
                               <button
                                 type="button"
                                 className="ghost icon-button"
@@ -969,6 +1091,142 @@ export function SettingsView({
                     <div className="settings-empty">No projects yet.</div>
                   )}
                 </div>
+              </section>
+            )}
+            {activeSection === "domains" && (
+              <section className="settings-section">
+                <div className="settings-section-title">Domains</div>
+                <div className="settings-section-subtitle">
+                  Manage domain prompts, themes, and defaults.
+                </div>
+                <div className="settings-subsection-title">Domain list</div>
+                <div className="settings-subsection-subtitle">
+                  Add or edit domain prompts that auto-apply to workspaces.
+                </div>
+                <div className="settings-domain-actions">
+                  <button
+                    type="button"
+                    className="ghost settings-button-compact"
+                    onClick={() => void handleCreateDomain()}
+                  >
+                    Add Domain
+                  </button>
+                </div>
+                {domains.length === 0 ? (
+                  <div className="settings-empty">No domains yet.</div>
+                ) : (
+                  <div className="settings-domain-list">
+                    {domains.map((domain) => {
+                      const draft = domainDrafts[domain.id] ?? domain;
+                      return (
+                        <div key={domain.id} className="settings-domain-card">
+                          <div className="settings-domain-header">
+                            <div className="settings-domain-title">
+                              {draft.theme.icon} {draft.name}
+                            </div>
+                            <div className="settings-domain-actions">
+                              <button
+                                type="button"
+                                className="ghost settings-button-compact"
+                                onClick={() => void handleSaveDomain(domain.id)}
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost settings-button-compact"
+                                onClick={() => void handleDeleteDomain(domain.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                          <div className="settings-domain-grid">
+                            <label className="settings-field">
+                              <span className="settings-field-label">Name</span>
+                              <input
+                                className="settings-input"
+                                value={draft.name}
+                                onChange={(event) =>
+                                  updateDomainDraft(domain.id, {
+                                    name: event.target.value,
+                                  })
+                                }
+                              />
+                            </label>
+                            <label className="settings-field">
+                              <span className="settings-field-label">Icon</span>
+                              <input
+                                className="settings-input"
+                                value={draft.theme.icon}
+                                onChange={(event) =>
+                                  updateDomainDraft(domain.id, {
+                                    theme: {
+                                      ...draft.theme,
+                                      icon: event.target.value,
+                                    },
+                                  })
+                                }
+                              />
+                            </label>
+                            <label className="settings-field">
+                              <span className="settings-field-label">Accent</span>
+                              <input
+                                className="settings-input"
+                                value={draft.theme.accent}
+                                onChange={(event) =>
+                                  updateDomainDraft(domain.id, {
+                                    theme: {
+                                      ...draft.theme,
+                                      accent: event.target.value,
+                                    },
+                                  })
+                                }
+                              />
+                            </label>
+                            <label className="settings-field">
+                              <span className="settings-field-label">Color</span>
+                              <input
+                                className="settings-input"
+                                value={draft.theme.color}
+                                onChange={(event) =>
+                                  updateDomainDraft(domain.id, {
+                                    theme: {
+                                      ...draft.theme,
+                                      color: event.target.value,
+                                    },
+                                  })
+                                }
+                              />
+                            </label>
+                          </div>
+                          <label className="settings-field">
+                            <span className="settings-field-label">System prompt</span>
+                            <textarea
+                              className="settings-textarea"
+                              rows={6}
+                              value={draft.systemPrompt}
+                              onChange={(event) =>
+                                updateDomainDraft(domain.id, {
+                                  systemPrompt: event.target.value,
+                                })
+                              }
+                            />
+                          </label>
+                          <div className="settings-domain-actions">
+                            <button
+                              type="button"
+                              className="ghost settings-button-compact"
+                              onClick={() => void handleImportPrompt(domain.id)}
+                            >
+                              Import prompt
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </section>
             )}
             {activeSection === "display" && (

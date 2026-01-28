@@ -28,7 +28,11 @@ type RenderedHook = {
   unmount: () => void;
 };
 
-function renderImageDropHook(options: { disabled: boolean; onAttachImages?: (paths: string[]) => void }): RenderedHook {
+function renderImageDropHook(options: {
+  disabled: boolean;
+  onAttachImages?: (paths: string[]) => void;
+  onDropFiles?: (paths: string[]) => void;
+}): RenderedHook {
   let result: HookResult | undefined;
 
   function Test() {
@@ -86,11 +90,13 @@ describe("useComposerImageDrop", () => {
   it("tracks drag over state for file transfers", () => {
     const hook = renderImageDropHook({ disabled: false });
     const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
 
     act(() => {
       hook.result.handleDragOver({
         dataTransfer: { types: ["Files"] },
         preventDefault,
+        stopPropagation,
       } as unknown as React.DragEvent<HTMLElement>);
     });
 
@@ -98,7 +104,9 @@ describe("useComposerImageDrop", () => {
     expect(hook.result.isDragOver).toBe(true);
 
     act(() => {
-      hook.result.handleDragLeave();
+      hook.result.handleDragLeave({
+        stopPropagation,
+      } as unknown as React.DragEvent<HTMLElement>);
     });
 
     expect(hook.result.isDragOver).toBe(false);
@@ -117,6 +125,7 @@ describe("useComposerImageDrop", () => {
       await hook.result.handleDrop({
         dataTransfer: { files: [file], items: [] },
         preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
       } as unknown as React.DragEvent<HTMLElement>);
     });
 
@@ -136,6 +145,7 @@ describe("useComposerImageDrop", () => {
       await hook.result.handleDrop({
         dataTransfer: { files: [file], items: [] },
         preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
       } as unknown as React.DragEvent<HTMLElement>);
     });
 
@@ -177,7 +187,12 @@ describe("useComposerImageDrop", () => {
 
   it("filters tauri drag-drop paths and respects drop target", async () => {
     const onAttachImages = vi.fn();
-    const hook = renderImageDropHook({ disabled: false, onAttachImages });
+    const onDropFiles = vi.fn();
+    const hook = renderImageDropHook({
+      disabled: false,
+      onAttachImages,
+      onDropFiles,
+    });
 
     const target = document.createElement("div");
     target.getBoundingClientRect = () =>
@@ -220,6 +235,27 @@ describe("useComposerImageDrop", () => {
     });
 
     expect(onAttachImages).toHaveBeenCalledWith(["/tmp/photo.png"]);
+    expect(onDropFiles).toHaveBeenCalledWith(["/tmp/note.txt"]);
+
+    hook.unmount();
+  });
+
+  it("emits dropped file paths for non-image drops", async () => {
+    const onDropFiles = vi.fn();
+    const hook = renderImageDropHook({ disabled: false, onDropFiles });
+
+    const file = new File(["data"], "notes.txt", { type: "text/plain" });
+    (file as File & { path?: string }).path = "/tmp/notes.txt";
+
+    await act(async () => {
+      await hook.result.handleDrop({
+        dataTransfer: { files: [file], items: [] },
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      } as unknown as React.DragEvent<HTMLElement>);
+    });
+
+    expect(onDropFiles).toHaveBeenCalledWith(["/tmp/notes.txt"]);
 
     hook.unmount();
   });

@@ -269,3 +269,144 @@ impl SupabaseClient {
         }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use httpmock::Method::{GET, PATCH, POST};
+    use httpmock::MockServer;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn insert_memory_returns_entry() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(POST).path("/rest/v1/memory");
+            then.status(200).json_body(json!([{
+                "id": "abc",
+                "content": "hello",
+                "memory_type": "daily",
+                "tags": ["test"],
+                "workspace_id": null,
+                "embedding_status": "pending",
+                "created_at": "2026-01-01T00:00:00Z"
+            }]));
+        });
+
+        let client = SupabaseClient::new(&server.base_url(), "anon");
+        let entry = MemoryEntry {
+            id: None,
+            content: "hello".to_string(),
+            memory_type: "daily".to_string(),
+            tags: vec!["test".to_string()],
+            workspace_id: None,
+            embedding_status: None,
+            created_at: None,
+        };
+
+        let inserted = client.insert_memory(&entry).await.unwrap();
+        assert_eq!(inserted.id.as_deref(), Some("abc"));
+    }
+
+    #[tokio::test]
+    async fn update_memory_embedding_succeeds() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(PATCH)
+                .path("/rest/v1/memory")
+                .query_param("id", "eq.abc");
+            then.status(204);
+        });
+
+        let client = SupabaseClient::new(&server.base_url(), "anon");
+        client
+            .update_memory_embedding("abc", &[0.1, 0.2], "embo-01", 2)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn search_by_text_returns_results() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(POST).path("/rest/v1/rpc/search_memory_by_text");
+            then.status(200).json_body(json!([{
+                "id": "xyz",
+                "content": "hit",
+                "memory_type": "daily",
+                "tags": [],
+                "created_at": "2026-01-01T00:00:00Z",
+                "rank": 0.9
+            }]));
+        });
+
+        let client = SupabaseClient::new(&server.base_url(), "anon");
+        let results = client.search_by_text("hit", 10).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "xyz");
+    }
+
+    #[tokio::test]
+    async fn search_by_embedding_returns_results() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(POST)
+                .path("/rest/v1/rpc/search_memory_by_embedding");
+            then.status(200).json_body(json!([{
+                "id": "vec",
+                "content": "semantic",
+                "memory_type": "curated",
+                "tags": ["tag"],
+                "workspace_id": "w1",
+                "created_at": "2026-01-01T00:00:00Z",
+                "distance": 0.1,
+                "score": 0.9
+            }]));
+        });
+
+        let client = SupabaseClient::new(&server.base_url(), "anon");
+        let results = client.search_by_embedding(&[0.1, 0.2], 10, Some(0.5)).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "vec");
+    }
+
+    #[tokio::test]
+    async fn bootstrap_returns_results() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(POST).path("/rest/v1/rpc/get_memory_bootstrap");
+            then.status(200).json_body(json!([{
+                "id": "boot",
+                "content": "recent",
+                "memory_type": "daily",
+                "tags": [],
+                "created_at": "2026-01-01T00:00:00Z"
+            }]));
+        });
+
+        let client = SupabaseClient::new(&server.base_url(), "anon");
+        let results = client.get_bootstrap().await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "boot");
+    }
+
+    #[tokio::test]
+    async fn get_status_counts_entries() {
+        let server = MockServer::start();
+        server.mock(|when, then| {
+            when.method(GET).path("/rest/v1/memory");
+            then.status(200).json_body(json!([
+                { "embedding_status": "pending" },
+                { "embedding_status": "ready" },
+                { "embedding_status": "error" }
+            ]));
+        });
+
+        let client = SupabaseClient::new(&server.base_url(), "anon");
+        let status = client.get_status().await.unwrap();
+        assert_eq!(status.get("total").and_then(|v| v.as_u64()), Some(3));
+        assert_eq!(status.get("pending").and_then(|v| v.as_u64()), Some(1));
+        assert_eq!(status.get("ready").and_then(|v| v.as_u64()), Some(1));
+        assert_eq!(status.get("error").and_then(|v| v.as_u64()), Some(1));
+    }
+}

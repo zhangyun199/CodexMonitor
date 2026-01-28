@@ -40,6 +40,7 @@ import {
   mergeThreadItems,
   previewThreadName,
 } from "../../../utils/threadItems";
+import { saveLastActiveThread } from "../../../utils/threadStorage";
 import { expandCustomPromptText } from "../../../utils/customPrompts";
 import { initialState, threadReducer } from "./useThreadsReducer";
 
@@ -1052,6 +1053,7 @@ export function useThreads({
           dispatch({ type: "ensureThread", workspaceId, threadId });
           if (shouldActivate) {
             dispatch({ type: "setActiveThreadId", workspaceId, threadId });
+            saveLastActiveThread(workspaceId, threadId);
             Sentry.metrics.count("thread_switched", 1, {
               attributes: {
                 workspace_id: workspaceId,
@@ -1225,8 +1227,9 @@ export function useThreads({
   );
 
   const listThreadsForWorkspace = useCallback(
-    async (workspace: WorkspaceInfo) => {
+    async (workspace: WorkspaceInfo): Promise<ThreadSummary[]> => {
       const workspacePath = normalizeRootPath(workspace.path);
+      let summaries: ThreadSummary[] = [];
       dispatch({
         type: "setThreadListLoading",
         workspaceId: workspace.id,
@@ -1325,7 +1328,7 @@ export function useThreads({
           const bActivity = Math.max(nextActivityByThread[bId] ?? 0, bCreated);
           return bActivity - aActivity;
         });
-        const summaries = uniqueThreads
+        summaries = uniqueThreads
           .slice(0, targetCount)
           .map((thread, index) => {
             const id = String(thread?.id ?? "");
@@ -1346,6 +1349,22 @@ export function useThreads({
             };
           })
           .filter((entry) => entry.id);
+        const existingThreads = state.threadsByWorkspace[workspace.id] ?? [];
+        const mergedById = new Map<string, ThreadSummary>();
+        existingThreads.forEach((thread) => mergedById.set(thread.id, thread));
+        summaries.forEach((thread) => mergedById.set(thread.id, thread));
+        onDebug?.({
+          id: `${Date.now()}-client-thread-list-merge`,
+          timestamp: Date.now(),
+          source: "client",
+          label: "thread/list merge",
+          payload: {
+            workspaceId: workspace.id,
+            fetchedCount: summaries.length,
+            existingCount: existingThreads.length,
+            mergedCount: mergedById.size,
+          },
+        });
         dispatch({
           type: "setThreads",
           workspaceId: workspace.id,
@@ -1384,8 +1403,9 @@ export function useThreads({
           isLoading: false,
         });
       }
+      return summaries;
     },
-    [getCustomName, onDebug],
+    [getCustomName, onDebug, state.threadsByWorkspace],
   );
 
   const loadOlderThreadsForWorkspace = useCallback(
@@ -1897,6 +1917,7 @@ export function useThreads({
         return;
       }
       dispatch({ type: "setActiveThreadId", workspaceId: targetId, threadId });
+      saveLastActiveThread(targetId, threadId);
       if (threadId) {
         Sentry.metrics.count("thread_switched", 1, {
           attributes: {
@@ -1974,6 +1995,7 @@ export function useThreads({
     renameThread,
     startThread,
     startThreadForWorkspace,
+    resumeThreadForWorkspace,
     listThreadsForWorkspace,
     refreshThread,
     resetWorkspaceThreads,

@@ -70,15 +70,18 @@ function normalizeDragPosition(
 type UseComposerImageDropArgs = {
   disabled: boolean;
   onAttachImages?: (paths: string[]) => void;
+  onDropFiles?: (paths: string[]) => void;
 };
 
 export function useComposerImageDrop({
   disabled,
   onAttachImages,
+  onDropFiles,
 }: UseComposerImageDropArgs) {
   const [isDragOver, setIsDragOver] = useState(false);
   const dropTargetRef = useRef<HTMLDivElement | null>(null);
   const lastClientPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const domDropHandledRef = useRef(false);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -87,6 +90,10 @@ export function useComposerImageDrop({
     }
     unlisten = subscribeWindowDragDrop((event) => {
       if (!dropTargetRef.current) {
+        return;
+      }
+      if (event.payload.type === "drop" && domDropHandledRef.current) {
+        domDropHandledRef.current = false;
         return;
       }
       if (event.payload.type === "leave") {
@@ -112,12 +119,16 @@ export function useComposerImageDrop({
         if (!isInside) {
           return;
         }
-        const imagePaths = (event.payload.paths ?? [])
+        const cleanedPaths = (event.payload.paths ?? [])
           .map((path) => path.trim())
-          .filter(Boolean)
-          .filter(isImagePath);
+          .filter(Boolean);
+        const imagePaths = cleanedPaths.filter(isImagePath);
+        const filePaths = cleanedPaths.filter((path) => !isImagePath(path));
         if (imagePaths.length > 0) {
           onAttachImages?.(imagePaths);
+        }
+        if (filePaths.length > 0) {
+          onDropFiles?.(filePaths);
         }
       }
     });
@@ -126,7 +137,7 @@ export function useComposerImageDrop({
         unlisten();
       }
     };
-  }, [disabled, onAttachImages]);
+  }, [disabled, onAttachImages, onDropFiles]);
 
   const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
     if (disabled) {
@@ -135,6 +146,7 @@ export function useComposerImageDrop({
     if (isDragFileTransfer(event.dataTransfer?.types)) {
       lastClientPositionRef.current = { x: event.clientX, y: event.clientY };
       event.preventDefault();
+      event.stopPropagation();
       setIsDragOver(true);
     }
   };
@@ -143,7 +155,8 @@ export function useComposerImageDrop({
     handleDragOver(event);
   };
 
-  const handleDragLeave = () => {
+  const handleDragLeave = (event: React.DragEvent<HTMLElement>) => {
+    event.stopPropagation();
     if (isDragOver) {
       setIsDragOver(false);
       lastClientPositionRef.current = null;
@@ -155,6 +168,11 @@ export function useComposerImageDrop({
       return;
     }
     event.preventDefault();
+    event.stopPropagation();
+    domDropHandledRef.current = true;
+    window.setTimeout(() => {
+      domDropHandledRef.current = false;
+    }, 120);
     setIsDragOver(false);
     lastClientPositionRef.current = null;
     const files = Array.from(event.dataTransfer?.files ?? []);
@@ -163,17 +181,38 @@ export function useComposerImageDrop({
       .filter((item) => item.kind === "file")
       .map((item) => item.getAsFile())
       .filter((file): file is File => Boolean(file));
-    const filePaths = [...files, ...itemFiles]
-      .map((file) => (file as File & { path?: string }).path ?? "")
+    const allFiles = [...files, ...itemFiles];
+    const fileEntries = allFiles.map((file) => {
+      const path = (file as File & { path?: string }).path ?? "";
+      const isImage = file.type.startsWith("image/") || isImagePath(file.name);
+      return { file, path, isImage };
+    });
+    const imagePaths = fileEntries
+      .map((entry) => entry.path)
+      .filter(Boolean)
+      .filter(isImagePath);
+    const filePaths = fileEntries
+      .map((entry) => entry.path)
+      .filter(Boolean)
+      .filter((path) => !isImagePath(path));
+    const fallbackFileNames = fileEntries
+      .filter((entry) => !entry.path && !entry.isImage)
+      .map((entry) => entry.file.name)
       .filter(Boolean);
-    const imagePaths = filePaths.filter(isImagePath);
+
     if (imagePaths.length > 0) {
       onAttachImages?.(imagePaths);
+    }
+    const droppedFiles = [...filePaths, ...fallbackFileNames];
+    if (droppedFiles.length > 0) {
+      onDropFiles?.(droppedFiles);
+    }
+    if (imagePaths.length > 0) {
       return;
     }
-    const fileImages = [...files, ...itemFiles].filter((file) =>
-      file.type.startsWith("image/"),
-    );
+    const fileImages = fileEntries
+      .filter((entry) => entry.isImage)
+      .map((entry) => entry.file);
     if (fileImages.length === 0) {
       return;
     }

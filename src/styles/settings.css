@@ -410,6 +410,47 @@
   gap: 6px;
 }
 
+.settings-domain-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.settings-domain-card {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border-muted);
+  background: var(--surface-card);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-domain-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-domain-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.settings-domain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.settings-domain-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .settings-overrides {
   display: flex;
   flex-direction: column;

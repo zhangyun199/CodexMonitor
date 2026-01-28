@@ -68,6 +68,7 @@ type AppServerEventHandlers = {
 export function useAppServerEvents(handlers: AppServerEventHandlers) {
   useEffect(() => {
     const unlisten = subscribeAppServerEvents((payload) => {
+      console.log("[app-server-event]", payload);
       handlers.onAppServerEvent?.(payload);
 
       const { workspace_id, message } = payload;
@@ -90,6 +91,7 @@ export function useAppServerEvents(handlers: AppServerEventHandlers) {
 
       if (method === "item/tool/requestUserInput" && (typeof message.id === "number" || typeof message.id === "string")) {
         const params = (message.params as Record<string, unknown>) ?? {};
+        console.log("[app-server-event] requestUserInput params", params);
         const requestPayload: RequestUserInputRequest = {
           workspace_id,
           request_id: message.id,

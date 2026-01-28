@@ -141,6 +141,41 @@ public struct CodexMonitorAPI: Sendable {
         return try await call("codex_doctor", params: dict.isEmpty ? nil : .object(dict), as: CodexDoctorResult.self)
     }
 
+    // MARK: - Domains
+    public func domainsList() async throws -> [Domain] {
+        return try await call("domains_list", as: [Domain].self)
+    }
+
+    public func domainsCreate(_ domain: Domain) async throws -> Domain {
+        let value = try JSONValue.fromEncodable(domain)
+        return try await call("domains_create", params: value, as: Domain.self)
+    }
+
+    public func domainsUpdate(_ domain: Domain) async throws -> Domain {
+        let value = try JSONValue.fromEncodable(domain)
+        return try await call("domains_update", params: value, as: Domain.self)
+    }
+
+    public func domainsDelete(_ domainId: String) async throws {
+        try await callVoid("domains_delete", params: .object(["domainId": .string(domainId)]))
+    }
+
+    public func domainTrends(
+        workspaceId: String,
+        domainId: String,
+        range: String
+    ) async throws -> DomainTrendSnapshot {
+        return try await call(
+            "domain_trends",
+            params: .object([
+                "workspaceId": .string(workspaceId),
+                "domainId": .string(domainId),
+                "range": .string(range),
+            ]),
+            as: DomainTrendSnapshot.self
+        )
+    }
+
     // MARK: - Memory
     public func memoryStatus() async throws -> MemoryStatus {
         return try await call("memory_status", as: MemoryStatus.self)

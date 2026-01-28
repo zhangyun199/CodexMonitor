@@ -63,6 +63,8 @@ final class CodexStore: ObservableObject {
     @Published var promptsByWorkspace: [String: [CustomPromptOption]] = [:]
     @Published var terminalOutputBySession: [String: String] = [:]
     @Published var usageSnapshot: LocalUsageSnapshot?
+    @Published var domains: [Domain] = []
+    @Published var domainTrendsByWorkspace: [String: DomainTrendSnapshot] = [:]
     @Published var debugEntries: [DebugEntry] = []
     @Published var queuedByThread: [String: [QueuedMessage]] = [:]
     @Published var collaborationModesByWorkspace: [String: [CollaborationModeOption]] = [:]
@@ -187,6 +189,7 @@ final class CodexStore: ObservableObject {
         await connectWorkspace(id: workspaceId)
         await refreshThreads(for: workspaceId)
         await refreshCollaborationModes(workspaceId: workspaceId)
+        await refreshDomains()
         await refreshUsage()
     }
 
@@ -197,6 +200,27 @@ final class CodexStore: ObservableObject {
             if activeWorkspaceId == nil {
                 activeWorkspaceId = list.first?.id
             }
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func refreshDomains() async {
+        do {
+            let list = try await api.domainsList()
+            domains = list
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
+    func refreshDomainTrends(workspaceId: String, range: String = "7d") async {
+        guard let domainId = workspaces.first(where: { $0.id == workspaceId })?.settings.domainId else {
+            return
+        }
+        do {
+            let snapshot = try await api.domainTrends(workspaceId: workspaceId, domainId: domainId, range: range)
+            domainTrendsByWorkspace[workspaceId] = snapshot
         } catch {
             lastError = error.localizedDescription
         }

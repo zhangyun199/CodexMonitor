@@ -1,6 +1,8 @@
 #[allow(dead_code)]
 #[path = "../backend/mod.rs"]
 mod backend;
+#[path = "../codex_params.rs"]
+mod codex_params;
 #[path = "../codex_config.rs"]
 mod codex_config;
 #[path = "../codex_home.rs"]
@@ -21,6 +23,8 @@ mod rules;
 mod skills;
 #[path = "../storage.rs"]
 mod storage;
+#[path = "../obsidian/mod.rs"]
+mod obsidian;
 #[allow(dead_code)]
 #[path = "../types.rs"]
 mod types;
@@ -52,16 +56,21 @@ use uuid::Uuid;
 use backend::app_server::{spawn_workspace_session, WorkspaceSession};
 use backend::events::{AppServerEvent, EventSink, TerminalOutput};
 use browser::service::BrowserService;
+use codex_params::{build_turn_start_params, build_user_input};
 use git_utils::{
     checkout_branch, commit_to_entry, diff_patch_to_string, diff_stats_for_path,
     list_git_roots as scan_git_roots, parse_github_repo, resolve_git_root,
 };
-use storage::{read_settings, read_workspaces, write_settings, write_workspaces};
+use storage::{
+    read_domains, read_settings, read_workspaces, seed_domains_from_files, write_domains,
+    write_settings, write_workspaces,
+};
 use types::{
-    AppSettings, AutoMemorySettings, BranchInfo, GitCommitDiff, GitFileDiff, GitFileStatus,
-    GitHubIssue, GitHubIssuesResponse, GitHubPullRequest, GitHubPullRequestComment,
-    GitHubPullRequestDiff, GitHubPullRequestsResponse, GitLogResponse, LocalUsageSnapshot,
-    WorkspaceEntry, WorkspaceInfo, WorkspaceKind, WorkspaceSettings, WorktreeInfo,
+    AppSettings, AutoMemorySettings, BranchInfo, Domain, DomainTrendSnapshot, GitCommitDiff,
+    GitFileDiff, GitFileStatus, GitHubIssue, GitHubIssuesResponse, GitHubPullRequest,
+    GitHubPullRequestComment, GitHubPullRequestDiff, GitHubPullRequestsResponse, GitLogResponse,
+    LocalUsageSnapshot, WorkspaceEntry, WorkspaceInfo, WorkspaceKind, WorkspaceSettings,
+    WorktreeInfo,
 };
 use auto_flush::{
     build_snapshot, parse_memory_flush_result, run_memory_flush_summarizer, write_memory_flush,
@@ -109,7 +118,9 @@ struct DaemonState {
     terminal_sessions: Mutex<HashMap<String, Arc<TerminalSession>>>,
     storage_path: PathBuf,
     settings_path: PathBuf,
+    domains_path: PathBuf,
     app_settings: Mutex<AppSettings>,
+    domains: Mutex<Vec<Domain>>,
     memory: RwLock<Option<MemoryService>>,
     auto_memory_runtime: Mutex<AutoMemoryRuntime>,
     browser: BrowserService,
@@ -150,8 +161,17 @@ impl DaemonState {
     fn load(config: &DaemonConfig, event_sink: DaemonEventSink) -> Self {
         let storage_path = config.data_dir.join("workspaces.json");
         let settings_path = config.data_dir.join("settings.json");
+        let domains_path = config.data_dir.join("domains.json");
         let workspaces = read_workspaces(&storage_path).unwrap_or_default();
         let app_settings = read_settings(&settings_path).unwrap_or_default();
+        let mut domains = read_domains(&domains_path).unwrap_or_default();
+        if domains.is_empty() {
+            let seeded = seed_domains_from_files();
+            if !seeded.is_empty() {
+                let _ = write_domains(&domains_path, &seeded);
+                domains = seeded;
+            }
+        }
         let memory = if app_settings.memory_enabled
             && !app_settings.supabase_url.is_empty()
             && !app_settings.supabase_anon_key.is_empty()
@@ -176,7 +196,9 @@ impl DaemonState {
             terminal_sessions: Mutex::new(HashMap::new()),
             storage_path,
             settings_path,
+            domains_path,
             app_settings: Mutex::new(app_settings),
+            domains: Mutex::new(domains),
             memory: RwLock::new(memory),
             auto_memory_runtime: Mutex::new(AutoMemoryRuntime::default()),
             browser: BrowserService::new(),
@@ -217,6 +239,19 @@ impl DaemonState {
         }
         sort_workspaces(&mut result);
         result
+    }
+
+    async fn domain_trends(
+        &self,
+        workspace_id: String,
+        domain_id: String,
+        range: String,
+    ) -> Result<DomainTrendSnapshot, String> {
+        let workspaces = self.workspaces.lock().await;
+        let workspace = workspaces
+            .get(&workspace_id)
+            .ok_or_else(|| "workspace not found".to_string())?;
+        obsidian::compute_domain_trends(&workspace.path, &domain_id, &range)
     }
 
     async fn is_workspace_path_dir(&self, path: String) -> bool {
@@ -876,6 +911,46 @@ impl DaemonState {
         Ok(settings)
     }
 
+    async fn domains_list(&self) -> Result<Vec<Domain>, String> {
+        let domains = self.domains.lock().await;
+        Ok(domains.clone())
+    }
+
+    async fn domains_create(&self, mut domain: Domain) -> Result<Domain, String> {
+        domain.id = Uuid::new_v4().to_string();
+        let domain = Self::normalize_domain(domain);
+        let mut domains = self.domains.lock().await;
+        domains.push(domain.clone());
+        write_domains(&self.domains_path, &domains)?;
+        Ok(domain)
+    }
+
+    async fn domains_update(&self, domain: Domain) -> Result<Domain, String> {
+        let domain = Self::normalize_domain(domain);
+        let mut domains = self.domains.lock().await;
+        if let Some(idx) = domains.iter().position(|item| item.id == domain.id) {
+            domains[idx] = domain.clone();
+            write_domains(&self.domains_path, &domains)?;
+            Ok(domain)
+        } else {
+            Err(format!("Domain not found: {}", domain.id))
+        }
+    }
+
+    async fn domains_delete(&self, domain_id: String) -> Result<(), String> {
+        let mut domains = self.domains.lock().await;
+        domains.retain(|domain| domain.id != domain_id);
+        write_domains(&self.domains_path, &domains)?;
+        Ok(())
+    }
+
+    fn normalize_domain(mut domain: Domain) -> Domain {
+        if domain.view_type.trim().is_empty() {
+            domain.view_type = "chat".to_string();
+        }
+        domain
+    }
+
     async fn memory_flush_now(
         &self,
         workspace_id: String,
@@ -1022,41 +1097,43 @@ impl DaemonState {
             "on-request"
         };
 
-        let trimmed_text = text.trim();
-        let mut input: Vec<Value> = Vec::new();
-        if !trimmed_text.is_empty() {
-            input.push(json!({ "type": "text", "text": trimmed_text }));
-        }
-        if let Some(paths) = images {
-            for path in paths {
-                let trimmed = path.trim();
-                if trimmed.is_empty() {
-                    continue;
-                }
-                if trimmed.starts_with("data:")
-                    || trimmed.starts_with("http://")
-                    || trimmed.starts_with("https://")
-                {
-                    input.push(json!({ "type": "image", "url": trimmed }));
-                } else {
-                    input.push(json!({ "type": "localImage", "path": trimmed }));
-                }
-            }
-        }
-        if input.is_empty() {
-            return Err("empty user message".to_string());
-        }
+        let input = build_user_input(&text, images.as_deref())?;
 
-        let params = json!({
-            "threadId": thread_id,
-            "input": input,
-            "cwd": session.entry.path,
-            "approvalPolicy": approval_policy,
-            "sandboxPolicy": sandbox_policy,
-            "model": model,
-            "effort": effort,
-            "collaborationMode": collaboration_mode,
-        });
+        let domain_instructions = {
+            let workspaces = self.workspaces.lock().await;
+            let workspace = workspaces.get(&workspace_id);
+            if let Some(workspace) = workspace {
+                let apply = workspace
+                    .settings
+                    .apply_domain_instructions
+                    .unwrap_or(true);
+                if apply {
+                    let domains = self.domains.lock().await;
+                    workspace
+                        .settings
+                        .domain_id
+                        .as_ref()
+                        .and_then(|id| domains.iter().find(|domain| &domain.id == id))
+                        .map(|domain| domain.system_prompt.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        let params = build_turn_start_params(
+            &thread_id,
+            input,
+            &session.entry.path,
+            approval_policy,
+            sandbox_policy,
+            model,
+            effort,
+            collaboration_mode,
+            domain_instructions,
+        );
         session.send_request("turn/start", params).await
     }
 
@@ -3688,13 +3765,17 @@ Changes:\n{diff}"
             callbacks.insert(thread_id.clone(), tx);
         }
 
-        let turn_params = json!({
-            "threadId": thread_id,
-            "input": [{ "type": "text", "text": prompt }],
-            "cwd": session.entry.path,
-            "approvalPolicy": "never",
-            "sandboxPolicy": { "type": "readOnly" },
-        });
+        let turn_params = build_turn_start_params(
+            &thread_id,
+            vec![json!({ "type": "text", "text": prompt })],
+            &session.entry.path,
+            "never",
+            json!({ "type": "readOnly" }),
+            None,
+            None,
+            None,
+            None,
+        );
         let turn_result = session.send_request("turn/start", turn_params).await;
         let turn_result = match turn_result {
             Ok(result) => result,
@@ -4409,11 +4490,39 @@ async fn handle_rpc_request(
             let updated = state.update_app_settings(settings).await?;
             serde_json::to_value(updated).map_err(|err| err.to_string())
         }
+        "domains_list" => {
+            let domains = state.domains_list().await?;
+            serde_json::to_value(domains).map_err(|err| err.to_string())
+        }
+        "domains_create" => {
+            let domain: Domain =
+                serde_json::from_value(params).map_err(|err| format!("Invalid domain: {err}"))?;
+            let created = state.domains_create(domain).await?;
+            serde_json::to_value(created).map_err(|err| err.to_string())
+        }
+        "domains_update" => {
+            let domain: Domain =
+                serde_json::from_value(params).map_err(|err| format!("Invalid domain: {err}"))?;
+            let updated = state.domains_update(domain).await?;
+            serde_json::to_value(updated).map_err(|err| err.to_string())
+        }
+        "domains_delete" => {
+            let domain_id = parse_string(&params, "domainId")?;
+            state.domains_delete(domain_id).await?;
+            Ok(json!({ "ok": true }))
+        }
         "memory_status" => {
             let memory = state.memory.read().await;
             match memory.as_ref() {
                 Some(mem) => mem.status().await.map(|s| serde_json::to_value(s).unwrap()),
-                None => Err("Memory not enabled".to_string()),
+                None => Ok(json!({
+                    "enabled": false,
+                    "embeddings_enabled": false,
+                    "total": 0,
+                    "pending": 0,
+                    "ready": 0,
+                    "error": 0
+                })),
             }
         }
         "memory_search" => {
@@ -4432,7 +4541,7 @@ async fn handle_rpc_request(
                     .search(query, limit)
                     .await
                     .map(|r| serde_json::to_value(r).unwrap()),
-                None => Err("Memory not enabled".to_string()),
+                None => Ok(json!([])),
             }
         }
         "memory_append" => {
@@ -4471,7 +4580,7 @@ async fn handle_rpc_request(
                     .bootstrap()
                     .await
                     .map(|r| serde_json::to_value(r).unwrap()),
-                None => Err("Memory not enabled".to_string()),
+                None => Ok(json!([])),
             }
         }
         "memory_flush_now" => {
@@ -4647,6 +4756,13 @@ async fn handle_rpc_request(
             let target = parse_string(&params, "target")?;
             let workspace_id = parse_optional_string(&params, "workspaceId");
             state.skills_uninstall(name, target, workspace_id).await
+        }
+        "domain_trends" => {
+            let workspace_id = parse_string(&params, "workspaceId")?;
+            let domain_id = parse_string(&params, "domainId")?;
+            let range = parse_string(&params, "range")?;
+            let snapshot = state.domain_trends(workspace_id, domain_id, range).await?;
+            serde_json::to_value(snapshot).map_err(|e| e.to_string())
         }
         "list_git_roots" => {
             let workspace_id = parse_string(&params, "workspaceId")?;

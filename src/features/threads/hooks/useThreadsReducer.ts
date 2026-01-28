@@ -826,11 +826,19 @@ export function threadReducer(state: ThreadState, action: ThreadAction): ThreadS
         ),
       };
     case "setThreads": {
+      const existing = state.threadsByWorkspace[action.workspaceId] ?? [];
+      const mergedById = new Map(existing.map((thread) => [thread.id, thread]));
+      action.threads.forEach((thread) => {
+        mergedById.set(thread.id, thread);
+      });
+      const merged = Array.from(mergedById.values()).sort(
+        (a, b) => b.updatedAt - a.updatedAt,
+      );
       return {
         ...state,
         threadsByWorkspace: {
           ...state.threadsByWorkspace,
-          [action.workspaceId]: action.threads,
+          [action.workspaceId]: merged,
         },
       };
     }

@@ -31,6 +31,7 @@ type ComposerInputProps = {
   attachments?: string[];
   onAddAttachment?: () => void;
   onAttachImages?: (paths: string[]) => void;
+  onDropFiles?: (paths: string[]) => void;
   onRemoveAttachment?: (path: string) => void;
   onTextChange: (next: string, selectionStart: number | null) => void;
   onTextPaste?: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
@@ -67,6 +68,7 @@ export function ComposerInput({
   attachments = [],
   onAddAttachment,
   onAttachImages,
+  onDropFiles,
   onRemoveAttachment,
   onTextChange,
   onTextPaste,
@@ -92,6 +94,29 @@ export function ComposerInput({
     const parts = normalized.split("/").filter(Boolean);
     return parts.length ? parts[parts.length - 1] : path;
   };
+  const handleDroppedFiles = (paths: string[]) => {
+    if (paths.length === 0) {
+      return;
+    }
+    const textarea = textareaRef.current;
+    const insertion = paths.join("\n");
+    if (!textarea) {
+      onTextChange(`${text}${text && insertion ? "\n" : ""}${insertion}`, null);
+      return;
+    }
+    const selectionStart = textarea.selectionStart ?? text.length;
+    const selectionEnd = textarea.selectionEnd ?? selectionStart;
+    const before = text.slice(0, selectionStart);
+    const after = text.slice(selectionEnd);
+    const needsLeadingNewline = before.length > 0 && !before.endsWith("\n");
+    const needsTrailingNewline = after.length > 0 && !after.startsWith("\n");
+    const prefix = needsLeadingNewline ? "\n" : "";
+    const suffix = needsTrailingNewline ? "\n" : "";
+    const nextText = `${before}${prefix}${insertion}${suffix}${after}`;
+    const nextCursor = (before + prefix + insertion).length;
+    onTextChange(nextText, nextCursor);
+  };
+
   const {
     dropTargetRef,
     isDragOver,
@@ -103,6 +128,10 @@ export function ComposerInput({
   } = useComposerImageDrop({
     disabled,
     onAttachImages,
+    onDropFiles: (paths) => {
+      onDropFiles?.(paths);
+      handleDroppedFiles(paths);
+    },
   });
 
   useEffect(() => {
@@ -225,10 +254,6 @@ export function ComposerInput({
             }
             disabled={disabled}
             onKeyDown={onKeyDown}
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
             onPaste={(event) => {
               void handlePaste(event);
               if (!event.defaultPrevented) {

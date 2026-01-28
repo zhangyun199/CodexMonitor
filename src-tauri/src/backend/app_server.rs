@@ -232,6 +232,7 @@ pub(crate) async fn spawn_workspace_session<E: EventSink>(
             if line.trim().is_empty() {
                 continue;
             }
+            eprintln!("[app-server stdout] {line}");
             let value: Value = match serde_json::from_str(&line) {
                 Ok(value) => value,
                 Err(err) => {

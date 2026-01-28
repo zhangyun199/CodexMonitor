@@ -45,7 +45,7 @@ Obsidian (raw) → Daemon parses → Dashboard data
 | Phase | Status | Description |
 |-------|--------|-------------|
 | **Phase 0** | ✅ Complete | `WorkspacePurpose` enum, `get_life_workspace_prompt`, thread-level injection, skip per-turn injection |
-| Phase 1 | 🔲 Pending | Delivery Dashboard (React + Rust + iOS) |
+| **Phase 1** | ✅ Complete | Delivery Dashboard (React + Rust + iOS) - parses Obsidian sessions, center panel swap |
 | Phase 2 | 🔲 Pending | Media Dashboard (covers, ratings) |
 | Phase 3 | 🔲 Pending | Remaining domains (Nutrition, Exercise, Finance, YouTube) |
 | Phase 4 | 🔲 Pending | Polish (caching, skeletons, filters, auto-detect) |

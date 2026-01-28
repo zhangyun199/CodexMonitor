@@ -176,6 +176,17 @@ public struct CodexMonitorAPI: Sendable {
         )
     }
 
+    public func getDeliveryDashboard(workspaceId: String, range: String) async throws -> DeliveryDashboard {
+        return try await call(
+            "get_delivery_dashboard",
+            params: .object([
+                "workspaceId": .string(workspaceId),
+                "range": .string(range),
+            ]),
+            as: DeliveryDashboard.self
+        )
+    }
+
     // MARK: - Memory
     public func memoryStatus() async throws -> MemoryStatus {
         return try await call("memory_status", as: MemoryStatus.self)

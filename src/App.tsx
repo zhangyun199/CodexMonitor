@@ -27,6 +27,7 @@ import "./styles/settings.css";
 import "./styles/compact-base.css";
 import "./styles/compact-phone.css";
 import "./styles/compact-tablet.css";
+import "./features/life/styles/life-dashboard.css";
 import successSoundUrl from "./assets/success-notification.mp3";
 import errorSoundUrl from "./assets/error-notification.mp3";
 import { AppLayout } from "./features/app/components/AppLayout";
@@ -34,6 +35,8 @@ import { AppModals } from "./features/app/components/AppModals";
 import { MainHeaderActions } from "./features/app/components/MainHeaderActions";
 import { useLayoutNodes } from "./features/layout/hooks/useLayoutNodes";
 import type { RightPanelTabId } from "./features/layout/components/RightPanelTabs";
+import { LifeWorkspaceView } from "./features/life/components/LifeWorkspaceView";
+import { useLifeWorkspace } from "./features/life/hooks/useLifeWorkspace";
 import { useWorkspaceDropZone } from "./features/workspaces/hooks/useWorkspaceDropZone";
 import { useThreads } from "./features/threads/hooks/useThreads";
 import { useThreadUserInput } from "./features/threads/hooks/useThreadUserInput";
@@ -201,6 +204,13 @@ function MainApp() {
   } = useDomains();
   const activeDomainId = activeWorkspace?.settings.domainId ?? null;
   const activeDomain = activeDomainId ? domainsById[activeDomainId] : null;
+  const isLifeWorkspace = activeWorkspace?.settings.purpose === "life";
+  const {
+    activeDomain: lifeActiveDomain,
+    setActiveDomain: setLifeActiveDomain,
+    timeRange: lifeTimeRange,
+    setTimeRange: setLifeTimeRange,
+  } = useLifeWorkspace(isLifeWorkspace ? activeWorkspaceId : null);
   const workspacesById = useMemo(
     () => new Map(workspaces.map((workspace) => [workspace.id, workspace])),
     [workspaces],
@@ -1279,6 +1289,8 @@ function MainApp() {
   const showComposer = !isCompact
     ? centerMode === "chat" || centerMode === "diff"
     : (isTablet ? tabletTab : activeTab) === "codex";
+  const shouldShowComposer =
+    showComposer && !(isLifeWorkspace && lifeActiveDomain);
   const showGitDetail = Boolean(selectedDiffPath) && isPhone;
   const {
     terminalTabs,
@@ -1680,7 +1692,7 @@ function MainApp() {
     dictationHint,
     onDismissDictationHint: clearDictationHint,
     composerSendLabel,
-    showComposer,
+    showComposer: shouldShowComposer,
     plan: activePlan,
     debugEntries,
     debugOpen,
@@ -1707,7 +1719,23 @@ function MainApp() {
     onWorkspaceDragEnter: handleWorkspaceDragEnter,
     onWorkspaceDragLeave: handleWorkspaceDragLeave,
     onWorkspaceDrop: handleWorkspaceDrop,
+    lifeMode: isLifeWorkspace,
+    lifeActiveDomain,
+    onSelectLifeDomain: setLifeActiveDomain,
   });
+
+  const lifeMessagesNode = isLifeWorkspace ? (
+    <LifeWorkspaceView
+      workspaceId={activeWorkspaceId}
+      activeDomain={lifeActiveDomain}
+      timeRange={lifeTimeRange}
+      onTimeRangeChange={setLifeTimeRange}
+      onBackToChat={() => setLifeActiveDomain(null)}
+      messagesNode={messagesNode}
+    />
+  ) : (
+    messagesNode
+  );
 
   const desktopTopbarLeftNodeWithToggle = !isCompact ? (
     <div className="topbar-leading">
@@ -1771,7 +1799,7 @@ function MainApp() {
         hasActivePlan={hasActivePlan}
         activeWorkspace={Boolean(activeWorkspace)}
         sidebarNode={sidebarNode}
-        messagesNode={messagesNode}
+        messagesNode={lifeMessagesNode}
         composerNode={composerNode}
         approvalToastsNode={approvalToastsNode}
         updateToastNode={updateToastNode}

@@ -10,6 +10,8 @@ export type WorkspaceSettings = {
   purpose?: WorkspacePurpose | null;
 };
 
+export * from "./features/life/types";
+
 export type WorkspaceGroup = {
   id: string;
   name: string;

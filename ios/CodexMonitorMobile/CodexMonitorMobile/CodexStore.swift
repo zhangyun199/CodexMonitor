@@ -65,6 +65,11 @@ final class CodexStore: ObservableObject {
     @Published var usageSnapshot: LocalUsageSnapshot?
     @Published var domains: [Domain] = []
     @Published var domainTrendsByWorkspace: [String: DomainTrendSnapshot] = [:]
+    @Published var lifeActiveDomain: LifeDomain? = nil
+    @Published var lifeTimeRange: LifeTimeRange = .today
+    @Published var deliveryDashboard: DeliveryDashboard?
+    @Published var dashboardLoading: Bool = false
+    @Published var dashboardError: String? = nil
     @Published var debugEntries: [DebugEntry] = []
     @Published var queuedByThread: [String: [QueuedMessage]] = [:]
     @Published var collaborationModesByWorkspace: [String: [CollaborationModeOption]] = [:]
@@ -86,6 +91,11 @@ final class CodexStore: ObservableObject {
     private let hostKey = "codex.monitor.host"
     private let portKey = "codex.monitor.port"
     private let tokenKey = "codex.monitor.token"
+
+    var activeWorkspacePurpose: WorkspacePurpose? {
+        guard let workspaceId = activeWorkspaceId else { return nil }
+        return workspaces.first(where: { $0.id == workspaceId })?.settings.purpose
+    }
 
     init() {
         let defaults = UserDefaults.standard
@@ -224,6 +234,19 @@ final class CodexStore: ObservableObject {
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    func fetchDeliveryDashboard(range: LifeTimeRange) async {
+        guard let workspaceId = activeWorkspaceId else { return }
+        dashboardLoading = true
+        dashboardError = nil
+        do {
+            let dashboard = try await api.getDeliveryDashboard(workspaceId: workspaceId, range: range.rawValue)
+            deliveryDashboard = dashboard
+        } catch {
+            dashboardError = error.localizedDescription
+        }
+        dashboardLoading = false
     }
 
     func addWorkspace(path: String, codexBin: String?) async {

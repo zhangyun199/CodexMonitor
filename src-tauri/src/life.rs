@@ -7,7 +7,10 @@ use crate::state::AppState;
 #[path = "life_core.rs"]
 mod core;
 
-pub(crate) use core::{build_life_workspace_prompt, is_life_workspace, life_debug_enabled};
+pub(crate) use core::{
+    build_delivery_dashboard, build_life_workspace_prompt, is_life_workspace, life_debug_enabled,
+    DeliveryDashboard,
+};
 
 #[tauri::command]
 pub(crate) async fn get_life_workspace_prompt(
@@ -29,17 +32,20 @@ pub(crate) async fn get_delivery_dashboard(
     range: String,
     state: State<'_, AppState>,
     app: AppHandle,
-) -> Result<Value, String> {
+) -> Result<DeliveryDashboard, String> {
     if remote_backend::is_remote_mode(&*state).await {
-        return remote_backend::call_remote(
+        let response = remote_backend::call_remote(
             &*state,
             app,
             "get_delivery_dashboard",
             json!({ "workspaceId": workspace_id, "range": range }),
         )
-        .await;
+        .await?;
+        return serde_json::from_value(response).map_err(|err| err.to_string());
     }
-    Ok(json!({}))
+    let workspaces = state.workspaces.lock().await;
+    let entry = workspaces.get(&workspace_id).ok_or("workspace not found")?;
+    build_delivery_dashboard(&entry.path, &range)
 }
 
 #[tauri::command]

@@ -14,6 +14,8 @@ import type {
   WorkspaceSettings,
   Domain,
   DomainTrendSnapshot,
+  DeliveryDashboard,
+  LifeTimeRange,
 } from "../types";
 import type {
   GitFileDiff,
@@ -77,6 +79,13 @@ export async function getDomainTrends(
   range: "7d" | "30d" | "lifetime",
 ): Promise<DomainTrendSnapshot> {
   return invoke<DomainTrendSnapshot>("domain_trends", { workspaceId, domainId, range });
+}
+
+export async function getDeliveryDashboard(
+  workspaceId: string,
+  range: LifeTimeRange,
+): Promise<DeliveryDashboard> {
+  return invoke<DeliveryDashboard>("get_delivery_dashboard", { workspaceId, range });
 }
 
 export async function addWorkspace(

@@ -1,0 +1,199 @@
+.life-workspace {
+  padding: 16px;
+  min-height: 100%;
+  background: linear-gradient(to bottom, #121826, #0f172a);
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.life-chat-layer {
+  height: 100%;
+}
+
+.life-dashboard-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.life-domain-selector {
+  padding: 12px;
+}
+
+.life-domain-selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.life-domain-selector-title {
+  font-weight: 600;
+}
+
+.life-domain-selector-list {
+  display: grid;
+  gap: 8px;
+}
+
+.life-domain-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.6);
+  color: inherit;
+  text-align: left;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.life-domain-button.is-active {
+  border-color: rgba(59, 130, 246, 0.8);
+  background: rgba(59, 130, 246, 0.15);
+}
+
+.life-domain-icon {
+  font-size: 1.1rem;
+}
+
+.life-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.life-dashboard-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.life-dashboard-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.life-dashboard-subtitle {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.life-dashboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.life-range-selector {
+  display: flex;
+  gap: 6px;
+}
+
+.life-range-button {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(30, 41, 59, 0.6);
+  color: inherit;
+}
+
+.life-range-button.is-active {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.7);
+}
+
+.life-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.life-stat-card {
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.life-stat-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.life-stat-value {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.life-stat-sub {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.life-section-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.life-merchant-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.life-merchant-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.life-merchant-name {
+  font-weight: 600;
+}
+
+.life-merchant-meta {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.life-table {
+  display: grid;
+  gap: 6px;
+}
+
+.life-table-row {
+  display: grid;
+  grid-template-columns: 80px 1.6fr 0.7fr 0.6fr 0.8fr 1fr;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.85rem;
+}
+
+.life-table-header {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.life-dashboard-status,
+.life-dashboard-error {
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+.life-dashboard-error {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}

@@ -240,6 +240,76 @@ public struct DomainTrendSnapshot: Codable, Hashable, Sendable {
     public var series: [TrendSeries]?
 }
 
+// MARK: - Life Workspace Dashboards
+
+public enum LifeDomain: String, Codable, CaseIterable, Identifiable, Sendable {
+    case delivery
+    case nutrition
+    case exercise
+    case media
+    case youtube
+    case finance
+
+    public var id: String { rawValue }
+}
+
+public enum LifeTimeRange: String, Codable, CaseIterable, Sendable {
+    case today
+    case week
+    case month
+    case lifetime
+}
+
+public struct DashboardMeta: Codable, Hashable, Sendable {
+    public var domain: String
+    public var range: String
+    public var periodStart: String
+    public var periodEnd: String
+    public var generatedAt: String
+    public var sources: [String]
+    public var cacheHit: Bool?
+}
+
+public struct DeliveryStats: Codable, Hashable, Sendable {
+    public var totalEarnings: Double
+    public var orderCount: Int
+    public var activeHours: Double
+    public var totalMiles: Double?
+    public var hourlyRate: Double
+    public var perMileRate: Double
+    public var avgOrderValue: Double?
+}
+
+public struct DeliveryOrder: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var startedAt: String
+    public var merchantName: String
+    public var payout: Double
+    public var miles: Double?
+    public var durationMinutes: Double?
+    public var platform: String?
+    public var notes: String?
+    public var rewardTag: String?
+    public var warningTag: String?
+}
+
+public struct MerchantStats: Codable, Hashable, Sendable {
+    public var merchantName: String
+    public var orderCount: Int
+    public var totalEarnings: Double
+    public var avgPayout: Double
+    public var avgMiles: Double?
+    public var avgPerMile: Double?
+    public var tier: String?
+}
+
+public struct DeliveryDashboard: Codable, Hashable, Sendable {
+    public var meta: DashboardMeta
+    public var stats: DeliveryStats
+    public var orders: [DeliveryOrder]
+    public var topMerchants: [MerchantStats]
+}
+
 public struct AutoMemorySettings: Codable, Hashable, Sendable {
     public var enabled: Bool
     public var reserveTokensFloor: Int

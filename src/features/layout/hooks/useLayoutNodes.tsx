@@ -21,6 +21,7 @@ import { MemoryPanel } from "../../memory/components/MemoryPanel";
 import { BrowserPanel } from "../../browser/components/BrowserPanel";
 import { SkillsPanel } from "../../skills/components/SkillsPanel";
 import { DomainPanel } from "../../domains/components/DomainPanel";
+import { DomainSelector as LifeDomainSelector } from "../../life/components/DomainSelector";
 import {
   RightPanelTabs,
   type RightPanelTabId,
@@ -52,6 +53,7 @@ import type {
   TurnPlan,
   Domain,
   WorkspaceInfo,
+  LifeDomain,
 } from "../../../types";
 import type { UpdateState } from "../../update/hooks/useUpdater";
 import type { TerminalSessionState } from "../../terminal/hooks/useTerminalSession";
@@ -195,6 +197,9 @@ type LayoutNodesOptions = {
   rightPanelMode: RightPanelTabId;
   activeDomain: Domain | null;
   onSelectRightPanelMode: (mode: RightPanelTabId) => void;
+  lifeMode: boolean;
+  lifeActiveDomain: LifeDomain | null;
+  onSelectLifeDomain: (domain: LifeDomain | null) => void;
   gitPanelMode: "diff" | "log" | "issues" | "prs";
   onGitPanelModeChange: (mode: "diff" | "log" | "issues" | "prs") => void;
   gitDiffViewStyle: "split" | "unified";
@@ -743,10 +748,18 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       domain={options.activeDomain}
     />
   );
+  const lifeDomainNode = (
+    <LifeDomainSelector
+      activeDomain={options.lifeActiveDomain}
+      onSelect={options.onSelectLifeDomain}
+    />
+  );
   const browserPanelNode = <BrowserPanel />;
   const skillsPanelNode = <SkillsPanel workspaceId={options.activeWorkspaceId} />;
 
-  const rightPanelNode = (
+  const rightPanelNode = options.lifeMode ? (
+    <div className="right-panel-stack">{lifeDomainNode}</div>
+  ) : (
     <div className="right-panel-stack">
       <div className="right-panel-switch">
         <RightPanelTabs

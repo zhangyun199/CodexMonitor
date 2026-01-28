@@ -1027,10 +1027,16 @@ impl DaemonState {
 
     async fn get_delivery_dashboard(
         &self,
-        _workspace_id: String,
-        _range: String,
+        workspace_id: String,
+        range: String,
     ) -> Result<Value, String> {
-        Ok(json!({}))
+        let workspaces = self.workspaces.lock().await;
+        let entry = workspaces
+            .get(&workspace_id)
+            .cloned()
+            .ok_or("workspace not found")?;
+        let dashboard = life::build_delivery_dashboard(&entry.path, &range)?;
+        serde_json::to_value(dashboard).map_err(|err| err.to_string())
     }
 
     async fn get_nutrition_dashboard(

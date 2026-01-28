@@ -68,6 +68,7 @@ final class CodexStore: ObservableObject {
     @Published var lifeActiveDomain: LifeDomain? = nil
     @Published var lifeTimeRange: LifeTimeRange = .today
     @Published var deliveryDashboard: DeliveryDashboard?
+    @Published var mediaDashboard: MediaDashboard?
     @Published var dashboardLoading: Bool = false
     @Published var dashboardError: String? = nil
     @Published var debugEntries: [DebugEntry] = []
@@ -243,6 +244,19 @@ final class CodexStore: ObservableObject {
         do {
             let dashboard = try await api.getDeliveryDashboard(workspaceId: workspaceId, range: range.rawValue)
             deliveryDashboard = dashboard
+        } catch {
+            dashboardError = error.localizedDescription
+        }
+        dashboardLoading = false
+    }
+
+    func fetchMediaDashboard(range: LifeTimeRange) async {
+        guard let workspaceId = activeWorkspaceId else { return }
+        dashboardLoading = true
+        dashboardError = nil
+        do {
+            let dashboard = try await api.getMediaDashboard(workspaceId: workspaceId, range: range.rawValue)
+            mediaDashboard = dashboard
         } catch {
             dashboardError = error.localizedDescription
         }

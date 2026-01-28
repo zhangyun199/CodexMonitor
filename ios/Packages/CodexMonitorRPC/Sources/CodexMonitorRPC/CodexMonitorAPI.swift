@@ -187,6 +187,17 @@ public struct CodexMonitorAPI: Sendable {
         )
     }
 
+    public func getMediaDashboard(workspaceId: String, range: String) async throws -> MediaDashboard {
+        return try await call(
+            "get_media_dashboard",
+            params: .object([
+                "workspaceId": .string(workspaceId),
+                "range": .string(range),
+            ]),
+            as: MediaDashboard.self
+        )
+    }
+
     // MARK: - Memory
     public func memoryStatus() async throws -> MemoryStatus {
         return try await call("memory_status", as: MemoryStatus.self)

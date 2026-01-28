@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { LifeDomain, LifeTimeRange } from "../types";
 import { DeliveryDashboard } from "./domains/DeliveryDashboard";
+import { MediaDashboard } from "./domains/MediaDashboard";
 
 type LifeWorkspaceViewProps = {
   workspaceId: string | null;
@@ -32,6 +33,12 @@ export function LifeWorkspaceView({
       </div>
       {activeDomain === "delivery" ? (
         <DeliveryDashboard
+          workspaceId={workspaceId}
+          range={timeRange}
+          onRangeChange={onTimeRangeChange}
+        />
+      ) : activeDomain === "media" ? (
+        <MediaDashboard
           workspaceId={workspaceId}
           range={timeRange}
           onRangeChange={onTimeRangeChange}

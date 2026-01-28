@@ -18,6 +18,11 @@ struct LifeWorkspaceView: View {
                         get: { store.lifeTimeRange },
                         set: { store.lifeTimeRange = $0 }
                     ))
+                case .media:
+                    MediaDashboardView(timeRange: Binding(
+                        get: { store.lifeTimeRange },
+                        set: { store.lifeTimeRange = $0 }
+                    ))
                 default:
                     Text("Dashboard coming soon.")
                         .foregroundStyle(.secondary)

@@ -197,3 +197,54 @@
   border-color: rgba(239, 68, 68, 0.5);
   color: #fca5a5;
 }
+
+.life-tag-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.life-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.8rem;
+}
+
+.life-tag-label {
+  text-transform: capitalize;
+}
+
+.life-tag-value {
+  font-weight: 600;
+}
+
+.life-media-list {
+  display: grid;
+  gap: 10px;
+}
+
+.life-media-card {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.life-media-title {
+  font-weight: 600;
+}
+
+.life-media-meta {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.life-media-time {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}

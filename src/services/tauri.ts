@@ -15,6 +15,7 @@ import type {
   Domain,
   DomainTrendSnapshot,
   DeliveryDashboard,
+  MediaDashboard,
   LifeTimeRange,
 } from "../types";
 import type {
@@ -86,6 +87,13 @@ export async function getDeliveryDashboard(
   range: LifeTimeRange,
 ): Promise<DeliveryDashboard> {
   return invoke<DeliveryDashboard>("get_delivery_dashboard", { workspaceId, range });
+}
+
+export async function getMediaDashboard(
+  workspaceId: string,
+  range: LifeTimeRange,
+): Promise<MediaDashboard> {
+  return invoke<MediaDashboard>("get_media_dashboard", { workspaceId, range });
 }
 
 export async function addWorkspace(

@@ -317,6 +317,60 @@ public struct DeliveryDashboard: Codable, Hashable, Sendable {
     public var topMerchants: [MerchantStats]
 }
 
+public enum MediaType: String, Codable, CaseIterable, Sendable {
+    case film
+    case tv
+    case game
+    case book
+    case anime
+    case other
+}
+
+public enum MediaStatus: String, Codable, CaseIterable, Sendable {
+    case backlog
+    case inProgress = "in_progress"
+    case completed
+    case dropped
+}
+
+public struct MediaItem: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var title: String
+    public var mediaType: MediaType
+    public var status: MediaStatus
+    public var rating: Double?
+    public var coverUrl: String?
+    public var lastActivityAt: String?
+    public var completedAt: String?
+    public var tags: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case mediaType = "type"
+        case status
+        case rating
+        case coverUrl
+        case lastActivityAt
+        case completedAt
+        case tags
+    }
+}
+
+public struct MediaStats: Codable, Hashable, Sendable {
+    public var backlogCount: Int
+    public var inProgressCount: Int
+    public var completedCount: Int
+    public var avgRating: Double?
+}
+
+public struct MediaDashboard: Codable, Hashable, Sendable {
+    public var meta: DashboardMeta
+    public var stats: MediaStats
+    public var recentlyActive: [MediaItem]
+    public var byType: [String: Int]
+}
+
 public struct AutoMemorySettings: Codable, Hashable, Sendable {
     public var enabled: Bool
     public var reserveTokensFloor: Int

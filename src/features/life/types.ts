@@ -90,3 +90,36 @@ export interface DeliveryDashboard {
   orders: DeliveryOrder[];
   topMerchants: MerchantStats[];
 }
+
+// -----------------------------
+// Media
+// -----------------------------
+
+export type MediaType = "film" | "tv" | "game" | "book" | "anime" | "other";
+export type MediaStatus = "backlog" | "in_progress" | "completed" | "dropped";
+
+export interface MediaItem {
+  id: string;
+  title: string;
+  type: MediaType;
+  status: MediaStatus;
+  rating?: number;
+  coverUrl?: string;
+  lastActivityAt?: string;
+  completedAt?: string;
+  tags?: string[];
+}
+
+export interface MediaStats {
+  backlogCount: number;
+  inProgressCount: number;
+  completedCount: number;
+  avgRating?: number;
+}
+
+export interface MediaDashboard {
+  meta: DashboardMeta;
+  stats: MediaStats;
+  recentlyActive: MediaItem[];
+  byType: Record<MediaType, number>;
+}

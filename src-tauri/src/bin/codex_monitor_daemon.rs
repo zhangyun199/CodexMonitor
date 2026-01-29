@@ -3391,6 +3391,12 @@ impl DaemonState {
             results.push(GitFileDiff {
                 path: normalize_git_path(path.to_string_lossy().as_ref()),
                 diff: content,
+                is_binary: false,
+                is_image: false,
+                old_image_data: None,
+                new_image_data: None,
+                old_image_mime: None,
+                new_image_mime: None,
             });
         }
 
@@ -3533,6 +3539,12 @@ impl DaemonState {
                 path: normalize_git_path(path.to_string_lossy().as_ref()),
                 status: status_for_delta(delta.status()).to_string(),
                 diff: content,
+                is_binary: false,
+                is_image: false,
+                old_image_data: None,
+                new_image_data: None,
+                old_image_mime: None,
+                new_image_mime: None,
             });
         }
 

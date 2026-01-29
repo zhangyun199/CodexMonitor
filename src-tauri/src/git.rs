@@ -1,12 +1,14 @@
+use std::fs;
 use std::path::{Path, PathBuf};
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use git2::{BranchType, DiffOptions, Repository, Sort, Status, StatusOptions};
 use serde_json::json;
 use tauri::{AppHandle, State};
 use tokio::process::Command;
 
 use crate::git_utils::{
-    checkout_branch, commit_to_entry, diff_patch_to_string, diff_stats_for_path,
+    checkout_branch, commit_to_entry, diff_patch_to_string, diff_stats_for_path, image_mime_type,
     list_git_roots as scan_git_roots, parse_github_repo, resolve_git_root,
 };
 use crate::remote_backend;
@@ -19,6 +21,30 @@ use crate::types::{
 use crate::utils::normalize_git_path;
 
 const INDEX_SKIP_WORKTREE_FLAG: u16 = 0x4000;
+const MAX_IMAGE_BYTES: usize = 10 * 1024 * 1024;
+
+fn encode_image_base64(data: &[u8]) -> Option<String> {
+    if data.len() > MAX_IMAGE_BYTES {
+        return None;
+    }
+    Some(STANDARD.encode(data))
+}
+
+fn blob_to_base64(blob: git2::Blob) -> Option<String> {
+    if blob.size() > MAX_IMAGE_BYTES {
+        return None;
+    }
+    encode_image_base64(blob.content())
+}
+
+fn read_image_base64(path: &Path) -> Option<String> {
+    let metadata = fs::metadata(path).ok()?;
+    if metadata.len() > MAX_IMAGE_BYTES as u64 {
+        return None;
+    }
+    let data = fs::read(path).ok()?;
+    encode_image_base64(&data)
+}
 
 async fn run_git_command(repo_root: &Path, args: &[&str]) -> Result<(), String> {
     let output = Command::new("git")
@@ -864,10 +890,59 @@ pub(crate) async fn get_git_diffs(
 
     let mut results = Vec::new();
     for (index, delta) in diff.deltas().enumerate() {
-        let path = delta.new_file().path().or_else(|| delta.old_file().path());
-        let Some(path) = path else {
+        let old_path = delta.old_file().path();
+        let new_path = delta.new_file().path();
+        let display_path = new_path.or(old_path);
+        let Some(display_path) = display_path else {
             continue;
         };
+        let old_path_str = old_path.map(|path| path.to_string_lossy());
+        let new_path_str = new_path.map(|path| path.to_string_lossy());
+        let display_path_str = display_path.to_string_lossy();
+        let normalized_path = normalize_git_path(&display_path_str);
+        let old_image_mime = old_path_str.as_deref().and_then(image_mime_type);
+        let new_image_mime = new_path_str.as_deref().and_then(image_mime_type);
+        let is_image = old_image_mime.is_some() || new_image_mime.is_some();
+
+        if is_image {
+            let is_deleted = delta.status() == git2::Delta::Deleted;
+            let is_added = delta.status() == git2::Delta::Added;
+
+            let old_image_data = if !is_added && old_image_mime.is_some() {
+                head_tree
+                    .as_ref()
+                    .and_then(|tree| old_path.and_then(|path| tree.get_path(path).ok()))
+                    .and_then(|entry| repo.find_blob(entry.id()).ok())
+                    .and_then(blob_to_base64)
+            } else {
+                None
+            };
+
+            let new_image_data = if !is_deleted && new_image_mime.is_some() {
+                match new_path {
+                    Some(path) => {
+                        let full_path = repo_root.join(path);
+                        read_image_base64(&full_path)
+                    }
+                    None => None,
+                }
+            } else {
+                None
+            };
+
+            results.push(GitFileDiff {
+                path: normalized_path,
+                diff: String::new(),
+                is_binary: true,
+                is_image: true,
+                old_image_data,
+                new_image_data,
+                old_image_mime: old_image_mime.map(str::to_string),
+                new_image_mime: new_image_mime.map(str::to_string),
+            });
+            continue;
+        }
+
         let patch = match git2::Patch::from_diff(&diff, index) {
             Ok(patch) => patch,
             Err(_) => continue,
@@ -883,8 +958,14 @@ pub(crate) async fn get_git_diffs(
             continue;
         }
         results.push(GitFileDiff {
-            path: normalize_git_path(path.to_string_lossy().as_ref()),
+            path: normalized_path,
             diff: content,
+            is_binary: false,
+            is_image: false,
+            old_image_data: None,
+            new_image_data: None,
+            old_image_mime: None,
+            new_image_mime: None,
         });
     }
 
@@ -1037,10 +1118,57 @@ pub(crate) async fn get_git_commit_diff(
 
     let mut results = Vec::new();
     for (index, delta) in diff.deltas().enumerate() {
-        let path = delta.new_file().path().or_else(|| delta.old_file().path());
-        let Some(path) = path else {
+        let old_path = delta.old_file().path();
+        let new_path = delta.new_file().path();
+        let display_path = new_path.or(old_path);
+        let Some(display_path) = display_path else {
             continue;
         };
+        let old_path_str = old_path.map(|path| path.to_string_lossy());
+        let new_path_str = new_path.map(|path| path.to_string_lossy());
+        let display_path_str = display_path.to_string_lossy();
+        let normalized_path = normalize_git_path(&display_path_str);
+        let old_image_mime = old_path_str.as_deref().and_then(image_mime_type);
+        let new_image_mime = new_path_str.as_deref().and_then(image_mime_type);
+        let is_image = old_image_mime.is_some() || new_image_mime.is_some();
+
+        if is_image {
+            let is_deleted = delta.status() == git2::Delta::Deleted;
+            let is_added = delta.status() == git2::Delta::Added;
+
+            let old_image_data = if !is_added && old_image_mime.is_some() {
+                parent_tree
+                    .as_ref()
+                    .and_then(|tree| old_path.and_then(|path| tree.get_path(path).ok()))
+                    .and_then(|entry| repo.find_blob(entry.id()).ok())
+                    .and_then(blob_to_base64)
+            } else {
+                None
+            };
+
+            let new_image_data = if !is_deleted && new_image_mime.is_some() {
+                new_path
+                    .and_then(|path| commit_tree.get_path(path).ok())
+                    .and_then(|entry| repo.find_blob(entry.id()).ok())
+                    .and_then(blob_to_base64)
+            } else {
+                None
+            };
+
+            results.push(GitCommitDiff {
+                path: normalized_path,
+                status: status_for_delta(delta.status()).to_string(),
+                diff: String::new(),
+                is_binary: true,
+                is_image: true,
+                old_image_data,
+                new_image_data,
+                old_image_mime: old_image_mime.map(str::to_string),
+                new_image_mime: new_image_mime.map(str::to_string),
+            });
+            continue;
+        }
+
         let patch = match git2::Patch::from_diff(&diff, index) {
             Ok(patch) => patch,
             Err(_) => continue,
@@ -1056,9 +1184,15 @@ pub(crate) async fn get_git_commit_diff(
             continue;
         }
         results.push(GitCommitDiff {
-            path: normalize_git_path(path.to_string_lossy().as_ref()),
+            path: normalized_path,
             status: status_for_delta(delta.status()).to_string(),
             diff: content,
+            is_binary: false,
+            is_image: false,
+            old_image_data: None,
+            new_image_data: None,
+            old_image_mime: None,
+            new_image_mime: None,
         });
     }
 

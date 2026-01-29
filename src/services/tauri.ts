@@ -35,6 +35,12 @@ import type {
   ReviewTarget,
 } from "../types";
 
+export type TextFileResponse = {
+  exists: boolean;
+  content: string;
+  truncated: boolean;
+};
+
 export async function pickWorkspacePath(): Promise<string | null> {
   const selection = await open({ directory: true, multiple: false });
   if (!selection || Array.isArray(selection)) {
@@ -641,6 +647,22 @@ export async function readWorkspaceFile(
     workspaceId,
     path,
   });
+}
+
+export async function readGlobalAgentsMd(): Promise<TextFileResponse> {
+  return invoke<TextFileResponse>("read_global_agents_md");
+}
+
+export async function writeGlobalAgentsMd(content: string): Promise<void> {
+  return invoke("write_global_agents_md", { content });
+}
+
+export async function readGlobalCodexConfigToml(): Promise<TextFileResponse> {
+  return invoke<TextFileResponse>("read_global_config_toml");
+}
+
+export async function writeGlobalCodexConfigToml(content: string): Promise<void> {
+  return invoke("write_global_config_toml", { content });
 }
 
 export async function listGitBranches(workspaceId: string) {

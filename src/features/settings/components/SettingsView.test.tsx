@@ -19,6 +19,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 
 const baseSettings: AppSettings = {
   codexBin: null,
+  codexArgs: null,
   backendMode: "local",
   remoteBackendHost: "127.0.0.1:4732",
   remoteBackendToken: null,
@@ -141,6 +142,7 @@ const renderDisplaySection = (
     onAssignWorkspaceDomain: vi.fn().mockResolvedValue(null),
     onRunDoctor: vi.fn().mockResolvedValue(createDoctorResult()),
     onUpdateWorkspaceCodexBin: vi.fn().mockResolvedValue(undefined),
+    onUpdateWorkspaceSettings: vi.fn().mockResolvedValue(undefined),
     domains: [baseDomain],
     onCreateDomain: vi.fn().mockResolvedValue(baseDomain),
     onUpdateDomain: vi.fn().mockResolvedValue(baseDomain),
@@ -324,6 +326,7 @@ describe("SettingsView Shortcuts", () => {
         onUpdateAppSettings={vi.fn().mockResolvedValue(undefined)}
         onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
         onUpdateWorkspaceCodexBin={vi.fn().mockResolvedValue(undefined)}
+        onUpdateWorkspaceSettings={vi.fn().mockResolvedValue(undefined)}
         domains={[baseDomain]}
         onCreateDomain={vi.fn().mockResolvedValue(baseDomain)}
         onUpdateDomain={vi.fn().mockResolvedValue(baseDomain)}
@@ -367,6 +370,7 @@ describe("SettingsView Shortcuts", () => {
         onUpdateAppSettings={vi.fn().mockResolvedValue(undefined)}
         onRunDoctor={vi.fn().mockResolvedValue(createDoctorResult())}
         onUpdateWorkspaceCodexBin={vi.fn().mockResolvedValue(undefined)}
+        onUpdateWorkspaceSettings={vi.fn().mockResolvedValue(undefined)}
         domains={[baseDomain]}
         onCreateDomain={vi.fn().mockResolvedValue(baseDomain)}
         onUpdateDomain={vi.fn().mockResolvedValue(baseDomain)}

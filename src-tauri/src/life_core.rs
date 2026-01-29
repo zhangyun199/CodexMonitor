@@ -906,11 +906,20 @@ pub(crate) async fn build_finance_dashboard(
     }
 
     let today = Utc::now().date_naive();
+    let (start_date, end_date) = match range {
+        "today" => (Some(today), Some(today)),
+        "week" | "7d" => (Some(today - Duration::days(6)), Some(today)),
+        "month" | "30d" => (Some(today - Duration::days(29)), Some(today)),
+        "lifetime" => (None, Some(today)),
+        _ => (None, Some(today)),
+    };
     let bills_dir = root.join("Entities").join("Finance").join("Bills");
     let bill_records = load_bill_records(&bills_dir, today);
 
-    let period_start = today.to_string();
-    let period_end = today.to_string();
+    let earliest_due = bill_records.iter().map(|record| record.due_date).min();
+    let latest_due = bill_records.iter().map(|record| record.due_date).max();
+    let period_start = start_date.or(earliest_due).unwrap_or(today).to_string();
+    let period_end = end_date.or(latest_due).unwrap_or(today).to_string();
     let meta = DashboardMeta {
         domain: "finance".to_string(),
         range: range.to_string(),
@@ -3029,10 +3038,7 @@ mod tests {
         assert_eq!(meal.estimated_calories, Some(500.0));
         assert_eq!(
             meal.foods,
-            vec![
-                "[[Food/Chicken]]".to_string(),
-                "[[Food/Rice]]".to_string()
-            ]
+            vec!["[[Food/Chicken]]".to_string(), "[[Food/Rice]]".to_string()]
         );
     }
 

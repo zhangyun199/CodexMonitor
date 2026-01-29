@@ -8,6 +8,8 @@ struct FinanceDashboardView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                header
+
                 HStack(spacing: 12) {
                     StatCardView(title: "Monthly Total", value: currency(store.financeDashboard?.stats.monthlyTotal))
                     StatCardView(title: "Due Soon", value: "\(store.financeDashboard?.stats.dueSoonCount ?? 0)")
@@ -17,7 +19,15 @@ struct FinanceDashboardView: View {
                     StatCardView(title: "Auto-Pay", value: "\(store.financeDashboard?.stats.autoPayCount ?? 0)")
                 }
 
-                TimeRangePicker(selection: $timeRange)
+                HStack {
+                    TimeRangePicker(selection: $timeRange)
+                    Button {
+                        Task { await store.fetchFinanceDashboard(range: timeRange) }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                }
 
                 if store.dashboardLoading {
                     ProgressView("Loading…")
@@ -52,23 +62,36 @@ struct FinanceDashboardView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("No bills found.")
+                        .foregroundStyle(.secondary)
                 }
 
                 if let categories = store.financeDashboard?.byCategory, !categories.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("By Category")
                             .font(.headline)
-                        ForEach(categories.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                        ForEach(categoryRows(categories), id: \.name) { row in
                             HStack {
-                                Text(key)
-                                Spacer()
-                                Text(currency(value))
+                                Text(row.name)
+                                    .frame(width: 120, alignment: .leading)
+                                GeometryReader { proxy in
+                                    Capsule()
+                                        .fill(Color.orange.opacity(0.6))
+                                        .frame(width: proxy.size.width * row.percent, height: 6)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .frame(height: 8)
+                                Text(currency(row.amount))
+                                    .frame(width: 80, alignment: .trailing)
                             }
                             .font(.caption)
-                            Divider()
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("No category totals yet.")
+                        .foregroundStyle(.secondary)
                 }
             }
             .padding()
@@ -92,4 +115,32 @@ struct FinanceDashboardView: View {
         }
         return value
     }
+
+    private func categoryRows(_ categories: [String: Double]) -> [CategoryRow] {
+        let rows = categories.sorted { $0.key < $1.key }
+        let maxValue = max(1, rows.map { $0.value }.max() ?? 1)
+        return rows.map { (name, amount) in
+            CategoryRow(name: name, amount: amount, percent: amount / maxValue)
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("💸 Finance Dashboard")
+                .font(.headline)
+            if let meta = store.financeDashboard?.meta {
+                Text("\(meta.periodStart) → \(meta.periodEnd)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct CategoryRow: Identifiable {
+    let id = UUID()
+    let name: String
+    let amount: Double
+    let percent: Double
 }

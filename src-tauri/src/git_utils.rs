@@ -187,3 +187,32 @@ pub(crate) fn list_git_roots(root: &Path, max_depth: usize, max_results: usize) 
     results.sort();
     results
 }
+
+pub(crate) fn image_mime_type(path: &str) -> Option<&'static str> {
+    let lower = path.to_ascii_lowercase();
+    if lower.ends_with(".png") {
+        return Some("image/png");
+    }
+    if lower.ends_with(".jpg") || lower.ends_with(".jpeg") {
+        return Some("image/jpeg");
+    }
+    if lower.ends_with(".gif") {
+        return Some("image/gif");
+    }
+    if lower.ends_with(".webp") {
+        return Some("image/webp");
+    }
+    if lower.ends_with(".svg") {
+        return Some("image/svg+xml");
+    }
+    if lower.ends_with(".bmp") {
+        return Some("image/bmp");
+    }
+    if lower.ends_with(".ico") {
+        return Some("image/x-icon");
+    }
+    if lower.ends_with(".tiff") || lower.ends_with(".tif") {
+        return Some("image/tiff");
+    }
+    None
+}

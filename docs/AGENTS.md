@@ -50,8 +50,21 @@ Obsidian (raw) → Daemon parses → Dashboard data
 | **Phase 2b** | ✅ Complete | YouTube Bookshelf (React + Rust + iOS) - tier cards (S/A/B/C), filters, no time range |
 | **Phase 3** | ✅ Complete | Nutrition, Exercise, Finance dashboards - stream parsing, weekly trends, streaks, bill due dates |
 | **Phase 4** | ✅ Complete | UI Polish - clean poster cards (title below), scrolling fix, weekly bar charts, domain accent colors, manual cover overrides |
+| **Upstream Merge** | ✅ Complete | Features from upstream CodexMonitor v0.7.30 (see below) |
 
 **Debug logging**: Set `LIFE_DEBUG=1` to see Life workspace logging.
+
+### Upstream Features Merged
+
+| Feature | Priority | Files |
+|---------|----------|-------|
+| **Prompt History** | 🔴 HIGH | `usePromptHistory.ts`, `Composer.tsx` - Arrow up/down through 200 previous prompts |
+| **Image Diff** | 🔴 HIGH | `ImageDiffCard.tsx`, `git.rs` - Side-by-side image comparisons in git diffs |
+| **Global AGENTS.md Editor** | 🔴 HIGH | `useGlobalAgentsMd.ts`, `SettingsView.tsx`, `codex_home.rs` |
+| **Global config.toml Editor** | 🔴 HIGH | `useGlobalCodexConfigToml.ts`, `SettingsView.tsx`, `codex_home.rs` |
+| **Sidebar Search** | 🟡 MEDIUM | `Sidebar.tsx`, `sidebar.css` - Search across workspaces |
+| **Recent Threads on Home** | 🟡 MEDIUM | `WorkspaceHome.tsx`, `workspaces.rs` |
+| **CODEX_HOME per workspace** | 🟡 MEDIUM | `workspaces.rs`, `types.rs` |
 
 ## Key paths
 

@@ -12,6 +12,18 @@ pub(crate) struct GitFileStatus {
 pub(crate) struct GitFileDiff {
     pub(crate) path: String,
     pub(crate) diff: String,
+    #[serde(default, rename = "isBinary")]
+    pub(crate) is_binary: bool,
+    #[serde(default, rename = "isImage")]
+    pub(crate) is_image: bool,
+    #[serde(rename = "oldImageData")]
+    pub(crate) old_image_data: Option<String>,
+    #[serde(rename = "newImageData")]
+    pub(crate) new_image_data: Option<String>,
+    #[serde(rename = "oldImageMime")]
+    pub(crate) old_image_mime: Option<String>,
+    #[serde(rename = "newImageMime")]
+    pub(crate) new_image_mime: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -19,6 +31,18 @@ pub(crate) struct GitCommitDiff {
     pub(crate) path: String,
     pub(crate) status: String,
     pub(crate) diff: String,
+    #[serde(default, rename = "isBinary")]
+    pub(crate) is_binary: bool,
+    #[serde(default, rename = "isImage")]
+    pub(crate) is_image: bool,
+    #[serde(rename = "oldImageData")]
+    pub(crate) old_image_data: Option<String>,
+    #[serde(rename = "newImageData")]
+    pub(crate) new_image_data: Option<String>,
+    #[serde(rename = "oldImageMime")]
+    pub(crate) old_image_mime: Option<String>,
+    #[serde(rename = "newImageMime")]
+    pub(crate) new_image_mime: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -245,6 +269,10 @@ pub(crate) struct WorkspaceSettings {
     pub(crate) group_id: Option<String>,
     #[serde(default, rename = "gitRoot")]
     pub(crate) git_root: Option<String>,
+    #[serde(default, rename = "codexHome")]
+    pub(crate) codex_home: Option<String>,
+    #[serde(default, rename = "codexArgs")]
+    pub(crate) codex_args: Option<String>,
     #[serde(default, rename = "domainId")]
     pub(crate) domain_id: Option<String>,
     #[serde(default, rename = "applyDomainInstructions")]
@@ -336,6 +364,8 @@ pub(crate) struct DomainTrendSnapshot {
 pub(crate) struct AppSettings {
     #[serde(default, rename = "codexBin")]
     pub(crate) codex_bin: Option<String>,
+    #[serde(default, rename = "codexArgs")]
+    pub(crate) codex_args: Option<String>,
     #[serde(default, rename = "backendMode")]
     pub(crate) backend_mode: BackendMode,
     #[serde(default = "default_remote_backend_host", rename = "remoteBackendHost")]
@@ -763,6 +793,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             codex_bin: None,
+            codex_args: None,
             backend_mode: BackendMode::Local,
             remote_backend_host: default_remote_backend_host(),
             remote_backend_token: None,

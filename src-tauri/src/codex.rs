@@ -29,17 +29,19 @@ use crate::types::WorkspaceEntry;
 pub(crate) async fn spawn_workspace_session(
     entry: WorkspaceEntry,
     default_codex_bin: Option<String>,
-    app_handle: AppHandle,
+    codex_args: Option<String>,
     codex_home: Option<PathBuf>,
+    app_handle: AppHandle,
 ) -> Result<Arc<WorkspaceSession>, String> {
     let client_version = app_handle.package_info().version.to_string();
     let event_sink = TauriEventSink::new(app_handle);
     spawn_workspace_session_inner(
         entry,
         default_codex_bin,
+        codex_args,
+        codex_home,
         client_version,
         event_sink,
-        codex_home,
     )
     .await
 }
@@ -772,21 +774,21 @@ pub(crate) async fn remember_approval_rule(
         return Err("empty command".to_string());
     }
 
-    let (entry, parent_path) = {
+    let (entry, parent_entry) = {
         let workspaces = state.workspaces.lock().await;
         let entry = workspaces
             .get(&workspace_id)
             .ok_or("workspace not found")?
             .clone();
-        let parent_path = entry
+        let parent_entry = entry
             .parent_id
             .as_ref()
             .and_then(|parent_id| workspaces.get(parent_id))
-            .map(|parent| parent.path.clone());
-        (entry, parent_path)
+            .cloned();
+        (entry, parent_entry)
     };
 
-    let codex_home = resolve_workspace_codex_home(&entry, parent_path.as_deref())
+    let codex_home = resolve_workspace_codex_home(&entry, parent_entry.as_ref())
         .ok_or("Unable to resolve CODEX_HOME".to_string())?;
     let rules_path = rules::default_rules_path(&codex_home);
     rules::append_prefix_rule(&rules_path, &command)?;

@@ -4,6 +4,7 @@ use tauri::Manager;
 mod auto_flush;
 mod backend;
 mod codex;
+mod codex_args;
 mod codex_config;
 mod codex_home;
 mod codex_params;
@@ -15,6 +16,7 @@ mod dictation;
 mod dictation;
 mod domains;
 mod event_sink;
+mod files;
 mod git;
 mod git_utils;
 mod life;
@@ -118,6 +120,10 @@ pub fn run() {
             git::revert_git_file,
             git::revert_git_all,
             git::commit_git,
+            files::read_global_agents_md,
+            files::write_global_agents_md,
+            files::read_global_config_toml,
+            files::write_global_config_toml,
             git::push_git,
             git::pull_git,
             git::sync_git,

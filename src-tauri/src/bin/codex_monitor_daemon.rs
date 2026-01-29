@@ -5,6 +5,8 @@ mod auto_flush;
 mod backend;
 #[path = "../browser/mod.rs"]
 mod browser;
+#[path = "../codex_args.rs"]
+mod codex_args;
 #[path = "../codex_config.rs"]
 mod codex_config;
 #[path = "../codex_home.rs"]
@@ -131,6 +133,13 @@ struct DaemonState {
 
 #[derive(Serialize, Deserialize)]
 struct WorkspaceFileResponse {
+    content: String,
+    truncated: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TextFileResponse {
+    exists: bool,
     content: String,
     truncated: bool,
 }
@@ -293,12 +302,17 @@ impl DaemonState {
         };
 
         let codex_home = codex_home::resolve_workspace_codex_home(&entry, None);
+        let codex_args = {
+            let settings = self.app_settings.lock().await;
+            codex_args::resolve_workspace_codex_args(&entry, None, Some(&settings))
+        };
         let session = spawn_workspace_session(
             entry.clone(),
             default_bin,
+            codex_args,
+            codex_home,
             client_version,
             self.event_sink.clone(),
-            codex_home,
         )
         .await?;
 
@@ -404,13 +418,18 @@ impl DaemonState {
             settings.codex_bin.clone()
         };
 
-        let codex_home = codex_home::resolve_workspace_codex_home(&entry, Some(&parent_entry.path));
+        let codex_home = codex_home::resolve_workspace_codex_home(&entry, Some(&parent_entry));
+        let codex_args = {
+            let settings = self.app_settings.lock().await;
+            codex_args::resolve_workspace_codex_args(&entry, Some(&parent_entry), Some(&settings))
+        };
         let session = spawn_workspace_session(
             entry.clone(),
             default_bin,
+            codex_args,
+            codex_home,
             client_version,
             self.event_sink.clone(),
-            codex_home,
         )
         .await?;
 
@@ -658,13 +677,22 @@ impl DaemonState {
                 settings.codex_bin.clone()
             };
             let codex_home =
-                codex_home::resolve_workspace_codex_home(&entry_snapshot, Some(&parent.path));
+                codex_home::resolve_workspace_codex_home(&entry_snapshot, Some(&parent));
+            let codex_args = {
+                let settings = self.app_settings.lock().await;
+                codex_args::resolve_workspace_codex_args(
+                    &entry_snapshot,
+                    Some(&parent),
+                    Some(&settings),
+                )
+            };
             match spawn_workspace_session(
                 entry_snapshot.clone(),
                 default_bin,
+                codex_args,
+                codex_home,
                 client_version,
                 self.event_sink.clone(),
-                codex_home,
             )
             .await
             {
@@ -867,23 +895,28 @@ impl DaemonState {
             settings.codex_bin.clone()
         };
 
-        let parent_path = if entry.kind.is_worktree() {
+        let parent_entry = if entry.kind.is_worktree() {
             let workspaces = self.workspaces.lock().await;
             entry
                 .parent_id
                 .as_deref()
                 .and_then(|parent_id| workspaces.get(parent_id))
-                .map(|parent| parent.path.clone())
+                .cloned()
         } else {
             None
         };
-        let codex_home = codex_home::resolve_workspace_codex_home(&entry, parent_path.as_deref());
+        let codex_home = codex_home::resolve_workspace_codex_home(&entry, parent_entry.as_ref());
+        let codex_args = {
+            let settings = self.app_settings.lock().await;
+            codex_args::resolve_workspace_codex_args(&entry, parent_entry.as_ref(), Some(&settings))
+        };
         let session = spawn_workspace_session(
             entry,
             default_bin,
+            codex_args,
+            codex_home,
             client_version,
             self.event_sink.clone(),
-            codex_home,
         )
         .await?;
 
@@ -1026,6 +1059,22 @@ impl DaemonState {
 
         let root = PathBuf::from(entry.path);
         read_workspace_file_inner(&root, &path)
+    }
+
+    async fn read_global_agents_md(&self) -> Result<TextFileResponse, String> {
+        read_global_file_inner("AGENTS.md")
+    }
+
+    async fn write_global_agents_md(&self, content: String) -> Result<(), String> {
+        write_global_file_inner("AGENTS.md", &content)
+    }
+
+    async fn read_global_config_toml(&self) -> Result<TextFileResponse, String> {
+        read_global_file_inner("config.toml")
+    }
+
+    async fn write_global_config_toml(&self, content: String) -> Result<(), String> {
+        write_global_file_inner("config.toml", &content)
     }
 
     async fn get_life_workspace_prompt(&self) -> Result<String, String> {
@@ -1565,21 +1614,9 @@ impl DaemonState {
             return Err("empty command".to_string());
         }
 
-        let (entry, parent_path) = {
-            let workspaces = self.workspaces.lock().await;
-            let entry = workspaces
-                .get(&workspace_id)
-                .ok_or("workspace not found")?
-                .clone();
-            let parent_path = entry
-                .parent_id
-                .as_ref()
-                .and_then(|parent_id| workspaces.get(parent_id))
-                .map(|parent| parent.path.clone());
-            (entry, parent_path)
-        };
+        let (entry, parent_entry) = self.workspace_entry_with_parent(&workspace_id).await?;
 
-        let codex_home = codex_home::resolve_workspace_codex_home(&entry, parent_path.as_deref())
+        let codex_home = codex_home::resolve_workspace_codex_home(&entry, parent_entry.as_ref())
             .ok_or("Unable to resolve CODEX_HOME".to_string())?;
         let rules_path = rules::default_rules_path(&codex_home);
         rules::append_prefix_rule(&rules_path, &command)?;
@@ -1591,8 +1628,8 @@ impl DaemonState {
     }
 
     async fn skills_config_path(&self, workspace_id: &str) -> Result<PathBuf, String> {
-        let (entry, parent_path) = self.workspace_entry_with_parent_path(workspace_id).await?;
-        let codex_home = codex_home::resolve_workspace_codex_home(&entry, parent_path.as_deref())
+        let (entry, parent_entry) = self.workspace_entry_with_parent(workspace_id).await?;
+        let codex_home = codex_home::resolve_workspace_codex_home(&entry, parent_entry.as_ref())
             .ok_or("Unable to resolve CODEX_HOME")?;
         Ok(codex_home.join("skills").join("config.json"))
     }
@@ -1725,6 +1762,35 @@ fn read_workspace_file_inner(
 
     let content = String::from_utf8(buffer).map_err(|_| "File is not valid UTF-8".to_string())?;
     Ok(WorkspaceFileResponse { content, truncated })
+}
+
+fn read_global_file_inner(filename: &str) -> Result<TextFileResponse, String> {
+    let Some(root) = resolve_codex_home() else {
+        return Err("Unable to resolve CODEX_HOME".to_string());
+    };
+    let path = root.join(filename);
+    if !path.exists() {
+        return Ok(TextFileResponse {
+            exists: false,
+            content: String::new(),
+            truncated: false,
+        });
+    }
+    let content = std::fs::read_to_string(&path).map_err(|err| err.to_string())?;
+    Ok(TextFileResponse {
+        exists: true,
+        content,
+        truncated: false,
+    })
+}
+
+fn write_global_file_inner(filename: &str, content: &str) -> Result<(), String> {
+    let Some(root) = resolve_codex_home() else {
+        return Err("Unable to resolve CODEX_HOME".to_string());
+    };
+    std::fs::create_dir_all(&root).map_err(|err| err.to_string())?;
+    let path = root.join(filename);
+    std::fs::write(path, content).map_err(|err| err.to_string())
 }
 
 async fn run_git_command(repo_path: &Path, args: &[&str]) -> Result<String, String> {
@@ -2422,21 +2488,21 @@ impl DaemonState {
             .ok_or("workspace not found".to_string())
     }
 
-    async fn workspace_entry_with_parent_path(
+    async fn workspace_entry_with_parent(
         &self,
         workspace_id: &str,
-    ) -> Result<(WorkspaceEntry, Option<String>), String> {
+    ) -> Result<(WorkspaceEntry, Option<WorkspaceEntry>), String> {
         let workspaces = self.workspaces.lock().await;
         let entry = workspaces
             .get(workspace_id)
             .cloned()
             .ok_or("workspace not found".to_string())?;
-        let parent_path = entry
+        let parent_entry = entry
             .parent_id
             .as_ref()
             .and_then(|parent_id| workspaces.get(parent_id))
-            .map(|parent| parent.path.clone());
-        Ok((entry, parent_path))
+            .cloned();
+        Ok((entry, parent_entry))
     }
 }
 
@@ -2522,12 +2588,17 @@ impl DaemonState {
             settings.codex_bin.clone()
         };
         let codex_home = codex_home::resolve_workspace_codex_home(&entry, None);
+        let codex_args = {
+            let settings = self.app_settings.lock().await;
+            codex_args::resolve_workspace_codex_args(&entry, None, Some(&settings))
+        };
         let session = match spawn_workspace_session(
             entry.clone(),
             default_bin,
+            codex_args,
+            codex_home,
             client_version,
             self.event_sink.clone(),
-            codex_home,
         )
         .await
         {
@@ -4661,6 +4732,24 @@ async fn handle_rpc_request(
             let path = parse_string(&params, "path")?;
             let response = state.read_workspace_file(workspace_id, path).await?;
             serde_json::to_value(response).map_err(|err| err.to_string())
+        }
+        "read_global_agents_md" => {
+            let response = state.read_global_agents_md().await?;
+            serde_json::to_value(response).map_err(|err| err.to_string())
+        }
+        "write_global_agents_md" => {
+            let content = parse_string(&params, "content")?;
+            state.write_global_agents_md(content).await?;
+            Ok(json!({ "ok": true }))
+        }
+        "read_global_config_toml" => {
+            let response = state.read_global_config_toml().await?;
+            serde_json::to_value(response).map_err(|err| err.to_string())
+        }
+        "write_global_config_toml" => {
+            let content = parse_string(&params, "content")?;
+            state.write_global_config_toml(content).await?;
+            Ok(json!({ "ok": true }))
         }
         "get_app_settings" => {
             let mut settings = state.app_settings.lock().await.clone();

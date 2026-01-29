@@ -719,6 +719,7 @@ dependencies = [
 name = "codex-monitor"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "block2",
  "chrono",
  "cpal",
@@ -737,6 +738,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2",
+ "shell-words",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -747,6 +749,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "tempfile",
  "tokio",
+ "toml 0.8.2",
  "uuid",
  "which 6.0.3",
  "whisper-rs",

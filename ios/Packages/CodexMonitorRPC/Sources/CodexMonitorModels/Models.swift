@@ -12,6 +12,8 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
     public var sortOrder: Int?
     public var groupId: String?
     public var gitRoot: String?
+    public var codexHome: String?
+    public var codexArgs: String?
     public var domainId: String?
     public var applyDomainInstructions: Bool?
     public var purpose: WorkspacePurpose?
@@ -22,6 +24,8 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
         sortOrder: Int? = nil,
         groupId: String? = nil,
         gitRoot: String? = nil,
+        codexHome: String? = nil,
+        codexArgs: String? = nil,
         domainId: String? = nil,
         applyDomainInstructions: Bool? = nil,
         purpose: WorkspacePurpose? = nil,
@@ -31,6 +35,8 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
         self.sortOrder = sortOrder
         self.groupId = groupId
         self.gitRoot = gitRoot
+        self.codexHome = codexHome
+        self.codexArgs = codexArgs
         self.domainId = domainId
         self.applyDomainInstructions = applyDomainInstructions
         self.purpose = purpose
@@ -42,6 +48,8 @@ public struct WorkspaceSettings: Codable, Hashable, Sendable {
         case sortOrder
         case groupId
         case gitRoot
+        case codexHome
+        case codexArgs
         case domainId
         case applyDomainInstructions
         case purpose
@@ -110,6 +118,7 @@ public enum ComposerEditorPreset: String, Codable, Sendable {
 
 public struct AppSettings: Codable, Hashable, Sendable {
     public var codexBin: String?
+    public var codexArgs: String?
     public var backendMode: BackendMode
     public var remoteBackendHost: String
     public var remoteBackendToken: String?
@@ -931,12 +940,24 @@ public struct GitStatusResponse: Codable, Hashable, Sendable {
 public struct GitFileDiff: Codable, Hashable, Sendable {
     public var path: String
     public var diff: String
+    public var isBinary: Bool?
+    public var isImage: Bool?
+    public var oldImageData: String?
+    public var newImageData: String?
+    public var oldImageMime: String?
+    public var newImageMime: String?
 }
 
 public struct GitCommitDiff: Codable, Hashable, Sendable {
     public var path: String
     public var status: String
     public var diff: String
+    public var isBinary: Bool?
+    public var isImage: Bool?
+    public var oldImageData: String?
+    public var newImageData: String?
+    public var oldImageMime: String?
+    public var newImageMime: String?
 }
 
 public struct GitLogEntry: Codable, Hashable, Sendable {

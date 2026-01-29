@@ -24,6 +24,7 @@ import "./styles/tabbar.css";
 import "./styles/worktree-modal.css";
 import "./styles/clone-modal.css";
 import "./styles/settings.css";
+import "./styles/workspace-home.css";
 import "./styles/compact-base.css";
 import "./styles/compact-phone.css";
 import "./styles/compact-tablet.css";
@@ -1875,6 +1876,9 @@ function MainApp() {
           onRunDoctor: doctor,
           onUpdateWorkspaceCodexBin: async (id, codexBin) => {
             await updateWorkspaceCodexBin(id, codexBin);
+          },
+          onUpdateWorkspaceSettings: async (id, settings) => {
+            await updateWorkspaceSettings(id, settings);
           },
           domains,
           onCreateDomain: createDomain,

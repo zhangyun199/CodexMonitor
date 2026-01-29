@@ -4,6 +4,7 @@ import { Sidebar } from "../../app/components/Sidebar";
 import { Home } from "../../home/components/Home";
 import { MainHeader } from "../../app/components/MainHeader";
 import { Messages } from "../../messages/components/Messages";
+import { WorkspaceHome } from "../../workspaces/components/WorkspaceHome";
 import { ApprovalToasts } from "../../app/components/ApprovalToasts";
 import { UpdateToast } from "../../update/components/UpdateToast";
 import { Composer } from "../../composer/components/Composer";
@@ -453,7 +454,18 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
     />
   );
 
-  const messagesNode = (
+  const workspaceHomeNode =
+    options.activeWorkspace && !options.activeThreadId ? (
+      <WorkspaceHome
+        workspace={options.activeWorkspace}
+        threads={options.threadsByWorkspace[options.activeWorkspace.id] ?? []}
+        onSelectThread={(threadId) =>
+          options.onSelectThread(options.activeWorkspace!.id, threadId)
+        }
+      />
+    ) : null;
+
+  const messagesNode = workspaceHomeNode ?? (
     <Messages
       items={options.activeItems}
       threadId={options.activeThreadId ?? null}
@@ -488,6 +500,7 @@ export function useLayoutNodes(options: LayoutNodesOptions): LayoutNodesResult {
       isProcessing={options.isProcessing}
       draftText={options.draftText}
       onDraftChange={options.onDraftChange}
+      historyKey={options.activeWorkspace?.id ?? null}
       attachedImages={options.activeImages}
       onPickImages={options.onPickImages}
       onAttachImages={options.onAttachImages}

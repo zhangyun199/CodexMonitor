@@ -471,9 +471,23 @@ struct TmdbResult {
     name: Option<String>,
     original_title: Option<String>,
     original_name: Option<String>,
+    original_language: Option<String>,
     release_date: Option<String>,
     first_air_date: Option<String>,
     poster_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TmdbImagesResponse {
+    posters: Vec<TmdbImage>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+struct TmdbImage {
+    file_path: String,
+    vote_count: Option<i64>,
+    vote_average: Option<f64>,
+    iso_639_1: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -493,6 +507,9 @@ struct IgdbTokenResponse {
 
 #[derive(Debug, Deserialize)]
 struct IgdbGameResult {
+    name: Option<String>,
+    #[serde(rename = "first_release_date")]
+    first_release_date: Option<i64>,
     cover: Option<IgdbCover>,
 }
 
@@ -1261,7 +1278,15 @@ pub async fn enrich_media_covers(
                 cover
             }
             "Book" => fetch_open_library_cover(&record.item.title).await?,
-            "Game" => fetch_igdb_cover(&record.item.title, igdb_client_id, &igdb_token).await?,
+            "Game" => {
+                fetch_igdb_cover(
+                    &record.item.title,
+                    record.year_hint,
+                    igdb_client_id,
+                    &igdb_token,
+                )
+                .await?
+            }
             "YouTube" => fetch_youtube_cover(record.youtube_id.as_deref(), record.url.as_deref()),
             _ => None,
         };
@@ -2696,6 +2721,16 @@ fn game_title_variants(title: &str) -> Vec<String> {
         let rest = trimmed[3..].trim();
         push_variant(&mut variants, format!("Metal Gear Solid {}", rest.trim()));
     }
+    if trimmed.eq_ignore_ascii_case("demon souls") {
+        push_variant(&mut variants, "Demon's Souls".to_string());
+    }
+    let lower = trimmed.to_lowercase();
+    if lower.contains("ocarina of time") && !lower.contains("zelda") {
+        push_variant(
+            &mut variants,
+            "The Legend of Zelda: Ocarina of Time".to_string(),
+        );
+    }
     variants
 }
 
@@ -2891,6 +2926,7 @@ async fn fetch_tmdb_cover(
                 .clone()
                 .or_else(|| result.original_name.clone())
                 .unwrap_or_default();
+            let original_language = result.original_language.clone();
             let date = result
                 .release_date
                 .clone()
@@ -2905,6 +2941,7 @@ async fn fetch_tmdb_cover(
                 id,
                 title,
                 original_title: original,
+                original_language,
                 year,
                 poster_path,
                 score,
@@ -2929,11 +2966,13 @@ async fn fetch_tmdb_cover(
         .map(|c| c.score)
         .unwrap_or(top.score.saturating_sub(10));
     let ambiguous = top.score <= 4 || (top.score - second_score).abs() <= 1;
+    let allow_exa = ambiguous && year_hint.is_some();
 
-    if ambiguous {
+    if allow_exa {
         if let Some(exa_key) = exa_api_key {
             if let Some(result) =
-                fetch_exa_tmdb_cover(title, variants, media_type, api_key, exa_key).await?
+                fetch_exa_tmdb_cover(title, variants, media_type, api_key, exa_key, year_hint)
+                    .await?
             {
                 return Ok(Some(result));
             }
@@ -2944,8 +2983,15 @@ async fn fetch_tmdb_cover(
         return Ok(None);
     }
 
-    let cover_url = format!("https://image.tmdb.org/t/p/w500{}", top.poster_path);
-    Ok(Some((cover_url, "tmdb".to_string())))
+    let cover = fetch_tmdb_cover_by_id(
+        api_key,
+        media_type,
+        top.id,
+        top.original_language.as_deref(),
+    )
+    .await?
+    .unwrap_or_else(|| format!("https://image.tmdb.org/t/p/w500{}", top.poster_path));
+    Ok(Some((cover, "tmdb".to_string())))
 }
 
 #[derive(Debug, Clone)]
@@ -2953,6 +2999,7 @@ struct TmdbCandidate {
     id: u64,
     title: String,
     original_title: String,
+    original_language: Option<String>,
     year: Option<i32>,
     poster_path: String,
     score: i32,
@@ -3051,14 +3098,17 @@ async fn fetch_exa_tmdb_cover(
     media_type: &str,
     tmdb_api_key: &str,
     exa_api_key: &str,
+    year_hint: Option<i32>,
 ) -> Result<Option<(String, String)>, String> {
     if exa_api_key.trim().is_empty() {
         return Ok(None);
     }
+    let year_label = year_hint.map(|value| value.to_string()).unwrap_or_default();
     let query = format!(
-        "site:themoviedb.org {} {} poster",
+        "site:themoviedb.org {} {} {} poster",
         title,
-        variants.get(0).cloned().unwrap_or_default()
+        variants.get(0).cloned().unwrap_or_default(),
+        year_label
     );
     let payload = serde_json::json!({
         "query": query,
@@ -3081,7 +3131,7 @@ async fn fetch_exa_tmdb_cover(
             if kind != media_type && media_type == "movie" && kind == "tv" {
                 // allow cross lookup for anime if needed
             }
-            if let Some(cover) = fetch_tmdb_cover_by_id(tmdb_api_key, &kind, id).await? {
+            if let Some(cover) = fetch_tmdb_cover_by_id(tmdb_api_key, &kind, id, None).await? {
                 return Ok(Some((cover, "tmdb-exa".to_string())));
             }
         }
@@ -3120,6 +3170,7 @@ async fn fetch_tmdb_cover_by_id(
     tmdb_api_key: &str,
     media_type: &str,
     id: u64,
+    preferred_language: Option<&str>,
 ) -> Result<Option<String>, String> {
     let url = format!("https://api.themoviedb.org/3/{media_type}/{id}?api_key={tmdb_api_key}");
     let resp = Client::new()
@@ -3131,12 +3182,105 @@ async fn fetch_tmdb_cover_by_id(
         return Ok(None);
     }
     let payload: TmdbResult = resp.json().await.map_err(|err| err.to_string())?;
+    if let Some(poster_path) =
+        fetch_tmdb_best_poster(tmdb_api_key, media_type, id, preferred_language).await?
+    {
+        return Ok(Some(poster_path));
+    }
     if let Some(poster_path) = payload.poster_path {
         return Ok(Some(format!(
             "https://image.tmdb.org/t/p/w500{poster_path}"
         )));
     }
     Ok(None)
+}
+
+async fn fetch_tmdb_best_poster(
+    tmdb_api_key: &str,
+    media_type: &str,
+    id: u64,
+    preferred_language: Option<&str>,
+) -> Result<Option<String>, String> {
+    let url = format!("https://api.themoviedb.org/3/{media_type}/{id}/images?api_key={tmdb_api_key}");
+    let resp = Client::new()
+        .get(url)
+        .send()
+        .await
+        .map_err(|err| err.to_string())?;
+    if !resp.status().is_success() {
+        return Ok(None);
+    }
+    let payload: TmdbImagesResponse = resp.json().await.map_err(|err| err.to_string())?;
+    if let Some(file_path) = pick_tmdb_poster(&payload.posters, preferred_language) {
+        return Ok(Some(format!(
+            "https://image.tmdb.org/t/p/w500{file_path}"
+        )));
+    }
+    Ok(None)
+}
+
+fn pick_tmdb_poster(posters: &[TmdbImage], preferred_language: Option<&str>) -> Option<String> {
+    if posters.is_empty() {
+        return None;
+    }
+
+    let pick_best = |items: Vec<&TmdbImage>| -> Option<String> {
+        let mut best: Option<&TmdbImage> = None;
+        for item in items {
+            best = match best {
+                None => Some(item),
+                Some(current) => {
+                    let current_votes = current.vote_count.unwrap_or(0);
+                    let item_votes = item.vote_count.unwrap_or(0);
+                    if item_votes > current_votes {
+                        Some(item)
+                    } else if item_votes == current_votes {
+                        let current_avg = current.vote_average.unwrap_or(0.0);
+                        let item_avg = item.vote_average.unwrap_or(0.0);
+                        if item_avg > current_avg {
+                            Some(item)
+                        } else {
+                            Some(current)
+                        }
+                    } else {
+                        Some(current)
+                    }
+                }
+            };
+        }
+        best.map(|item| item.file_path.clone())
+    };
+
+    let with_votes: Vec<&TmdbImage> = posters
+        .iter()
+        .filter(|poster| poster.vote_count.unwrap_or(0) > 0)
+        .collect();
+
+    if let Some(lang) = preferred_language {
+        let lang_matches: Vec<&TmdbImage> = with_votes
+            .iter()
+            .copied()
+            .filter(|poster| poster.iso_639_1.as_deref() == Some(lang))
+            .collect();
+        if let Some(best) = pick_best(lang_matches) {
+            return Some(best);
+        }
+    }
+
+    let english_matches: Vec<&TmdbImage> = with_votes
+        .iter()
+        .copied()
+        .filter(|poster| poster.iso_639_1.as_deref() == Some("en"))
+        .collect();
+    if let Some(best) = pick_best(english_matches) {
+        return Some(best);
+    }
+
+    if let Some(best) = pick_best(with_votes) {
+        return Some(best);
+    }
+
+    posters.first().map(|poster| poster.file_path.clone())
 }
 
 async fn fetch_open_library_cover(title: &str) -> Result<Option<(String, String)>, String> {
@@ -3184,6 +3328,7 @@ async fn fetch_igdb_token(client_id: &str, client_secret: &str) -> Result<String
 
 async fn fetch_igdb_cover(
     title: &str,
+    year_hint: Option<i32>,
     client_id: Option<&str>,
     access_token: &str,
 ) -> Result<Option<(String, String)>, String> {
@@ -3193,9 +3338,12 @@ async fn fetch_igdb_cover(
     if client_id.trim().is_empty() || access_token.trim().is_empty() {
         return Ok(None);
     }
-    for variant in game_title_variants(title) {
+    let variants = game_title_variants(title);
+    let mut candidates: Vec<IgdbCandidate> = Vec::new();
+
+    for variant in &variants {
         let body = format!(
-            "search \"{}\"; fields cover.image_id; limit 1;",
+            "search \"{}\"; fields name, first_release_date, cover.image_id; limit 10;",
             variant.replace('\"', "")
         );
         let resp = Client::new()
@@ -3210,16 +3358,74 @@ async fn fetch_igdb_cover(
             continue;
         }
         let results: Vec<IgdbGameResult> = resp.json().await.map_err(|err| err.to_string())?;
-        if let Some(result) = results.into_iter().find(|item| item.cover.is_some()) {
-            let cover = result.cover.unwrap();
-            let cover_url = format!(
-                "https://images.igdb.com/igdb/image/upload/t_cover_big/{}.jpg",
-                cover.image_id
-            );
-            return Ok(Some((cover_url, "igdb".to_string())));
+        for result in results {
+            let Some(cover) = result.cover else {
+                continue;
+            };
+            let name = result.name.unwrap_or_default();
+            if name.trim().is_empty() {
+                continue;
+            }
+            let year = result
+                .first_release_date
+                .and_then(igdb_year_from_timestamp);
+            let score = score_igdb_candidate(&name, &variants, year_hint, year);
+            candidates.push(IgdbCandidate {
+                name,
+                year,
+                cover,
+                score,
+            });
         }
     }
-    Ok(None)
+
+    if candidates.is_empty() {
+        return Ok(None);
+    }
+
+    candidates.sort_by(|a, b| {
+        b.score
+            .cmp(&a.score)
+            .then_with(|| a.year.unwrap_or(9999).cmp(&b.year.unwrap_or(9999)))
+            .then_with(|| a.name.cmp(&b.name))
+    });
+
+    let top = &candidates[0];
+    let second_score = candidates
+        .get(1)
+        .map(|c| c.score)
+        .unwrap_or(top.score.saturating_sub(10));
+    let ambiguous = top.score <= 4 || (top.score - second_score).abs() <= 1;
+    if top.score <= 2 && ambiguous {
+        return Ok(None);
+    }
+
+    let cover_url = format!(
+        "https://images.igdb.com/igdb/image/upload/t_cover_big/{}.jpg",
+        top.cover.image_id
+    );
+    Ok(Some((cover_url, "igdb".to_string())))
+}
+
+#[derive(Debug)]
+struct IgdbCandidate {
+    name: String,
+    year: Option<i32>,
+    cover: IgdbCover,
+    score: i32,
+}
+
+fn igdb_year_from_timestamp(value: i64) -> Option<i32> {
+    chrono::NaiveDateTime::from_timestamp_opt(value, 0).map(|dt| dt.year())
+}
+
+fn score_igdb_candidate(
+    name: &str,
+    variants: &[String],
+    year_hint: Option<i32>,
+    candidate_year: Option<i32>,
+) -> i32 {
+    score_tmdb_candidate(name, name, variants, year_hint, candidate_year)
 }
 
 fn fetch_youtube_cover(youtube_id: Option<&str>, url: Option<&str>) -> Option<(String, String)> {

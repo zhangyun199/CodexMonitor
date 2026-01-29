@@ -85,6 +85,13 @@ Obsidian (raw) → Daemon parses → Dashboard data
 | **Life Rust commands** | `src-tauri/src/life.rs` |
 | **Life prompt builder** | `src-tauri/src/life_core.rs` |
 | **Domain prompts** | `workspace-*.md` files |
+| **Prompt history hook** | `src/features/composer/hooks/usePromptHistory.ts` |
+| **Image diff component** | `src/features/git/components/ImageDiffCard.tsx` |
+| **Global config editors** | `src-tauri/src/files.rs` |
+| **Codex args parser** | `src-tauri/src/codex_args.rs` |
+| **File editor hook** | `src/features/shared/hooks/useFileEditor.ts` |
+| **Workspace home** | `src/features/workspaces/components/WorkspaceHome.tsx` |
+| **Cover overrides** | `Obsidian/Indexes/media.covers.overrides.json` |
 
 ## RPC Quick Reference (daemon)
 
@@ -105,6 +112,8 @@ Full details: `docs/API_REFERENCE.md`
 | `get_git_status` / `get_git_diffs` / `commit_git` | Git operations |
 | `terminal_open` / `terminal_write` | PTY terminal sessions |
 | `prompts_list` / `prompts_create` | Prompt library CRUD |
+| `read_global_agents_md` / `write_global_agents_md` | Global AGENTS.md file |
+| `read_global_config_toml` / `write_global_config_toml` | Global config.toml file |
 | notifications: `app-server-event` | Streamed Codex events |
 | notifications: `terminal-output` | Terminal output stream |
 

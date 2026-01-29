@@ -4606,3 +4606,89 @@ See worker protocol in `browser-worker/src/index.ts` for exact params.
 ```json
 { "enabled": [{"name":"...","path":"..."}], "disabled": [] }
 ```
+
+---
+
+## Global Configuration Files (2026-01-28)
+
+### `read_global_agents_md`
+
+Read the global AGENTS.md file from `~/.codex/AGENTS.md`.
+
+**Request params**
+
+_None_
+
+**Response**
+
+```json
+{
+  "exists": true,
+  "content": "# My Agents\n...",
+  "truncated": false
+}
+```
+
+| Field | Type | Description |
+|------|------|-------------|
+| `exists` | `boolean` | Whether the file exists on disk |
+| `content` | `string` | File contents (empty if not exists) |
+| `truncated` | `boolean` | Whether content was truncated |
+
+---
+
+### `write_global_agents_md`
+
+Write the global AGENTS.md file to `~/.codex/AGENTS.md`.
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `content` | `string` | yes | File contents to write |
+
+**Response**
+
+_None (empty object on success)_
+
+---
+
+### `read_global_config_toml`
+
+Read the global Codex config.toml file from `~/.codex/config.toml`.
+
+**Request params**
+
+_None_
+
+**Response**
+
+```json
+{
+  "exists": true,
+  "content": "[features]\n...",
+  "truncated": false
+}
+```
+
+| Field | Type | Description |
+|------|------|-------------|
+| `exists` | `boolean` | Whether the file exists on disk |
+| `content` | `string` | File contents (empty if not exists) |
+| `truncated` | `boolean` | Whether content was truncated |
+
+---
+
+### `write_global_config_toml`
+
+Write the global Codex config.toml file to `~/.codex/config.toml`.
+
+**Request params**
+
+| Field | Type | Required | Description |
+|------|------|----------|-------------|
+| `content` | `string` | yes | File contents to write |
+
+**Response**
+
+_None (empty object on success)_

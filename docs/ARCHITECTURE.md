@@ -763,6 +763,184 @@ The summarizer uses a "commit message" pattern — extract durable facts, decisi
 
 ---
 
+## Prompt History System
+
+CodexMonitor includes a prompt history feature for recalling previous messages.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      React Frontend                                  │
+│  └── usePromptHistory (src/features/composer/hooks/usePromptHistory.ts)
+│      └── localStorage per workspace                                  │
+│      └── Arrow up/down navigation                                    │
+│      └── 200 prompt limit                                            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Storage
+
+- **Location**: `localStorage` (browser storage)
+- **Key pattern**: `codexmonitor.promptHistory.<workspaceId>`
+- **Default key**: `codexmonitor.promptHistory.default`
+- **Limit**: 200 prompts per workspace
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Arrow up/down | Navigate through history when composer is empty |
+| Per-workspace | Each workspace has isolated history |
+| Migration | Default history migrates to workspace-specific on first use |
+| Draft preservation | Current draft is preserved when navigating |
+| Deduplication | Consecutive duplicate prompts are not stored |
+
+### Usage
+
+Press Arrow Up when the composer is empty to recall the most recent prompt. Continue pressing to go further back in history. Press Arrow Down to go forward, or return to your draft.
+
+---
+
+## Image Diff System
+
+CodexMonitor supports visual side-by-side comparison of image files in git diffs.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│              Daemon / Backend (Rust)                                 │
+│  └── git.rs                                                          │
+│      └── Detects image files by extension                            │
+│      └── Base64 encodes old/new versions                             │
+│      └── Returns GitFileDiff with image data                         │
+└─────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              React Frontend                                          │
+│  └── ImageDiffCard (src/features/git/components/ImageDiffCard.tsx)   │
+│      └── Renders side-by-side image comparison                       │
+│      └── Shows file sizes                                            │
+│      └── Handles add/modify/delete states                            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Supported Formats
+
+| Extension | MIME Type |
+|-----------|-----------|
+| `.png` | `image/png` |
+| `.jpg`, `.jpeg` | `image/jpeg` |
+| `.gif` | `image/gif` |
+| `.webp` | `image/webp` |
+| `.svg` | `image/svg+xml` |
+| `.bmp` | `image/bmp` |
+| `.ico` | `image/x-icon` |
+
+### Display Modes
+
+| Status | Display |
+|--------|---------|
+| Modified (M) | Side-by-side: old on left, new on right |
+| Added (A) | Single pane: new image only |
+| Deleted (D) | Single pane: old image only |
+
+---
+
+## Global Configuration Editors
+
+CodexMonitor provides in-app editors for global Codex configuration files.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│              React Frontend                                          │
+│  └── Settings View                                                   │
+│      ├── Global AGENTS.md tab                                        │
+│      │   └── useGlobalAgentsMd hook                                  │
+│      └── Global config.toml tab                                      │
+│          └── useGlobalCodexConfigToml hook                           │
+└─────────────────────────────────────────────────────────────────────┘
+         │ (Tauri invoke / daemon RPC)
+         ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              Daemon / Backend (Rust)                                 │
+│  └── files.rs                                                        │
+│      ├── read_global_agents_md / write_global_agents_md              │
+│      └── read_global_config_toml / write_global_config_toml          │
+└─────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              Filesystem                                              │
+│  └── ~/.codex/                                                       │
+│      ├── AGENTS.md          (global agent instructions)              │
+│      └── config.toml        (Codex feature flags, MCP servers)       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Files Edited
+
+| File | Purpose |
+|------|---------|
+| `~/.codex/AGENTS.md` | Global agent instructions for all Codex sessions |
+| `~/.codex/config.toml` | Codex configuration (features, MCP servers, etc.) |
+
+### Shared Hook Pattern
+
+Both editors use the `useFileEditor` hook pattern:
+
+```typescript
+// src/features/shared/hooks/useFileEditor.ts
+type FileEditorResponse = {
+  exists: boolean;
+  content: string;
+  truncated: boolean;
+};
+```
+
+---
+
+## CODEX_HOME Per Workspace
+
+CodexMonitor supports workspace-specific Codex home directories for isolated configuration.
+
+### Architecture
+
+By default, Codex uses `~/.codex/` for all sessions. With per-workspace CODEX_HOME, each workspace can have its own:
+- Threads and sessions
+- Rules and approvals
+- Prompts
+- Configuration
+
+### Configuration
+
+Set `codex_home` in workspace settings to override the default:
+
+```json
+{
+  "id": "workspace-123",
+  "settings": {
+    "codex_home": "/path/to/custom/.codex"
+  }
+}
+```
+
+### Resolution Order
+
+1. Workspace-specific `settings.codex_home` (if set)
+2. Parent workspace `codex_home` (for worktrees)
+3. Default `~/.codex/`
+
+### Environment
+
+When spawning `codex app-server`, the `CODEX_HOME` environment variable is set to the resolved path.
+
+---
+
 ## Browser Control System
 
 CodexMonitor provides browser automation capabilities through a Playwright-based worker process.

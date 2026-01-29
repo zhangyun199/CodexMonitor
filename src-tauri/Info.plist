@@ -3,6 +3,6 @@
 <plist version="1.0">
   <dict>
     <key>NSMicrophoneUsageDescription</key>
-    <string>Allow access to the microphone for dictation.</string>
+    <string>CodexMonitor needs microphone access for voice input features.</string>
   </dict>
 </plist>

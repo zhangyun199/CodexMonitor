@@ -56,6 +56,7 @@ use tokio::process::Command;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tokio::task;
 use uuid::Uuid;
+use utils::{git_env_path, resolve_git_binary};
 
 use auto_flush::{
     build_snapshot, parse_memory_flush_result, run_memory_flush_summarizer, write_memory_flush,
@@ -1531,10 +1532,12 @@ impl DaemonState {
             return Err("Destination already exists".to_string());
         }
 
-        let status = Command::new("git")
+        let git_bin = resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
+        let status = Command::new(git_bin)
             .arg("clone")
             .arg(&source_url)
             .arg(&dest)
+            .env("PATH", git_env_path())
             .status()
             .await
             .map_err(|e| e.to_string())?;
@@ -1794,9 +1797,11 @@ fn write_global_file_inner(filename: &str, content: &str) -> Result<(), String> 
 }
 
 async fn run_git_command(repo_path: &Path, args: &[&str]) -> Result<String, String> {
-    let output = Command::new("git")
+    let git_bin = resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
+    let output = Command::new(git_bin)
         .args(args)
         .current_dir(repo_path)
+        .env("PATH", git_env_path())
         .output()
         .await
         .map_err(|e| format!("Failed to run git: {e}"))?;
@@ -1823,9 +1828,11 @@ fn is_missing_worktree_error(error: &str) -> bool {
 }
 
 async fn run_git_command_bytes(repo_path: &PathBuf, args: &[&str]) -> Result<Vec<u8>, String> {
-    let output = Command::new("git")
+    let git_bin = resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
+    let output = Command::new(git_bin)
         .args(args)
         .current_dir(repo_path)
+        .env("PATH", git_env_path())
         .output()
         .await
         .map_err(|e| format!("Failed to run git: {e}"))?;
@@ -1848,9 +1855,11 @@ async fn run_git_command_bytes(repo_path: &PathBuf, args: &[&str]) -> Result<Vec
 }
 
 async fn run_git_diff(repo_path: &PathBuf, args: &[&str]) -> Result<Vec<u8>, String> {
-    let output = Command::new("git")
+    let git_bin = resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
+    let output = Command::new(git_bin)
         .args(args)
         .current_dir(repo_path)
+        .env("PATH", git_env_path())
         .output()
         .await
         .map_err(|e| format!("Failed to run git: {e}"))?;
@@ -1880,6 +1889,17 @@ fn shell_path() -> String {
     env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string())
 }
 
+fn resolve_locale() -> String {
+    let candidate = env::var("LC_ALL")
+        .or_else(|_| env::var("LANG"))
+        .unwrap_or_else(|_| "en_US.UTF-8".to_string());
+    let lower = candidate.to_lowercase();
+    if lower.contains("utf-8") || lower.contains("utf8") {
+        return candidate;
+    }
+    "en_US.UTF-8".to_string()
+}
+
 fn spawn_terminal_reader(
     event_sink: DaemonEventSink,
     workspace_id: String,
@@ -1888,17 +1908,55 @@ fn spawn_terminal_reader(
 ) {
     std::thread::spawn(move || {
         let mut buffer = [0u8; 8192];
+        let mut pending: Vec<u8> = Vec::new();
         loop {
             match reader.read(&mut buffer) {
                 Ok(0) => break,
                 Ok(count) => {
-                    let data = String::from_utf8_lossy(&buffer[..count]).to_string();
-                    let payload = TerminalOutput {
-                        workspace_id: workspace_id.clone(),
-                        terminal_id: terminal_id.clone(),
-                        data,
-                    };
-                    event_sink.emit_terminal_output(payload);
+                    pending.extend_from_slice(&buffer[..count]);
+                    loop {
+                        match std::str::from_utf8(&pending) {
+                            Ok(decoded) => {
+                                if !decoded.is_empty() {
+                                    let payload = TerminalOutput {
+                                        workspace_id: workspace_id.clone(),
+                                        terminal_id: terminal_id.clone(),
+                                        data: decoded.to_string(),
+                                    };
+                                    event_sink.emit_terminal_output(payload);
+                                }
+                                pending.clear();
+                                break;
+                            }
+                            Err(error) => {
+                                let valid_up_to = error.valid_up_to();
+                                if valid_up_to == 0 {
+                                    if error.error_len().is_none() {
+                                        break;
+                                    }
+                                    let invalid_len = error.error_len().unwrap_or(1);
+                                    pending.drain(..invalid_len.min(pending.len()));
+                                    continue;
+                                }
+                                let chunk =
+                                    String::from_utf8_lossy(&pending[..valid_up_to]).to_string();
+                                if !chunk.is_empty() {
+                                    let payload = TerminalOutput {
+                                        workspace_id: workspace_id.clone(),
+                                        terminal_id: terminal_id.clone(),
+                                        data: chunk,
+                                    };
+                                    event_sink.emit_terminal_output(payload);
+                                }
+                                pending.drain(..valid_up_to);
+                                if error.error_len().is_none() {
+                                    break;
+                                }
+                                let invalid_len = error.error_len().unwrap_or(1);
+                                pending.drain(..invalid_len.min(pending.len()));
+                            }
+                        }
+                    }
                 }
                 Err(_) => break,
             }
@@ -2710,9 +2768,11 @@ impl DaemonState {
             return Err("No changes to apply.".to_string());
         }
 
-        let mut child = Command::new("git")
+        let git_bin = resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
+        let mut child = Command::new(git_bin)
             .args(["apply", "--3way", "--whitespace=nowarn", "-"])
             .current_dir(&parent_root)
+            .env("PATH", git_env_path())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -2805,6 +2865,10 @@ impl DaemonState {
         cmd.cwd(cwd);
         cmd.arg("-i");
         cmd.env("TERM", "xterm-256color");
+        let locale = resolve_locale();
+        cmd.env("LANG", &locale);
+        cmd.env("LC_ALL", &locale);
+        cmd.env("LC_CTYPE", &locale);
 
         let child = pair
             .slave
@@ -4127,9 +4191,11 @@ Changes:\n{diff}"
 }
 
 async fn git_branch_exists(repo_path: &PathBuf, branch: &str) -> Result<bool, String> {
-    let status = Command::new("git")
+    let git_bin = resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
+    let status = Command::new(git_bin)
         .args(["show-ref", "--verify", &format!("refs/heads/{branch}")])
         .current_dir(repo_path)
+        .env("PATH", git_env_path())
         .status()
         .await
         .map_err(|e| format!("Failed to run git: {e}"))?;
@@ -4137,9 +4203,11 @@ async fn git_branch_exists(repo_path: &PathBuf, branch: &str) -> Result<bool, St
 }
 
 async fn git_remote_exists(repo_path: &PathBuf, remote: &str) -> Result<bool, String> {
-    let status = Command::new("git")
+    let git_bin = resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
+    let status = Command::new(git_bin)
         .args(["remote", "get-url", remote])
         .current_dir(repo_path)
+        .env("PATH", git_env_path())
         .status()
         .await
         .map_err(|e| format!("Failed to run git: {e}"))?;
@@ -4151,7 +4219,8 @@ async fn git_remote_branch_exists_live(
     remote: &str,
     branch: &str,
 ) -> Result<bool, String> {
-    let output = Command::new("git")
+    let git_bin = resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
+    let output = Command::new(git_bin)
         .args([
             "ls-remote",
             "--heads",
@@ -4159,6 +4228,7 @@ async fn git_remote_branch_exists_live(
             &format!("refs/heads/{branch}"),
         ])
         .current_dir(repo_path)
+        .env("PATH", git_env_path())
         .output()
         .await
         .map_err(|e| format!("Failed to run git: {e}"))?;
@@ -4185,13 +4255,15 @@ async fn git_remote_branch_exists(
     remote: &str,
     branch: &str,
 ) -> Result<bool, String> {
-    let status = Command::new("git")
+    let git_bin = resolve_git_binary().map_err(|e| format!("Failed to run git: {e}"))?;
+    let status = Command::new(git_bin)
         .args([
             "show-ref",
             "--verify",
             &format!("refs/remotes/{remote}/{branch}"),
         ])
         .current_dir(repo_path)
+        .env("PATH", git_env_path())
         .status()
         .await
         .map_err(|e| format!("Failed to run git: {e}"))?;

@@ -35,6 +35,14 @@ import type {
   ReviewTarget,
 } from "../types";
 
+function isMissingTauriInvokeError(error: unknown) {
+  return (
+    error instanceof TypeError &&
+    (error.message.includes("reading 'invoke'") ||
+      error.message.includes("reading \"invoke\""))
+  );
+}
+
 export type TextFileResponse = {
   exists: boolean;
   content: string;
@@ -66,7 +74,15 @@ export async function pickImageFiles(): Promise<string[]> {
 }
 
 export async function listWorkspaces(): Promise<WorkspaceInfo[]> {
-  return invoke<WorkspaceInfo[]>("list_workspaces");
+  try {
+    return await invoke<WorkspaceInfo[]>("list_workspaces");
+  } catch (error) {
+    if (isMissingTauriInvokeError(error)) {
+      console.warn("Tauri invoke bridge unavailable; returning empty workspaces list.");
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function listDomains(): Promise<Domain[]> {

@@ -227,6 +227,10 @@ Conventions:
 
 - [FinanceDashboard](#financedashboard)
 
+- [TextFileResponse](#textfileresponse)
+
+- [CoverOverrides](#coveroverrides)
+
 
 ---
 
@@ -5143,5 +5147,83 @@ pub struct FinanceDashboard {
     pub calendar_view: Vec<BillCalendarDay>,
 }
 ```
+
+---
+
+## TextFileResponse
+
+**Used in:** Desktop ✅, Daemon ✅
+
+Response type for global configuration file read operations.
+
+**Definition (wire shape)**
+
+| Field | Type | Optional | Description |
+|---|---|---|---|
+| `exists` | `boolean` | no | Whether the file exists on disk |
+| `content` | `string` | no | File contents (empty if not exists) |
+| `truncated` | `boolean` | no | Whether content was truncated |
+
+
+**TypeScript**
+
+```ts
+export type TextFileResponse = {
+  exists: boolean;
+  content: string;
+  truncated: boolean;
+};
+```
+
+**Rust**
+
+```rust
+pub(crate) struct TextFileResponse {
+    pub exists: bool,
+    pub content: String,
+    pub truncated: bool,
+}
+```
+
+**Notes**
+
+- Used by `read_global_agents_md` and `read_global_config_toml` RPC methods.
+- `content` is empty string when `exists` is false.
+- `truncated` is reserved for future large file handling.
+
+---
+
+## CoverOverrides
+
+**Used in:** Desktop ✅, Daemon ✅
+
+Manual cover image overrides for Media and YouTube dashboards.
+
+**Definition (wire shape)**
+
+A JSON object mapping entity IDs to cover image URLs.
+
+```json
+{
+  "media-id-123": "https://example.com/custom-cover.jpg",
+  "youtube-idea-456": "/local/path/to/cover.png"
+}
+```
+
+**TypeScript**
+
+```ts
+export type CoverOverrides = Record<string, string>;
+```
+
+**File Location**
+
+`Obsidian/Indexes/media.covers.overrides.json`
+
+**Notes**
+
+- Keys are entity IDs (media or YouTube idea IDs).
+- Values are URLs (http/https) or local file paths.
+- Overrides take precedence over API-fetched covers.
 
 ---

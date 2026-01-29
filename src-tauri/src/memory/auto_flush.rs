@@ -1,6 +1,7 @@
 use crate::backend::app_server::WorkspaceSession;
 use crate::memory::MemoryService;
 use crate::types::AutoMemorySettings;
+use crate::utils::{git_env_path, resolve_git_binary};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -224,11 +225,16 @@ fn extract_item_text(item: &Value) -> String {
 
 async fn collect_git_status(path: &str) -> String {
     let mut output = String::new();
-    let status = tokio::process::Command::new("git")
+    let git_bin = match resolve_git_binary() {
+        Ok(path) => path,
+        Err(_) => return output,
+    };
+    let status = tokio::process::Command::new(git_bin.clone())
         .arg("-C")
         .arg(path)
         .arg("status")
         .arg("-sb")
+        .env("PATH", git_env_path())
         .output()
         .await;
     if let Ok(status) = status {
@@ -237,11 +243,12 @@ async fn collect_git_status(path: &str) -> String {
         }
     }
 
-    let diff = tokio::process::Command::new("git")
+    let diff = tokio::process::Command::new(git_bin)
         .arg("-C")
         .arg(path)
         .arg("diff")
         .arg("--stat")
+        .env("PATH", git_env_path())
         .output()
         .await;
     if let Ok(diff) = diff {

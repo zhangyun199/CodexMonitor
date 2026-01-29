@@ -575,3 +575,199 @@ Skills enabled/disabled state is resolved from config using:
 1. If `config.enabled` is non-empty, use that list
 2. Else if `config.disabled` is non-empty, enable all except those
 3. Else enable all skills by default
+
+---
+
+## Prompt History (2026-01-28)
+
+- **Path**: `src/features/composer/hooks/usePromptHistory.ts`
+- Integrated into the Composer component
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Arrow up/down navigation | Recall previous prompts when composer is empty |
+| Per-workspace storage | Each workspace has isolated history |
+| 200 prompt limit | Oldest prompts are dropped when limit reached |
+| Draft preservation | Current draft is saved when navigating history |
+| Auto-migration | Default history migrates to workspace-specific key |
+
+### Hook API
+
+```typescript
+const {
+  handleHistoryKeyDown,    // Attach to textarea onKeyDown
+  handleHistoryTextChange, // Call when text changes (resets navigation)
+  recordHistory,           // Call when message is sent
+  resetHistoryNavigation,  // Reset navigation state
+} = usePromptHistory({
+  historyKey: workspace?.id,  // null uses "default" key
+  text,
+  hasAttachments,
+  disabled,
+  isAutocompleteOpen,
+  textareaRef,
+  setText,
+  setSelectionStart,
+});
+```
+
+### Storage Keys
+
+- **Pattern**: `codexmonitor.promptHistory.<key>`
+- **Default**: `codexmonitor.promptHistory.default`
+- **Per-workspace**: `codexmonitor.promptHistory.<workspaceId>`
+
+---
+
+## Image Diff Card (2026-01-28)
+
+- **Path**: `src/features/git/components/ImageDiffCard.tsx`
+- Renders in the git diff viewer for image files
+
+### Props
+
+```typescript
+type ImageDiffCardProps = {
+  path: string;              // File path
+  status: string;            // Git status (A/M/D)
+  oldImageData?: string;     // Base64 encoded old image
+  newImageData?: string;     // Base64 encoded new image
+  oldImageMime?: string;     // MIME type override
+  newImageMime?: string;     // MIME type override
+  isSelected: boolean;       // Highlight state
+};
+```
+
+### Display Modes
+
+| Status | Layout |
+|--------|--------|
+| Modified | Side-by-side comparison |
+| Added | Single pane (new image) |
+| Deleted | Single pane (old image) |
+
+### Supported Formats
+
+PNG, JPG, JPEG, GIF, WebP, SVG, BMP, ICO
+
+---
+
+## Settings View - Global Config Tabs (2026-01-28)
+
+### Global AGENTS.md Editor
+
+- **Hook**: `src/features/settings/hooks/useGlobalAgentsMd.ts`
+- **File**: `~/.codex/AGENTS.md`
+- Edit global agent instructions that apply to all Codex sessions
+
+### Global config.toml Editor
+
+- **Hook**: `src/features/settings/hooks/useGlobalCodexConfigToml.ts`
+- **File**: `~/.codex/config.toml`
+- Edit Codex configuration (feature flags, MCP servers, etc.)
+
+### Shared File Editor Pattern
+
+Both use `useFileEditor` from `src/features/shared/hooks/useFileEditor.ts`:
+
+```typescript
+const {
+  content,      // Current editor content
+  exists,       // Whether file exists on disk
+  truncated,    // Whether content was truncated
+  isLoading,    // Loading state
+  isSaving,     // Saving state
+  isDirty,      // Whether content differs from saved
+  error,        // Error message if any
+  setContent,   // Update content
+  refresh,      // Reload from disk
+  save,         // Save to disk
+} = useFileEditor({ key, read, write, readErrorTitle, writeErrorTitle });
+```
+
+---
+
+## Sidebar Search (2026-01-28)
+
+- **Location**: Workspace sidebar
+- Filter workspaces by name using a search input
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Real-time filtering | Workspaces filter as you type |
+| Case-insensitive | Search matches regardless of case |
+| Preserves groups | Filtered view maintains group structure |
+
+---
+
+## WorkspaceHome Component (2026-01-28)
+
+- **Path**: `src/features/workspaces/components/WorkspaceHome.tsx`
+- Displays recent threads when no thread is selected
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| Recent threads | Shows up to 8 most recent threads |
+| Quick access | Click to select and resume thread |
+| Relative time | Shows time since last update |
+
+### Props
+
+```typescript
+type WorkspaceHomeProps = {
+  workspace: WorkspaceInfo;
+  threads: ThreadSummary[];
+  onSelectThread: (threadId: string) => void;
+};
+```
+
+---
+
+## Domain Accent Colors (2026-01-28)
+
+Life workspace domains now have consistent accent colors via CSS variables:
+
+```css
+/* Domain accent colors */
+.domain-delivery { --domain-accent: var(--blue-500); }
+.domain-nutrition { --domain-accent: var(--green-500); }
+.domain-exercise { --domain-accent: var(--orange-500); }
+.domain-finance { --domain-accent: var(--yellow-500); }
+.domain-youtube { --domain-accent: var(--red-500); }
+.domain-media { --domain-accent: var(--purple-500); }
+```
+
+### Usage
+
+Components within a domain context can use `var(--domain-accent)` for consistent theming.
+
+---
+
+## Manual Cover Overrides (2026-01-28)
+
+Media and YouTube dashboards support manual cover image overrides.
+
+### Override File
+
+- **Path**: `Obsidian/Indexes/media.covers.overrides.json`
+
+### Format
+
+```json
+{
+  "media-id-123": "https://example.com/custom-cover.jpg",
+  "youtube-idea-456": "/local/path/to/cover.png"
+}
+```
+
+### Resolution Order
+
+1. Manual override from `media.covers.overrides.json`
+2. API-fetched cover (TMDB, IGDB)
+3. Fallback placeholder

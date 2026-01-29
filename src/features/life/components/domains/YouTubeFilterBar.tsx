@@ -32,12 +32,12 @@ export function YouTubeFilterBar({ filters, onChange }: YouTubeFilterBarProps) {
   return (
     <div className="youtube-filter-bar">
       <div className="youtube-filter-row">
-        <div className="youtube-filter-group">
+        <div className="life-segment-control">
           {TIERS.map((tier) => (
             <button
               key={tier}
               type="button"
-              className={`youtube-pill ${filters.tier === tier ? "is-active" : ""}`}
+              className={`life-segment-button ${filters.tier === tier ? "is-active" : ""}`}
               onClick={() => onChange({ tier })}
             >
               {tier === "all" ? "All" : tier}
@@ -76,17 +76,17 @@ export function YouTubeFilterBar({ filters, onChange }: YouTubeFilterBarProps) {
             ))}
           </select>
 
-          <div className="youtube-view-toggle">
+          <div className="life-segment-control">
             <button
               type="button"
-              className={`youtube-pill ${filters.viewMode === "grid" ? "is-active" : ""}`}
+              className={`life-segment-button ${filters.viewMode === "grid" ? "is-active" : ""}`}
               onClick={() => onChange({ viewMode: "grid" })}
             >
               Grid
             </button>
             <button
               type="button"
-              className={`youtube-pill ${filters.viewMode === "list" ? "is-active" : ""}`}
+              className={`life-segment-button ${filters.viewMode === "list" ? "is-active" : ""}`}
               onClick={() => onChange({ viewMode: "list" })}
             >
               List

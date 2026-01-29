@@ -1,6 +1,5 @@
 import type { Bill, LifeTimeRange } from "../../types";
 import { useFinanceDashboard } from "../../hooks/useFinanceDashboard";
-import { StatCard } from "../shared/StatCard";
 import { TimeRangeSelector } from "../shared/TimeRangeSelector";
 
 type FinanceDashboardProps = {
@@ -23,6 +22,7 @@ export function FinanceDashboard({
   const bills = dashboard?.bills ?? [];
   const categories = dashboard?.byCategory ?? {};
   const statusMessage = dashboard?.statusMessage;
+  const dueSoonCount = bills.filter((bill) => isDueSoon(bill.nextDueDate)).length;
 
   return (
     <div className="life-dashboard life-finance-dashboard">
@@ -53,20 +53,29 @@ export function FinanceDashboard({
 
       {dashboard ? (
         <>
-          <div className="life-stat-grid">
-            <StatCard
-              label="Monthly Total"
-              value={stats ? formatCurrency(stats.monthlyTotal) : "--"}
-            />
-            <StatCard
-              label="Due Soon"
-              value={stats ? String(stats.dueSoonCount) : "--"}
-            />
-            <StatCard
-              label="Auto-Pay"
-              value={stats ? String(stats.autoPayCount) : "--"}
-            />
-          </div>
+          <section className="life-card">
+            <div className="life-section-title">Monthly Summary</div>
+            <div className="finance-summary-grid">
+              <div className="finance-summary-item">
+                <div className="finance-summary-label">Total Due</div>
+                <div className="finance-summary-value">
+                  {stats ? formatCurrency(stats.monthlyTotal) : "--"}
+                </div>
+              </div>
+              <div className="finance-summary-item">
+                <div className="finance-summary-label">Due Soon</div>
+                <div className="finance-summary-value">
+                  {stats ? String(dueSoonCount) : "--"}
+                </div>
+              </div>
+              <div className="finance-summary-item">
+                <div className="finance-summary-label">Auto-Pay</div>
+                <div className="finance-summary-value">
+                  {stats ? String(stats.autoPayCount) : "--"}
+                </div>
+              </div>
+            </div>
+          </section>
 
           {statusMessage ? (
             <div className="life-dashboard-status life-status-warning">
@@ -88,7 +97,7 @@ export function FinanceDashboard({
           </section>
 
           <section className="life-section">
-            <div className="life-section-title">By Category</div>
+            <div className="life-section-title">Spending by Category</div>
             {Object.keys(categories).length ? (
               <CategoryBars categories={categories} />
             ) : (
@@ -104,14 +113,18 @@ export function FinanceDashboard({
 function BillRow({ bill }: { bill: Bill }) {
   const dueDate = formatShortDate(bill.nextDueDate);
   const dueSoon = isDueSoon(bill.nextDueDate);
+  const daysRemaining = daysUntil(bill.nextDueDate);
   return (
-    <div className={`life-list-item${dueSoon ? " is-due-soon" : ""}`}>
-      <div className="life-list-title">
-        {dueDate} {bill.autoPay ? "🔄" : "•"} {bill.name}
-        {dueSoon ? <span className="life-pill">Due soon</span> : null}
-      </div>
-      <div className="life-list-meta">
-        {formatCurrency(bill.amount)} · {bill.frequency}
+    <div className="finance-bill-row">
+      <span className={`finance-bill-dot${dueSoon ? " is-due-soon" : ""}`} />
+      <div>
+        <div className="life-list-title">
+          {dueDate} {bill.autoPay ? "🔄" : "•"} {bill.name}
+        </div>
+        <div className="finance-bill-meta">
+          {formatCurrency(bill.amount)} · {bill.frequency}
+          {daysRemaining !== null ? ` · ${daysRemaining}d` : ""}
+        </div>
       </div>
     </div>
   );
@@ -159,4 +172,12 @@ function isDueSoon(value: string) {
   const diff = date.getTime() - now.getTime();
   const days = diff / (1000 * 60 * 60 * 24);
   return days >= 0 && days <= 7;
+}
+
+function daysUntil(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const now = new Date();
+  const diff = date.getTime() - now.getTime();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }

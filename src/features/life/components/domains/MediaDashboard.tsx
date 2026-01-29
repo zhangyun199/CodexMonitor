@@ -69,7 +69,7 @@ export function MediaDashboard({ workspaceId }: MediaDashboardProps) {
           <button
             type="button"
             className="ghost life-refresh-button"
-            onClick={() => void handleEnrich()}
+            onClick={() => void handleEnrich(true)}
             disabled={loading}
           >
             Fetch Covers
@@ -77,7 +77,7 @@ export function MediaDashboard({ workspaceId }: MediaDashboardProps) {
           <button
             type="button"
             className="ghost life-refresh-button"
-            onClick={() => void handleEnrich()}
+            onClick={() => void handleEnrich(false)}
             disabled={loading}
           >
             Retry Missing
@@ -120,10 +120,10 @@ export function MediaDashboard({ workspaceId }: MediaDashboardProps) {
     </div>
   );
 
-  async function handleEnrich() {
+  async function handleEnrich(force: boolean) {
     if (!workspaceId) return;
     try {
-      await enrichMediaCovers(workspaceId);
+      await enrichMediaCovers(workspaceId, force);
       await refresh();
     } catch (err) {
       console.error(err);

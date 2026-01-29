@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import type { LifeTimeRange, MealEntry } from "../../types";
 import { NUTRITION_GOALS } from "../../types";
 import { useNutritionDashboard } from "../../hooks/useNutritionDashboard";
-import { StatCard } from "../shared/StatCard";
 import { TimeRangeSelector } from "../shared/TimeRangeSelector";
 
 const MEAL_EMOJI: Record<MealEntry["mealType"], string> = {
@@ -31,12 +30,42 @@ export function NutritionDashboard({
   const stats = dashboard?.stats;
   const meals = dashboard?.meals ?? [];
   const trend = dashboard?.weeklyTrend;
+  const mealTitle = range === "today" ? "Today's Meals" : "Meals";
 
+  const caloriesValue = stats?.calories ?? 0;
   const calories = stats ? stats.calories.toFixed(0) : "--";
-  const protein = stats ? `${stats.protein.toFixed(0)}g` : "--";
-  const carbs = stats ? `${stats.carbs.toFixed(0)}g` : "--";
-  const fat = stats ? `${stats.fat.toFixed(0)}g` : "--";
-  const fiber = stats?.fiber ? `${stats.fiber.toFixed(0)}g` : "--";
+  const remaining = stats
+    ? Math.max(0, NUTRITION_GOALS.calories - stats.calories)
+    : 0;
+  const macroRows = useMemo(
+    () => [
+      {
+        label: "Protein",
+        value: stats?.protein ?? 0,
+        goal: NUTRITION_GOALS.protein,
+        className: "nutrition-macro-fill--protein",
+      },
+      {
+        label: "Carbs",
+        value: stats?.carbs ?? 0,
+        goal: NUTRITION_GOALS.carbs,
+        className: "nutrition-macro-fill--carbs",
+      },
+      {
+        label: "Fat",
+        value: stats?.fat ?? 0,
+        goal: NUTRITION_GOALS.fat,
+        className: "nutrition-macro-fill--fat",
+      },
+      {
+        label: "Fiber",
+        value: stats?.fiber ?? 0,
+        goal: NUTRITION_GOALS.fiber ?? 35,
+        className: "nutrition-macro-fill--fiber",
+      },
+    ],
+    [stats],
+  );
 
   const trendRows = useMemo(() => {
     if (!trend) return [];
@@ -81,36 +110,50 @@ export function NutritionDashboard({
 
       {dashboard ? (
         <>
-          <div className="life-stat-grid">
-            <StatCard
-              label="Calories"
-              value={calories}
-              subLabel={`goal ${NUTRITION_GOALS.calories}`}
-            />
-            <StatCard
-              label="Protein"
-              value={protein}
-              subLabel={`goal ${NUTRITION_GOALS.protein}g`}
-            />
-            <StatCard
-              label="Carbs"
-              value={carbs}
-              subLabel={`goal ${NUTRITION_GOALS.carbs}g`}
-            />
-            <StatCard
-              label="Fat"
-              value={fat}
-              subLabel={`goal ${NUTRITION_GOALS.fat}g`}
-            />
-            <StatCard label="Fiber" value={fiber} />
-          </div>
+          <section className="life-card">
+            <div className="nutrition-hero">
+              <div>
+                <div className="nutrition-hero-value">{calories}</div>
+                <div className="nutrition-hero-label">calories</div>
+                <div className="nutrition-hero-remaining">
+                  {remaining.toFixed(0)} remaining
+                </div>
+              </div>
+              <div className="life-stat-sub">
+                Target: {NUTRITION_GOALS.calories} cal
+                {caloriesValue > NUTRITION_GOALS.calories ? " · over goal" : ""}
+              </div>
+            </div>
+          </section>
+
+          <section className="life-card">
+            <div className="life-section-title">Macros</div>
+            {macroRows.map((macro) => {
+              const percent =
+                macro.goal > 0 ? Math.min(100, (macro.value / macro.goal) * 100) : 0;
+              return (
+                <div key={macro.label} className="nutrition-macro-bar">
+                  <div className="nutrition-macro-label">{macro.label}</div>
+                  <div className="nutrition-macro-track">
+                    <div
+                      className={`nutrition-macro-fill ${macro.className}`}
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                  <div className="nutrition-macro-value">
+                    {macro.value.toFixed(0)}g / {macro.goal}g
+                  </div>
+                </div>
+              );
+            })}
+          </section>
 
           <section className="life-section">
-            <div className="life-section-title">Meals</div>
+            <div className="life-section-title">{mealTitle}</div>
             {meals.length ? (
               <div className="life-list">
                 {meals.map((meal) => (
-                  <div key={meal.id} className="life-list-item">
+                  <div key={meal.id} className="life-card">
                     <div className="life-list-title">
                       {MEAL_EMOJI[meal.mealType]} {meal.description}
                     </div>

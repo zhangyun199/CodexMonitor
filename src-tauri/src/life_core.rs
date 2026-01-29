@@ -439,6 +439,7 @@ struct MediaFrontmatter {
     media_type: Option<String>,
     status: Option<String>,
     rating: Option<f64>,
+    year: Option<serde_yaml::Value>,
     created_at: Option<String>,
     completed_at: Option<String>,
     updated_at: Option<String>,
@@ -465,6 +466,13 @@ struct TmdbSearchResponse {
 
 #[derive(Debug, Deserialize)]
 struct TmdbResult {
+    id: Option<u64>,
+    title: Option<String>,
+    name: Option<String>,
+    original_title: Option<String>,
+    original_name: Option<String>,
+    release_date: Option<String>,
+    first_air_date: Option<String>,
     poster_path: Option<String>,
 }
 
@@ -1146,6 +1154,8 @@ pub async fn enrich_media_covers(
     tmdb_api_key: Option<&str>,
     igdb_client_id: Option<&str>,
     igdb_client_secret: Option<&str>,
+    exa_api_key: Option<&str>,
+    force_refresh: bool,
 ) -> Result<MediaCoverSummary, String> {
     let root = resolve_obsidian_root(workspace_path, obsidian_root);
     if !root.exists() {
@@ -1182,20 +1192,73 @@ pub async fn enrich_media_covers(
             skipped += 1;
             continue;
         }
-        if cache.contains_key(&record.item.id) || record.item.cover_url.is_some() {
+        if !force_refresh
+            && (cache.contains_key(&record.item.id) || record.item.cover_url.is_some())
+        {
             skipped += 1;
             continue;
         }
+        let title_variants = title_variants(&record.item.title);
+        let movie_hint = has_movie_hint(&record.item.title);
+        let season_hint = has_season_hint(&record.item.title);
         let maybe_cover = match record.item.media_type.as_str() {
-            "Film" => fetch_tmdb_cover(&record.item.title, "movie", tmdb_api_key).await?,
-            "TV" => fetch_tmdb_cover(&record.item.title, "tv", tmdb_api_key).await?,
+            "Film" => {
+                fetch_tmdb_cover(
+                    &record.item.title,
+                    &title_variants,
+                    "movie",
+                    tmdb_api_key,
+                    record.year_hint,
+                    exa_api_key,
+                )
+                .await?
+            }
+            "TV" => {
+                fetch_tmdb_cover(
+                    &record.item.title,
+                    &title_variants,
+                    "tv",
+                    tmdb_api_key,
+                    record.year_hint,
+                    exa_api_key,
+                )
+                .await?
+            }
             "Anime" => {
-                let cover = fetch_tmdb_cover(&record.item.title, "tv", tmdb_api_key).await?;
-                if cover.is_some() {
-                    cover
+                let mut cover = None;
+                if movie_hint {
+                    cover = fetch_tmdb_cover(
+                        &record.item.title,
+                        &title_variants,
+                        "movie",
+                        tmdb_api_key,
+                        record.year_hint,
+                        exa_api_key,
+                    )
+                    .await?;
                 } else {
-                    fetch_tmdb_cover(&record.item.title, "movie", tmdb_api_key).await?
+                    cover = fetch_tmdb_cover(
+                        &record.item.title,
+                        &title_variants,
+                        "tv",
+                        tmdb_api_key,
+                        record.year_hint,
+                        exa_api_key,
+                    )
+                    .await?;
+                    if cover.is_none() && !season_hint {
+                        cover = fetch_tmdb_cover(
+                            &record.item.title,
+                            &title_variants,
+                            "movie",
+                            tmdb_api_key,
+                            record.year_hint,
+                            exa_api_key,
+                        )
+                        .await?;
+                    }
                 }
+                cover
             }
             "Book" => fetch_open_library_cover(&record.item.title).await?,
             "Game" => fetch_igdb_cover(&record.item.title, igdb_client_id, &igdb_token).await?,
@@ -1213,6 +1276,14 @@ pub async fn enrich_media_covers(
                 },
             );
             found += 1;
+        } else if force_refresh {
+            if let Some(existing) = cache.get(&record.item.id) {
+                if !existing.cover_url.is_empty() {
+                    skipped += 1;
+                    continue;
+                }
+            }
+            failed += 1;
         } else {
             failed += 1;
         }
@@ -1472,6 +1543,7 @@ struct MediaRecord {
     item: MediaItem,
     url: Option<String>,
     youtube_id: Option<String>,
+    year_hint: Option<i32>,
 }
 
 fn load_media_items(root: &Path) -> Vec<MediaRecord> {
@@ -1527,6 +1599,11 @@ fn load_media_items(root: &Path) -> Vec<MediaRecord> {
             .clone()
             .or_else(|| Some(created_at.clone()))
             .unwrap_or_else(|| created_at.clone());
+        let year_hint = parsed
+            .year
+            .as_ref()
+            .and_then(parse_year_value)
+            .or_else(|| extract_year_from_title(&title));
         let item = MediaItem {
             id,
             title,
@@ -1542,6 +1619,7 @@ fn load_media_items(root: &Path) -> Vec<MediaRecord> {
             item,
             url: parsed.url,
             youtube_id: parsed.youtube_id,
+            year_hint,
         });
     }
 
@@ -2596,6 +2674,17 @@ fn title_variants(title: &str) -> Vec<String> {
     let no_trailing_series = strip_trailing_series_number(&no_parens_no_season);
     push_variant(&mut variants, no_trailing_series);
 
+    if base.to_lowercase().contains("sac") {
+        let expanded = base
+            .replace("SAC", "Stand Alone Complex")
+            .replace("Sac", "Stand Alone Complex")
+            .replace("sac", "Stand Alone Complex");
+        push_variant(&mut variants, expanded);
+    }
+
+    let no_bullet = base.replace('·', " ");
+    push_variant(&mut variants, no_bullet);
+
     variants
 }
 
@@ -2689,10 +2778,69 @@ fn is_roman_numeral(token: &str) -> bool {
             .all(|c| matches!(c, 'I' | 'V' | 'X' | 'L' | 'C' | 'D' | 'M'))
 }
 
+fn parse_year_value(value: &serde_yaml::Value) -> Option<i32> {
+    match value {
+        serde_yaml::Value::Number(num) => num.as_i64().map(|v| v as i32),
+        serde_yaml::Value::String(text) => extract_year_from_title(text),
+        _ => None,
+    }
+}
+
+fn extract_year_from_title(value: &str) -> Option<i32> {
+    let mut digits = String::new();
+    let mut in_parens = false;
+    for ch in value.chars() {
+        if ch == '(' {
+            in_parens = true;
+            digits.clear();
+            continue;
+        }
+        if ch == ')' {
+            if in_parens && digits.len() == 4 {
+                if let Ok(year) = digits.parse::<i32>() {
+                    if (1900..=2100).contains(&year) {
+                        return Some(year);
+                    }
+                }
+            }
+            in_parens = false;
+            digits.clear();
+            continue;
+        }
+        if in_parens && ch.is_ascii_digit() {
+            digits.push(ch);
+        }
+    }
+    None
+}
+
+fn has_movie_hint(title: &str) -> bool {
+    let lower = title.to_lowercase();
+    lower.contains("(movie)")
+        || lower.contains("movie")
+        || lower.contains("film")
+        || lower.contains("ova")
+}
+
+fn has_season_hint(title: &str) -> bool {
+    let lower = title.to_lowercase();
+    if lower.contains("season") {
+        return true;
+    }
+    if lower.contains("s1") || lower.contains("s2") || lower.contains("s3") || lower.contains("s4")
+    {
+        return true;
+    }
+    lower.contains("s1-") || lower.contains("s2-") || lower.contains("s3-")
+}
+
 async fn fetch_tmdb_cover(
     title: &str,
+    variants: &[String],
     media_type: &str,
     tmdb_api_key: Option<&str>,
+    year_hint: Option<i32>,
+    exa_api_key: Option<&str>,
 ) -> Result<Option<(String, String)>, String> {
     let Some(api_key) = tmdb_api_key else {
         return Ok(None);
@@ -2701,13 +2849,26 @@ async fn fetch_tmdb_cover(
         return Ok(None);
     }
     let base = format!("https://api.themoviedb.org/3/search/{media_type}");
-    for variant in title_variants(title) {
+    let client = Client::new();
+    let mut candidates: Vec<TmdbCandidate> = Vec::new();
+
+    for variant in variants {
         let mut url = Url::parse(&base).map_err(|err| err.to_string())?;
-        url.query_pairs_mut()
-            .append_pair("api_key", api_key)
-            .append_pair("query", &variant)
-            .append_pair("include_adult", "false");
-        let resp = Client::new()
+        {
+            let mut pairs = url.query_pairs_mut();
+            pairs
+                .append_pair("api_key", api_key)
+                .append_pair("query", variant)
+                .append_pair("include_adult", "false");
+            if let Some(year) = year_hint {
+                if media_type == "movie" {
+                    pairs.append_pair("year", &year.to_string());
+                } else if media_type == "tv" {
+                    pairs.append_pair("first_air_date_year", &year.to_string());
+                }
+            }
+        }
+        let resp = client
             .get(url)
             .send()
             .await
@@ -2716,15 +2877,264 @@ async fn fetch_tmdb_cover(
             continue;
         }
         let payload: TmdbSearchResponse = resp.json().await.map_err(|err| err.to_string())?;
-        if let Some(result) = payload
-            .results
-            .into_iter()
-            .find(|result| result.poster_path.is_some())
-        {
-            let poster_path = result.poster_path.unwrap();
-            let cover_url = format!("https://image.tmdb.org/t/p/w500{poster_path}");
-            return Ok(Some((cover_url, "tmdb".to_string())));
+        for result in payload.results {
+            let Some(poster_path) = result.poster_path.clone() else {
+                continue;
+            };
+            let title = result
+                .title
+                .clone()
+                .or_else(|| result.name.clone())
+                .unwrap_or_default();
+            let original = result
+                .original_title
+                .clone()
+                .or_else(|| result.original_name.clone())
+                .unwrap_or_default();
+            let date = result
+                .release_date
+                .clone()
+                .or_else(|| result.first_air_date.clone());
+            let year = date
+                .as_deref()
+                .and_then(|value| value.split('-').next())
+                .and_then(|value| value.parse::<i32>().ok());
+            let id = result.id.unwrap_or_default();
+            let score = score_tmdb_candidate(&title, &original, variants, year_hint, year);
+            candidates.push(TmdbCandidate {
+                id,
+                title,
+                original_title: original,
+                year,
+                poster_path,
+                score,
+            });
         }
+    }
+
+    if candidates.is_empty() {
+        return Ok(None);
+    }
+
+    candidates.sort_by(|a, b| {
+        b.score
+            .cmp(&a.score)
+            .then_with(|| a.year.unwrap_or(9999).cmp(&b.year.unwrap_or(9999)))
+            .then_with(|| a.title.cmp(&b.title))
+    });
+
+    let top = &candidates[0];
+    let second_score = candidates
+        .get(1)
+        .map(|c| c.score)
+        .unwrap_or(top.score.saturating_sub(10));
+    let ambiguous = top.score <= 4 || (top.score - second_score).abs() <= 1;
+
+    if ambiguous {
+        if let Some(exa_key) = exa_api_key {
+            if let Some(result) =
+                fetch_exa_tmdb_cover(title, variants, media_type, api_key, exa_key).await?
+            {
+                return Ok(Some(result));
+            }
+        }
+    }
+
+    if top.score <= 2 && ambiguous {
+        return Ok(None);
+    }
+
+    let cover_url = format!("https://image.tmdb.org/t/p/w500{}", top.poster_path);
+    Ok(Some((cover_url, "tmdb".to_string())))
+}
+
+#[derive(Debug, Clone)]
+struct TmdbCandidate {
+    id: u64,
+    title: String,
+    original_title: String,
+    year: Option<i32>,
+    poster_path: String,
+    score: i32,
+}
+
+fn score_tmdb_candidate(
+    title: &str,
+    original: &str,
+    variants: &[String],
+    year_hint: Option<i32>,
+    candidate_year: Option<i32>,
+) -> i32 {
+    let mut score = 0i32;
+    let title_norm = normalize_title_for_match(title);
+    let original_norm = normalize_title_for_match(original);
+    for variant in variants {
+        let variant_norm = normalize_title_for_match(variant);
+        if variant_norm.is_empty() {
+            continue;
+        }
+        if title_norm == variant_norm || original_norm == variant_norm {
+            score += 6;
+        } else if title_norm.contains(&variant_norm) || original_norm.contains(&variant_norm) {
+            score += 3;
+        } else if variant_norm.contains(&title_norm) || variant_norm.contains(&original_norm) {
+            score += 2;
+        }
+    }
+    let token_penalty = variants
+        .iter()
+        .map(|variant| token_mismatch_penalty(title, variant))
+        .min()
+        .unwrap_or(0);
+    score -= token_penalty;
+    if let Some(year) = year_hint {
+        if let Some(candidate) = candidate_year {
+            let diff = (candidate - year).abs();
+            if diff == 0 {
+                score += 5;
+            } else if diff <= 1 {
+                score += 2;
+            } else {
+                score -= diff.min(5);
+            }
+        }
+    }
+    score
+}
+
+fn normalize_title_for_match(value: &str) -> String {
+    value
+        .to_lowercase()
+        .replace('·', "")
+        .replace(':', "")
+        .replace('-', " ")
+        .replace('_', " ")
+        .replace('’', "")
+        .replace('\'', "")
+        .replace('.', "")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn token_mismatch_penalty(candidate: &str, variant: &str) -> i32 {
+    let candidate_tokens = normalize_tokens(candidate);
+    let variant_tokens = normalize_tokens(variant);
+    if variant_tokens.is_empty() || candidate_tokens.is_empty() {
+        return 0;
+    }
+    let extra = candidate_tokens
+        .iter()
+        .filter(|token| !variant_tokens.contains(*token))
+        .count() as i32;
+    let missing = variant_tokens
+        .iter()
+        .filter(|token| !candidate_tokens.contains(*token))
+        .count() as i32;
+    (extra + missing).min(6)
+}
+
+fn normalize_tokens(value: &str) -> Vec<String> {
+    let stop_words = [
+        "the", "a", "an", "of", "and", "to", "in", "for", "on", "part", "season",
+    ];
+    normalize_title_for_match(value)
+        .split_whitespace()
+        .map(|token| token.to_string())
+        .filter(|token| !stop_words.contains(&token.as_str()))
+        .collect()
+}
+
+async fn fetch_exa_tmdb_cover(
+    title: &str,
+    variants: &[String],
+    media_type: &str,
+    tmdb_api_key: &str,
+    exa_api_key: &str,
+) -> Result<Option<(String, String)>, String> {
+    if exa_api_key.trim().is_empty() {
+        return Ok(None);
+    }
+    let query = format!(
+        "site:themoviedb.org {} {} poster",
+        title,
+        variants.get(0).cloned().unwrap_or_default()
+    );
+    let payload = serde_json::json!({
+        "query": query,
+        "num_results": 5,
+        "type": "neural",
+    });
+    let resp = Client::new()
+        .post("https://api.exa.ai/search")
+        .header("Authorization", format!("Bearer {exa_api_key}"))
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|err| err.to_string())?;
+    if !resp.status().is_success() {
+        return Ok(None);
+    }
+    let data: ExaSearchResponse = resp.json().await.map_err(|err| err.to_string())?;
+    for result in data.results {
+        if let Some((kind, id)) = parse_tmdb_id_from_url(&result.url) {
+            if kind != media_type && media_type == "movie" && kind == "tv" {
+                // allow cross lookup for anime if needed
+            }
+            if let Some(cover) = fetch_tmdb_cover_by_id(tmdb_api_key, &kind, id).await? {
+                return Ok(Some((cover, "tmdb-exa".to_string())));
+            }
+        }
+    }
+    Ok(None)
+}
+
+#[derive(Debug, Deserialize)]
+struct ExaSearchResponse {
+    results: Vec<ExaSearchResult>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ExaSearchResult {
+    url: String,
+}
+
+fn parse_tmdb_id_from_url(url: &str) -> Option<(String, u64)> {
+    let lower = url.to_lowercase();
+    if let Some(index) = lower.find("themoviedb.org/") {
+        let tail = &lower[index + "themoviedb.org/".len()..];
+        let mut parts = tail.split('/');
+        let kind = parts.next()?.to_string();
+        let id_part = parts.next().unwrap_or("");
+        let id_str = id_part.split('-').next().unwrap_or("");
+        if let Ok(id) = id_str.parse::<u64>() {
+            if kind == "movie" || kind == "tv" {
+                return Some((kind, id));
+            }
+        }
+    }
+    None
+}
+
+async fn fetch_tmdb_cover_by_id(
+    tmdb_api_key: &str,
+    media_type: &str,
+    id: u64,
+) -> Result<Option<String>, String> {
+    let url = format!("https://api.themoviedb.org/3/{media_type}/{id}?api_key={tmdb_api_key}");
+    let resp = Client::new()
+        .get(url)
+        .send()
+        .await
+        .map_err(|err| err.to_string())?;
+    if !resp.status().is_success() {
+        return Ok(None);
+    }
+    let payload: TmdbResult = resp.json().await.map_err(|err| err.to_string())?;
+    if let Some(poster_path) = payload.poster_path {
+        return Ok(Some(format!(
+            "https://image.tmdb.org/t/p/w500{poster_path}"
+        )));
     }
     Ok(None)
 }

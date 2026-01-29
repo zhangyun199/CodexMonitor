@@ -125,6 +125,7 @@ export const NUTRITION_GOALS = {
   protein: 180,
   carbs: 150,
   fat: 80,
+  fiber: 35,
 };
 
 // -----------------------------

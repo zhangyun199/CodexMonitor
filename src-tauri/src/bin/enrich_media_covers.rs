@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<(), String> {
+    let force_refresh = std::env::args().any(|arg| arg == "--force");
     let obsidian_root = std::env::var("OBSIDIAN_ROOT")
         .ok()
         .filter(|value| !value.trim().is_empty())
@@ -36,6 +37,16 @@ async fn main() -> Result<(), String> {
         .and_then(|value| value.as_str())
         .filter(|value| !value.trim().is_empty())
         .map(|value| value.to_string());
+    let exa_api_key = settings_value
+        .get("exa_api_key")
+        .and_then(|value| value.as_str())
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| value.to_string())
+        .or_else(|| {
+            std::env::var("EXA_API_KEY")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+        });
 
     let summary = enrich_media_covers(
         &obsidian_root,
@@ -43,6 +54,8 @@ async fn main() -> Result<(), String> {
         tmdb_api_key.as_deref(),
         igdb_client_id.as_deref(),
         igdb_client_secret.as_deref(),
+        exa_api_key.as_deref(),
+        force_refresh,
     )
     .await?;
 

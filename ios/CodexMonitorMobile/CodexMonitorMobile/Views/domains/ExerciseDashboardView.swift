@@ -10,15 +10,7 @@ struct ExerciseDashboardView: View {
             VStack(spacing: 16) {
                 header
 
-                HStack(spacing: 12) {
-                    StatCardView(title: "Workouts", value: "\(store.exerciseDashboard?.stats.workoutCount ?? 0)")
-                    StatCardView(title: "Walking", value: miles(store.exerciseDashboard?.stats.walkingMiles))
-                }
-
-                HStack(spacing: 12) {
-                    StatCardView(title: "Active Days", value: "\(store.exerciseDashboard?.stats.activeDays ?? 0)")
-                    StatCardView(title: "Streak", value: streak(store.exerciseDashboard?.stats.currentStreak))
-                }
+                activityCard
 
                 HStack {
                     TimeRangePicker(selection: $timeRange)
@@ -42,17 +34,18 @@ struct ExerciseDashboardView: View {
 
                 if let entries = store.exerciseDashboard?.entries, !entries.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text(rangeTitle(timeRange))
+                        Text(activityTitle)
                             .font(.headline)
                         ForEach(entries) { entry in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(emoji(for: entry.type)) \(entry.description)")
-                                    .font(.subheadline)
-                                Text(entryMeta(entry))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                            GlassCardView {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(emoji(for: entry.type)) \(entry.description)")
+                                        .font(.subheadline)
+                                    Text(entryMeta(entry))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
-                            Divider()
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -61,31 +54,18 @@ struct ExerciseDashboardView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let breakdown = store.exerciseDashboard?.byType, !breakdown.isEmpty {
+                GlassCardView {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Activity Breakdown")
+                        Text("This Week")
                             .font(.headline)
-                        ForEach(breakdownRows(breakdown), id: \.type) { row in
-                            HStack {
-                                Text("\(emoji(for: row.type)) \(row.type)")
-                                    .frame(width: 100, alignment: .leading)
-                                GeometryReader { proxy in
-                                    Capsule()
-                                        .fill(Color.blue.opacity(0.6))
-                                        .frame(width: proxy.size.width * row.percent, height: 6)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                .frame(height: 8)
-                                Text("\(row.count)")
-                                    .frame(width: 40, alignment: .trailing)
+                        HStack(spacing: 6) {
+                            ForEach(activityDots) { dot in
+                                Circle()
+                                    .fill(dot.isActive ? LifeColors.exercise : Color.white.opacity(0.2))
+                                    .frame(width: 10, height: 10)
                             }
-                            .font(.caption)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text("No activity yet.")
-                        .foregroundStyle(.secondary)
                 }
             }
             .padding()
@@ -95,27 +75,64 @@ struct ExerciseDashboardView: View {
         }
     }
 
-    private func miles(_ value: Double?) -> String {
-        guard let value else { return "--" }
-        return String(format: "%.1f mi", value)
-    }
-
-    private func streak(_ value: Int?) -> String {
-        guard let value else { return "--" }
-        return "\(value) 🔥"
-    }
-
-    private func emoji(for type: String) -> String {
-        switch type.lowercased() {
-        case "walk":
-            return "🚶"
-        case "strength":
-            return "🏋️"
-        case "cardio":
-            return "🏃"
-        default:
-            return "✨"
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("🏋️ Exercise Dashboard")
+                .font(.headline)
+            if let meta = store.exerciseDashboard?.meta {
+                Text("\(meta.periodStart) → \(meta.periodEnd)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var activityCard: some View {
+        let totals = computeTotals()
+        let streak = store.exerciseDashboard?.stats.currentStreak ?? 0
+        return GlassCardView {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Activity")
+                        .font(.headline)
+                    Spacer()
+                    Text("🔥 \(streak) day streak")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                ActivityRow(label: "Move", value: "\(Int(totals.move)) / 500 cal", progress: totals.move / 500, color: LifeColors.move)
+                ActivityRow(label: "Exercise", value: "\(Int(totals.minutes)) / 30 min", progress: totals.minutes / 30, color: LifeColors.exercise)
+                ActivityRow(label: "Miles", value: String(format: "%.1f / 4.0 mi", totals.miles), progress: totals.miles / 4, color: LifeColors.stand)
+            }
+        }
+    }
+
+    private func computeTotals() -> (move: Double, minutes: Double, miles: Double) {
+        let entries = store.exerciseDashboard?.entries ?? []
+        let minutes = entries.reduce(0) { $0 + ($1.duration ?? 0) }
+        let miles = store.exerciseDashboard?.stats.walkingMiles ?? 0
+        let move = entries.reduce(0) { $0 + ($1.miles ?? 0) * 100 } + Double(store.exerciseDashboard?.stats.workoutCount ?? 0) * 150
+        let normalizedMinutes = minutes > 0 ? minutes : Double(store.exerciseDashboard?.stats.workoutCount ?? 0) * 30
+        return (move: move, minutes: normalizedMinutes, miles: miles)
+    }
+
+    private var activityDots: [ActivityDot] {
+        let entries = store.exerciseDashboard?.entries ?? []
+        let active = Set(entries.map { String($0.timestamp.prefix(10)) })
+        let today = Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return (0..<7).map { index in
+            let day = Calendar.current.date(byAdding: .day, value: index - 6, to: today) ?? today
+            let key = formatter.string(from: day)
+            return ActivityDot(id: UUID(), isActive: active.contains(key))
+        }
+    }
+
+    private var activityTitle: String {
+        timeRange == .today ? "Today's Activity" : "Activity"
     }
 
     private func entryMeta(_ entry: ExerciseEntry) -> String {
@@ -138,44 +155,42 @@ struct ExerciseDashboardView: View {
         return timestamp
     }
 
-    private func rangeTitle(_ range: LifeTimeRange) -> String {
-        switch range {
-        case .today:
-            return "Today"
-        case .week:
-            return "This Week"
-        case .month:
-            return "This Month"
-        case .lifetime:
-            return "All Time"
+    private func emoji(for type: String) -> String {
+        switch type.lowercased() {
+        case "walk":
+            return "🚶"
+        case "strength":
+            return "🏋️"
+        case "cardio":
+            return "🏃"
+        default:
+            return "✨"
         }
-    }
-
-    private func breakdownRows(_ breakdown: [String: Int]) -> [BreakdownRow] {
-        let rows = breakdown.sorted { $0.key < $1.key }
-        let maxValue = max(1, rows.map { $0.value }.max() ?? 1)
-        return rows.map { (type, count) in
-            BreakdownRow(type: type, count: count, percent: Double(count) / Double(maxValue))
-        }
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("🏋️ Exercise Dashboard")
-                .font(.headline)
-            if let meta = store.exerciseDashboard?.meta {
-                Text("\(meta.periodStart) → \(meta.periodEnd)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
-private struct BreakdownRow: Identifiable {
-    let id = UUID()
-    let type: String
-    let count: Int
-    let percent: Double
+private struct ActivityRow: View {
+    let label: String
+    let value: String
+    let progress: Double
+    let color: Color
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .frame(width: 80, alignment: .leading)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ProgressBarView(progress: progress, color: color, height: 8)
+            Text(value)
+                .frame(width: 110, alignment: .trailing)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct ActivityDot: Identifiable {
+    let id: UUID
+    let isActive: Bool
 }

@@ -14,12 +14,12 @@ const ranges: Array<{ id: LifeTimeRange; label: string }> = [
 
 export function TimeRangeSelector({ value, onChange }: TimeRangeSelectorProps) {
   return (
-    <div className="life-range-selector">
+    <div className="life-segment-control">
       {ranges.map((range) => (
         <button
           key={range.id}
           type="button"
-          className={`life-range-button${value === range.id ? " is-active" : ""}`}
+          className={`life-segment-button${value === range.id ? " is-active" : ""}`}
           onClick={() => onChange(range.id)}
         >
           {range.label}

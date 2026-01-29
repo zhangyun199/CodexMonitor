@@ -11,48 +11,9 @@ struct NutritionDashboardView: View {
             VStack(spacing: 16) {
                 header
 
-                HStack(spacing: 12) {
-                    StatCardView(
-                        title: "Calories",
-                        value: goalValue(
-                            store.nutritionDashboard?.stats.calories,
-                            goals.calories,
-                            suffix: ""
-                        )
-                    )
-                    StatCardView(
-                        title: "Protein",
-                        value: goalValue(
-                            store.nutritionDashboard?.stats.protein,
-                            goals.protein,
-                            suffix: "g"
-                        )
-                    )
-                }
+                heroCard
 
-                HStack(spacing: 12) {
-                    StatCardView(
-                        title: "Carbs",
-                        value: goalValue(
-                            store.nutritionDashboard?.stats.carbs,
-                            goals.carbs,
-                            suffix: "g"
-                        )
-                    )
-                    StatCardView(
-                        title: "Fat",
-                        value: goalValue(
-                            store.nutritionDashboard?.stats.fat,
-                            goals.fat,
-                            suffix: "g"
-                        )
-                    )
-                }
-
-                HStack(spacing: 12) {
-                    StatCardView(title: "Fiber", value: grams(store.nutritionDashboard?.stats.fiber))
-                    StatCardView(title: "Meals", value: count(store.nutritionDashboard?.stats.mealCount))
-                }
+                macroCard
 
                 HStack {
                     TimeRangePicker(selection: $timeRange)
@@ -76,17 +37,18 @@ struct NutritionDashboardView: View {
 
                 if let meals = store.nutritionDashboard?.meals, !meals.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Meals")
+                        Text(mealTitle)
                             .font(.headline)
                         ForEach(meals) { meal in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(emoji(for: meal.mealType)) \(meal.description)")
-                                    .font(.subheadline)
-                                Text(mealMeta(meal))
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                            GlassCardView {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(emoji(for: meal.mealType)) \(meal.description)")
+                                        .font(.subheadline)
+                                    Text(mealMeta(meal))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
-                            Divider()
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -96,30 +58,23 @@ struct NutritionDashboardView: View {
                 }
 
                 if let trend = store.nutritionDashboard?.weeklyTrend, !trend.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Weekly Trends")
-                            .font(.headline)
-                        ForEach(trendRows(trend), id: \.date) { row in
-                            HStack {
-                                Text(shortDate(row.date))
-                                    .frame(width: 50, alignment: .leading)
-                                GeometryReader { proxy in
-                                    Capsule()
-                                        .fill(Color.green.opacity(0.6))
-                                        .frame(width: proxy.size.width * row.percent, height: 6)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                    GlassCardView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Weekly Trends")
+                                .font(.headline)
+                            ForEach(trendRows(trend), id: \.date) { row in
+                                HStack {
+                                    Text(shortDate(row.date))
+                                        .frame(width: 50, alignment: .leading)
+                                    ProgressBarView(progress: row.percent, color: LifeColors.earnings, height: 6)
+                                    Text("\(Int(row.value)) cal")
+                                        .frame(width: 70, alignment: .trailing)
                                 }
-                                .frame(height: 8)
-                                Text("\(Int(row.value)) cal")
-                                    .frame(width: 70, alignment: .trailing)
+                                .font(.caption)
                             }
-                            .font(.caption)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text("No trends yet.")
-                        .foregroundStyle(.secondary)
                 }
             }
             .padding()
@@ -129,30 +84,68 @@ struct NutritionDashboardView: View {
         }
     }
 
-    private func grams(_ value: Double?) -> String {
-        guard let value else { return "--" }
-        return "\(Int(value))g"
-    }
-
-    private func shortDate(_ value: String) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        if let date = formatter.date(from: value) {
-            formatter.dateFormat = "MMM d"
-            return formatter.string(from: date)
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("🍽️ Nutrition Dashboard")
+                .font(.headline)
+            if let meta = store.nutritionDashboard?.meta {
+                Text("\(meta.periodStart) → \(meta.periodEnd)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
-        return value
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func goalValue(_ value: Double?, _ goal: Int, suffix: String) -> String {
-        guard let value else { return "--" }
-        let current = Int(value)
-        return "\(current)\(suffix) / \(goal)\(suffix)"
+    private var heroCard: some View {
+        let calories = store.nutritionDashboard?.stats.calories ?? 0
+        let remaining = max(0, Double(goals.calories) - calories)
+        return GlassCardView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("\(Int(calories))")
+                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                Text("calories")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text("\(Int(remaining)) remaining")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
-    private func count(_ value: Int?) -> String {
-        guard let value else { return "--" }
-        return "\(value)"
+    private var macroCard: some View {
+        let stats = store.nutritionDashboard?.stats
+        let rows: [MacroRow] = [
+            MacroRow(label: "Protein", value: stats?.protein ?? 0, goal: Double(goals.protein), color: LifeColors.protein),
+            MacroRow(label: "Carbs", value: stats?.carbs ?? 0, goal: Double(goals.carbs), color: LifeColors.carbs),
+            MacroRow(label: "Fat", value: stats?.fat ?? 0, goal: Double(goals.fat), color: LifeColors.fat),
+            MacroRow(label: "Fiber", value: stats?.fiber ?? 0, goal: Double(goals.fiber), color: LifeColors.fiber)
+        ]
+        return GlassCardView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Macros")
+                    .font(.headline)
+                ForEach(rows) { row in
+                    HStack {
+                        Text(row.label)
+                            .frame(width: 70, alignment: .leading)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        ProgressBarView(progress: row.progress, color: row.color, height: 8)
+                        Text("\(Int(row.value))g / \(Int(row.goal))g")
+                            .frame(width: 90, alignment: .trailing)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var mealTitle: String {
+        timeRange == .today ? "Today's Meals" : "Meals"
     }
 
     private func mealMeta(_ meal: MealEntry) -> String {
@@ -180,6 +173,16 @@ struct NutritionDashboardView: View {
         }
     }
 
+    private func shortDate(_ value: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        if let date = formatter.date(from: value) {
+            formatter.dateFormat = "MMM d"
+            return formatter.string(from: date)
+        }
+        return value
+    }
+
     private func emoji(for mealType: String) -> String {
         switch mealType.lowercased() {
         case "breakfast":
@@ -192,19 +195,6 @@ struct NutritionDashboardView: View {
             return "🍪"
         }
     }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("🍽️ Nutrition Dashboard")
-                .font(.headline)
-            if let meta = store.nutritionDashboard?.meta {
-                Text("\(meta.periodStart) → \(meta.periodEnd)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
 }
 
 private struct NutritionGoals {
@@ -212,6 +202,7 @@ private struct NutritionGoals {
     let protein = 180
     let carbs = 150
     let fat = 80
+    let fiber = 35
 }
 
 private struct TrendRow: Identifiable {
@@ -219,4 +210,17 @@ private struct TrendRow: Identifiable {
     let date: String
     let value: Double
     let percent: Double
+}
+
+private struct MacroRow: Identifiable {
+    let id = UUID()
+    let label: String
+    let value: Double
+    let goal: Double
+    let color: Color
+
+    var progress: Double {
+        guard goal > 0 else { return 0 }
+        return min(1, value / goal)
+    }
 }

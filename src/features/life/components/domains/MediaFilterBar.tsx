@@ -32,12 +32,12 @@ export function MediaFilterBar({ filters, onChange }: MediaFilterBarProps) {
   return (
     <div className="media-filter-bar">
       <div className="media-filter-row">
-        <div className="media-filter-group">
+        <div className="life-segment-control">
           {MEDIA_TYPES.map((type) => (
             <button
               key={type}
               type="button"
-              className={`media-pill ${filters.type === type ? "is-active" : ""}`}
+              className={`life-segment-button ${filters.type === type ? "is-active" : ""}`}
               onClick={() => onChange({ type })}
             >
               {type === "all" ? "All" : type}
@@ -47,12 +47,12 @@ export function MediaFilterBar({ filters, onChange }: MediaFilterBarProps) {
       </div>
 
       <div className="media-filter-row">
-        <div className="media-filter-group">
+        <div className="life-segment-control">
           {STATUS_OPTIONS.map((status) => (
             <button
               key={status}
               type="button"
-              className={`media-pill ${filters.status === status ? "is-active" : ""}`}
+              className={`life-segment-button ${filters.status === status ? "is-active" : ""}`}
               onClick={() => onChange({ status })}
             >
               {status === "all" ? "All" : status}
@@ -75,17 +75,17 @@ export function MediaFilterBar({ filters, onChange }: MediaFilterBarProps) {
             ))}
           </select>
 
-          <div className="media-view-toggle">
+          <div className="life-segment-control">
             <button
               type="button"
-              className={`media-pill ${filters.viewMode === "grid" ? "is-active" : ""}`}
+              className={`life-segment-button ${filters.viewMode === "grid" ? "is-active" : ""}`}
               onClick={() => onChange({ viewMode: "grid" })}
             >
               Grid
             </button>
             <button
               type="button"
-              className={`media-pill ${filters.viewMode === "list" ? "is-active" : ""}`}
+              className={`life-segment-button ${filters.viewMode === "list" ? "is-active" : ""}`}
               onClick={() => onChange({ viewMode: "list" })}
             >
               List

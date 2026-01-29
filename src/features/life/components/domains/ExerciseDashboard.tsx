@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import type { ExerciseEntry, LifeTimeRange } from "../../types";
 import { useExerciseDashboard } from "../../hooks/useExerciseDashboard";
-import { StatCard } from "../shared/StatCard";
 import { TimeRangeSelector } from "../shared/TimeRangeSelector";
 
 const TYPE_EMOJI: Record<ExerciseEntry["type"], string> = {
@@ -30,6 +29,7 @@ export function ExerciseDashboard({
   const stats = dashboard?.stats;
   const entries = dashboard?.entries ?? [];
   const byType = dashboard?.byType ?? {};
+  const activityTitle = range === "today" ? "Today's Activity" : "Activity";
 
   const breakdown = useMemo(() => {
     const rows = Object.entries(byType).sort(
@@ -42,6 +42,41 @@ export function ExerciseDashboard({
       percent: maxValue > 0 ? (count / maxValue) * 100 : 0,
     }));
   }, [byType]);
+
+  const totals = useMemo(() => {
+    const totalMinutes = entries.reduce(
+      (sum, entry) => sum + (entry.duration ?? 0),
+      0,
+    );
+    const moveCalories = entries.reduce(
+      (sum, entry) => sum + (entry.miles ?? 0) * 100,
+      0,
+    );
+    const derivedMove = moveCalories + (stats?.workoutCount ?? 0) * 150;
+    const minutes =
+      totalMinutes > 0 ? totalMinutes : (stats?.workoutCount ?? 0) * 30;
+    return {
+      move: derivedMove,
+      minutes,
+      miles: stats?.walkingMiles ?? 0,
+    };
+  }, [entries, stats]);
+
+  const activityDots = useMemo(() => {
+    const active = new Set(
+      entries.map((entry) => entry.timestamp.slice(0, 10)),
+    );
+    const today = new Date();
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() - (6 - index));
+      const key = date.toISOString().slice(0, 10);
+      return {
+        key,
+        isActive: active.has(key),
+      };
+    });
+  }, [entries]);
 
   return (
     <div className="life-dashboard life-exercise-dashboard">
@@ -72,31 +107,61 @@ export function ExerciseDashboard({
 
       {dashboard ? (
         <>
-          <div className="life-stat-grid">
-            <StatCard
-              label="Workouts"
-              value={stats ? String(stats.workoutCount) : "--"}
-            />
-            <StatCard
-              label="Walking"
-              value={stats ? `${stats.walkingMiles.toFixed(1)} mi` : "--"}
-            />
-            <StatCard
-              label="Active Days"
-              value={stats ? String(stats.activeDays) : "--"}
-            />
-            <StatCard
-              label="Streak"
-              value={stats ? `${stats.currentStreak} 🔥` : "--"}
-            />
-          </div>
+          <section className="life-card">
+            <div className="life-section-title">
+              Activity{" "}
+              <span className="exercise-streak">
+                🔥 {stats ? stats.currentStreak : 0} day streak
+              </span>
+            </div>
+            <div className="exercise-activity-row">
+              <div className="exercise-activity-label">Move</div>
+              <div className="exercise-activity-track">
+                <div
+                  className="exercise-activity-fill exercise-activity-fill--move"
+                  style={{ width: `${Math.min(100, (totals.move / 500) * 100)}%` }}
+                />
+              </div>
+              <div className="exercise-activity-value">
+                {totals.move.toFixed(0)} / 500 cal
+              </div>
+            </div>
+            <div className="exercise-activity-row">
+              <div className="exercise-activity-label">Exercise</div>
+              <div className="exercise-activity-track">
+                <div
+                  className="exercise-activity-fill exercise-activity-fill--exercise"
+                  style={{
+                    width: `${Math.min(100, (totals.minutes / 30) * 100)}%`,
+                  }}
+                />
+              </div>
+              <div className="exercise-activity-value">
+                {totals.minutes.toFixed(0)} / 30 min
+              </div>
+            </div>
+            <div className="exercise-activity-row">
+              <div className="exercise-activity-label">Miles</div>
+              <div className="exercise-activity-track">
+                <div
+                  className="exercise-activity-fill exercise-activity-fill--miles"
+                  style={{
+                    width: `${Math.min(100, (totals.miles / 4) * 100)}%`,
+                  }}
+                />
+              </div>
+              <div className="exercise-activity-value">
+                {totals.miles.toFixed(1)} / 4.0 mi
+              </div>
+            </div>
+          </section>
 
           <section className="life-section">
-            <div className="life-section-title">This Week</div>
+            <div className="life-section-title">{activityTitle}</div>
             {entries.length ? (
               <div className="life-list">
                 {entries.map((entry) => (
-                  <div key={entry.id} className="life-list-item">
+                  <div key={entry.id} className="life-card">
                     <div className="life-list-title">
                       {TYPE_EMOJI[entry.type]} {entry.description}
                     </div>
@@ -111,6 +176,18 @@ export function ExerciseDashboard({
             ) : (
               <div className="life-dashboard-status">No exercise logged yet.</div>
             )}
+          </section>
+
+          <section className="life-section">
+            <div className="life-section-title">This Week</div>
+            <div className="exercise-activity-dots">
+              {activityDots.map((dot) => (
+                <div
+                  key={dot.key}
+                  className={`exercise-activity-dot${dot.isActive ? " is-active" : ""}`}
+                />
+              ))}
+            </div>
           </section>
 
           <section className="life-section">

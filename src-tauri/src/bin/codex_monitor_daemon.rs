@@ -55,8 +55,8 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::process::Command;
 use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 use tokio::task;
-use uuid::Uuid;
 use utils::{git_env_path, resolve_git_binary};
+use uuid::Uuid;
 
 use auto_flush::{
     build_snapshot, parse_memory_flush_result, run_memory_flush_summarizer, write_memory_flush,
@@ -1177,7 +1177,11 @@ impl DaemonState {
         serde_json::to_value(dashboard).map_err(|err| err.to_string())
     }
 
-    async fn enrich_media_covers(&self, workspace_id: String) -> Result<Value, String> {
+    async fn enrich_media_covers(
+        &self,
+        workspace_id: String,
+        force: bool,
+    ) -> Result<Value, String> {
         let workspaces = self.workspaces.lock().await;
         let entry = workspaces
             .get(&workspace_id)
@@ -1188,12 +1192,19 @@ impl DaemonState {
         let igdb_client_id = resolve_api_key(settings.igdb_client_id.as_str(), "IGDB_CLIENT_ID");
         let igdb_client_secret =
             resolve_api_key(settings.igdb_client_secret.as_str(), "IGDB_CLIENT_SECRET");
+        let exa_api_key = if !settings.exa_api_key.trim().is_empty() {
+            Some(settings.exa_api_key.clone())
+        } else {
+            resolve_api_key("", "EXA_API_KEY")
+        };
         let summary = life::enrich_media_covers(
             &entry.path,
             entry.settings.obsidian_root.as_deref(),
             tmdb_key.as_deref(),
             igdb_client_id.as_deref(),
             igdb_client_secret.as_deref(),
+            exa_api_key.as_deref(),
+            force,
         )
         .await?;
         serde_json::to_value(summary).map_err(|err| err.to_string())
@@ -5074,7 +5085,11 @@ async fn handle_rpc_request(
         }
         "enrich_media_covers" => {
             let workspace_id = parse_string(&params, "workspaceId")?;
-            state.enrich_media_covers(workspace_id).await
+            let force = params
+                .get("force")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            state.enrich_media_covers(workspace_id, force).await
         }
         "get_finance_dashboard" => {
             let workspace_id = parse_string(&params, "workspaceId")?;

@@ -85,9 +85,7 @@ fn trigger_microphone_permission_request(tx: oneshot::Sender<Result<bool, String
 }
 
 #[cfg(target_os = "macos")]
-async fn request_microphone_permission_with_completion(
-    app: &AppHandle,
-) -> Result<bool, String> {
+async fn request_microphone_permission_with_completion(app: &AppHandle) -> Result<bool, String> {
     let (tx, rx) = oneshot::channel();
     let app_handle = app.clone();
     app_handle

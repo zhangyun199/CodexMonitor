@@ -159,6 +159,7 @@ pub(crate) async fn get_youtube_dashboard(
 #[tauri::command]
 pub(crate) async fn enrich_media_covers(
     workspace_id: String,
+    force: Option<bool>,
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<MediaCoverSummary, String> {
@@ -167,7 +168,7 @@ pub(crate) async fn enrich_media_covers(
             &*state,
             app,
             "enrich_media_covers",
-            json!({ "workspaceId": workspace_id }),
+            json!({ "workspaceId": workspace_id, "force": force.unwrap_or(false) }),
         )
         .await?;
         return serde_json::from_value(response).map_err(|err| err.to_string());
@@ -179,6 +180,12 @@ pub(crate) async fn enrich_media_covers(
     let igdb_client_id = resolve_api_key(settings.igdb_client_id.as_str(), "IGDB_CLIENT_ID");
     let igdb_client_secret =
         resolve_api_key(settings.igdb_client_secret.as_str(), "IGDB_CLIENT_SECRET");
+    let exa_api_key = if !settings.exa_api_key.trim().is_empty() {
+        Some(settings.exa_api_key.clone())
+    } else {
+        resolve_api_key("", "EXA_API_KEY")
+    };
+    let force_refresh = force.unwrap_or(false);
 
     enrich_media_covers_inner(
         &entry.path,
@@ -186,6 +193,8 @@ pub(crate) async fn enrich_media_covers(
         tmdb_key.as_deref(),
         igdb_client_id.as_deref(),
         igdb_client_secret.as_deref(),
+        exa_api_key.as_deref(),
+        force_refresh,
     )
     .await
 }

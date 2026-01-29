@@ -149,6 +149,7 @@ export type AppSettings = {
   tmdb_api_key?: string;
   igdb_client_id?: string;
   igdb_client_secret?: string;
+  exa_api_key?: string;
   memory_embedding_enabled?: boolean;
   autoMemory: AutoMemorySettings;
   composerEditorPreset: ComposerEditorPreset;

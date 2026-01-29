@@ -161,6 +161,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var tmdb_api_key: String?
     public var igdb_client_id: String?
     public var igdb_client_secret: String?
+    public var exa_api_key: String?
     public var memory_embedding_enabled: Bool?
     public var autoMemory: AutoMemorySettings
     public var composerEditorPreset: ComposerEditorPreset

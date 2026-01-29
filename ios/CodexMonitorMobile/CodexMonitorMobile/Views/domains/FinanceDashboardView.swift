@@ -10,14 +10,7 @@ struct FinanceDashboardView: View {
             VStack(spacing: 16) {
                 header
 
-                HStack(spacing: 12) {
-                    StatCardView(title: "Monthly Total", value: currency(store.financeDashboard?.stats.monthlyTotal))
-                    StatCardView(title: "Due Soon", value: "\(store.financeDashboard?.stats.dueSoonCount ?? 0)")
-                }
-
-                HStack(spacing: 12) {
-                    StatCardView(title: "Auto-Pay", value: "\(store.financeDashboard?.stats.autoPayCount ?? 0)")
-                }
+                summaryCard
 
                 HStack {
                     TimeRangePicker(selection: $timeRange)
@@ -51,14 +44,21 @@ struct FinanceDashboardView: View {
                         Text("Upcoming Bills")
                             .font(.headline)
                         ForEach(bills) { bill in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(shortDate(bill.nextDueDate)) \(bill.autoPay ? "🔄" : "•") \(bill.name)")
-                                    .font(.subheadline)
-                                Text("\(currency(bill.amount)) · \(bill.frequency)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                            GlassCardView {
+                                HStack(alignment: .top, spacing: 10) {
+                                    Circle()
+                                        .fill(isDueSoon(bill.nextDueDate) ? LifeColors.negative : Color.white.opacity(0.25))
+                                        .frame(width: 10, height: 10)
+                                        .padding(.top, 4)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("\(shortDate(bill.nextDueDate)) \(bill.autoPay ? "🔄" : "•") \(bill.name)")
+                                            .font(.subheadline)
+                                        Text("\(currency(bill.amount)) · \(bill.frequency) · \(daysUntil(bill.nextDueDate))d")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                             }
-                            Divider()
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -68,36 +68,80 @@ struct FinanceDashboardView: View {
                 }
 
                 if let categories = store.financeDashboard?.byCategory, !categories.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("By Category")
-                            .font(.headline)
-                        ForEach(categoryRows(categories), id: \.name) { row in
-                            HStack {
-                                Text(row.name)
-                                    .frame(width: 120, alignment: .leading)
-                                GeometryReader { proxy in
-                                    Capsule()
-                                        .fill(Color.orange.opacity(0.6))
-                                        .frame(width: proxy.size.width * row.percent, height: 6)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                    GlassCardView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Spending by Category")
+                                .font(.headline)
+                            ForEach(categoryRows(categories), id: \.name) { row in
+                                HStack {
+                                    Text(row.name)
+                                        .frame(width: 120, alignment: .leading)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    ProgressBarView(progress: row.percent, color: Color.white.opacity(0.7), height: 6)
+                                    Text(currency(row.amount))
+                                        .frame(width: 80, alignment: .trailing)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
-                                .frame(height: 8)
-                                Text(currency(row.amount))
-                                    .frame(width: 80, alignment: .trailing)
                             }
-                            .font(.caption)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    Text("No category totals yet.")
-                        .foregroundStyle(.secondary)
                 }
             }
             .padding()
         }
         .task(id: timeRange) {
             await store.fetchFinanceDashboard(range: timeRange)
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("💸 Finance Dashboard")
+                .font(.headline)
+            if let meta = store.financeDashboard?.meta {
+                Text("\(meta.periodStart) → \(meta.periodEnd)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var summaryCard: some View {
+        let stats = store.financeDashboard?.stats
+        return GlassCardView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Monthly Summary")
+                    .font(.headline)
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Total Due")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(currency(stats?.monthlyTotal))
+                            .font(.headline)
+                    }
+                    Spacer()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Due Soon")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("\(stats?.dueSoonCount ?? 0)")
+                            .font(.headline)
+                    }
+                    Spacer()
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Auto‑Pay")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("\(stats?.autoPayCount ?? 0)")
+                            .font(.headline)
+                    }
+                }
+            }
         }
     }
 
@@ -116,25 +160,24 @@ struct FinanceDashboardView: View {
         return value
     }
 
+    private func daysUntil(_ value: String) -> Int {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: value) else { return 0 }
+        let diff = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0
+        return max(0, diff)
+    }
+
+    private func isDueSoon(_ value: String) -> Bool {
+        daysUntil(value) <= 7
+    }
+
     private func categoryRows(_ categories: [String: Double]) -> [CategoryRow] {
         let rows = categories.sorted { $0.key < $1.key }
         let maxValue = max(1, rows.map { $0.value }.max() ?? 1)
         return rows.map { (name, amount) in
             CategoryRow(name: name, amount: amount, percent: amount / maxValue)
         }
-    }
-
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("💸 Finance Dashboard")
-                .font(.headline)
-            if let meta = store.financeDashboard?.meta {
-                Text("\(meta.periodStart) → \(meta.periodEnd)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

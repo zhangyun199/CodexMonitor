@@ -151,8 +151,9 @@ export async function getFinanceDashboard(
 
 export async function enrichMediaCovers(
   workspaceId: string,
+  force = false,
 ): Promise<MediaCoverSummary> {
-  return invoke<MediaCoverSummary>("enrich_media_covers", { workspaceId });
+  return invoke<MediaCoverSummary>("enrich_media_covers", { workspaceId, force });
 }
 
 export async function addWorkspace(

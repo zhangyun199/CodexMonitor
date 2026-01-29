@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import type { LifeTimeRange } from "../../types";
 import { useDeliveryDashboard } from "../../hooks/useDeliveryDashboard";
-import { StatCard } from "../shared/StatCard";
 import { TimeRangeSelector } from "../shared/TimeRangeSelector";
 
 type DeliveryDashboardProps = {
@@ -24,10 +23,8 @@ export function DeliveryDashboard({
   const orders = dashboard?.orders ?? [];
   const topMerchants = dashboard?.topMerchants ?? [];
 
-  const earnings = useMemo(
-    () => (stats ? `$${stats.totalEarnings.toFixed(2)}` : "--"),
-    [stats],
-  );
+  const earningsValue = stats?.totalEarnings ?? 0;
+  const earnings = stats ? `$${stats.totalEarnings.toFixed(2)}` : "--";
   const ordersCount = stats ? String(stats.orderCount) : "--";
   const hourlyRate = stats ? `$${stats.hourlyRate.toFixed(2)}` : "--";
   const perMile = stats ? `$${stats.perMileRate.toFixed(2)}` : "--";
@@ -37,6 +34,18 @@ export function DeliveryDashboard({
       : "--";
   const whales =
     stats?.whaleCatches !== undefined ? String(stats.whaleCatches) : "--";
+  const totalMiles = useMemo(() => {
+    if (stats?.totalMiles !== undefined) {
+      return stats.totalMiles;
+    }
+    return orders.reduce((sum, order) => sum + (order.miles ?? 0), 0);
+  }, [orders, stats]);
+  const goal = 150;
+  const progress = Math.min(100, (earningsValue / goal) * 100);
+  const recentOrders = useMemo(
+    () => orders.slice(-6).reverse(),
+    [orders],
+  );
 
   return (
     <div className="life-dashboard life-delivery-dashboard">
@@ -67,13 +76,56 @@ export function DeliveryDashboard({
 
       {dashboard ? (
         <>
-          <div className="life-stat-grid">
-            <StatCard label="Earnings" value={earnings} />
-            <StatCard label="Orders" value={ordersCount} />
-            <StatCard label="$/hr" value={hourlyRate} />
-            <StatCard label="$/mi" value={perMile} />
-            <StatCard label="AR" value={arLabel} />
-            <StatCard label="Whales" value={whales} />
+          <section className="life-card delivery-hero">
+            <div className="delivery-hero-earnings">{earnings}</div>
+            <div className="delivery-goal-progress">
+              <div
+                className="delivery-goal-progress-fill"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="delivery-goal-meta">
+              {progress.toFixed(0)}% of ${goal} goal
+            </div>
+          </section>
+
+          <div className="delivery-compact-stats">
+            <div className="life-card">
+              <div className="delivery-stat-label">$/hr</div>
+              <div className="delivery-stat-value delivery-stat-value--time">
+                {hourlyRate}
+              </div>
+            </div>
+            <div className="life-card">
+              <div className="delivery-stat-label">Orders</div>
+              <div className="delivery-stat-value delivery-stat-value--count">
+                {ordersCount}
+              </div>
+            </div>
+            <div className="life-card">
+              <div className="delivery-stat-label">Miles</div>
+              <div className="delivery-stat-value delivery-stat-value--neutral">
+                {totalMiles ? `${totalMiles.toFixed(1)} mi` : "--"}
+              </div>
+            </div>
+            <div className="life-card">
+              <div className="delivery-stat-label">$/mi</div>
+              <div className="delivery-stat-value delivery-stat-value--neutral">
+                {perMile}
+              </div>
+            </div>
+            <div className="life-card">
+              <div className="delivery-stat-label">AR</div>
+              <div className="delivery-stat-value delivery-stat-value--neutral">
+                {arLabel}
+              </div>
+            </div>
+            <div className="life-card">
+              <div className="delivery-stat-label">Whales</div>
+              <div className="delivery-stat-value delivery-stat-value--neutral">
+                {whales}
+              </div>
+            </div>
           </div>
 
           <section className="life-section">
@@ -81,7 +133,7 @@ export function DeliveryDashboard({
             {topMerchants.length ? (
               <div className="life-merchant-grid">
                 {topMerchants.map((merchant) => (
-                  <div key={merchant.merchantName} className="life-merchant-card">
+                  <div key={merchant.merchantName} className="life-card">
                     <div className="life-merchant-name">{merchant.merchantName}</div>
                     <div className="life-merchant-meta">
                       {merchant.orderCount} orders · ${merchant.totalEarnings.toFixed(2)}
@@ -95,25 +147,17 @@ export function DeliveryDashboard({
           </section>
 
           <section className="life-section">
-            <div className="life-section-title">Orders</div>
-            {orders.length ? (
-              <div className="life-table">
-                <div className="life-table-row life-table-header">
-                  <div>Time</div>
-                  <div>Merchant</div>
-                  <div>Payout</div>
-                  <div>Miles</div>
-                  <div>App</div>
-                  <div>Notes</div>
-                </div>
-                {orders.map((order) => (
-                  <div key={order.id} className="life-table-row">
-                    <div>{order.startedAt.slice(11, 16)}</div>
-                    <div>{order.merchantName}</div>
-                    <div>${order.payout.toFixed(2)}</div>
-                    <div>{order.miles ? order.miles.toFixed(1) : "--"}</div>
-                    <div>{order.platform ?? "--"}</div>
-                    <div>{order.notes ?? ""}</div>
+            <div className="life-section-title">Recent Orders</div>
+            {recentOrders.length ? (
+              <div className="life-list">
+                {recentOrders.map((order) => (
+                  <div key={order.id} className="life-card">
+                    <div className="life-list-title">{order.merchantName}</div>
+                    <div className="life-list-meta">
+                      {order.startedAt.slice(11, 16)} · ${order.payout.toFixed(2)}
+                      {order.miles ? ` · ${order.miles.toFixed(1)} mi` : ""}
+                      {order.platform ? ` · ${order.platform}` : ""}
+                    </div>
                   </div>
                 ))}
               </div>

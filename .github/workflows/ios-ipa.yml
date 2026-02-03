@@ -1,0 +1,44 @@
+name: iOS IPA (Unsigned Artifact)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Build iOS archive (no signing)
+        run: |
+          cd ios/CodexMonitorMobile
+          xcodebuild \
+            -project CodexMonitorMobile.xcodeproj \
+            -scheme CodexMonitorMobile \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/CodexMonitorMobile.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            archive
+      - name: Package unsigned IPA (zip Payload/*.app)
+        run: |
+          cd ios/CodexMonitorMobile
+          mkdir -p build/export/Payload
+          cp -R "build/CodexMonitorMobile.xcarchive/Products/Applications/CodexMonitorMobile.app" "build/export/Payload/"
+          (cd build/export && zip -qry "CodexMonitorMobile-unsigned.ipa" Payload)
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodexMonitorMobile-ipa
+          path: ios/CodexMonitorMobile/build/export/*.ipa
+          if-no-files-found: error

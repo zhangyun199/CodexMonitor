@@ -25,6 +25,7 @@ jobs:
       - name: Generate Xcode project
         run: |
           cd ios/CodexMonitorMobile
+          rm -rf CodexMonitorMobile.xcodeproj
           xcodegen generate
 
       - name: Build iOS archive (no signing)

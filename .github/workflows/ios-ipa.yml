@@ -27,6 +27,7 @@ jobs:
           cd ios/CodexMonitorMobile
           rm -rf CodexMonitorMobile.xcodeproj
           xcodegen generate
+          /usr/libexec/PlistBuddy -c 'Print :objectVersion' CodexMonitorMobile.xcodeproj/project.pbxproj
 
       - name: Build iOS archive (no signing)
         run: |

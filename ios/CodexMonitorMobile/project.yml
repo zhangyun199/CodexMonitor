@@ -1,7 +1,7 @@
 name: CodexMonitorMobile
 options:
   deploymentTarget:
-    iOS: "17.0"
+    iOS: "26.0"
   createIntermediateGroups: true
 settings:
   base:
@@ -10,7 +10,7 @@ targets:
   CodexMonitorMobile:
     type: application
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "26.0"
     sources:
       - path: CodexMonitorMobile
     settings:

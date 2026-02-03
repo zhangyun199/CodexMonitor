@@ -17,6 +17,16 @@ jobs:
           sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
 
+      - name: Install XcodeGen
+        run: |
+          brew update
+          brew install xcodegen
+
+      - name: Generate Xcode project
+        run: |
+          cd ios/CodexMonitorMobile
+          xcodegen generate
+
       - name: Build iOS archive (no signing)
         run: |
           cd ios/CodexMonitorMobile
